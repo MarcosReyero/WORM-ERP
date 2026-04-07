@@ -160,13 +160,19 @@ export function InventoryMovementsPage() {
     ? articles
         .filter((article) => articleMatchesQuery(article, deferredArticleQuery))
         .sort(sortArticlesForOverview)
-        .slice(0, 8)
+        .slice(0, 5)
     : []
   const visibleMovements = movements
     .filter((movement) => movementMatchesQuery(movement, deferredQuery))
     .filter((movement) =>
       movementTypeFilter === 'all' ? true : movement.movement_type === movementTypeFilter,
     )
+  const canSubmitMovement =
+    permissions.can_record_movement &&
+    busyAction !== 'movement' &&
+    Boolean(movementForm.article_id) &&
+    Boolean(movementForm.quantity) &&
+    !unsupportedMovementMessage
 
   async function handleMovementSubmit(event) {
     event.preventDefault()
@@ -191,6 +197,14 @@ export function InventoryMovementsPage() {
       ...current,
       movement_type: MOVEMENT_MODE_CONFIG[mode].defaultType,
     }))
+  }
+
+  function selectMovementArticle(article) {
+    setMovementForm((current) => ({
+      ...current,
+      article_id: String(article.id),
+    }))
+    setArticleSearch(`${article.internal_code} ${article.name}`)
   }
 
   return (
@@ -293,17 +307,14 @@ export function InventoryMovementsPage() {
         </section>
       ) : (
         <section className="module-page-stack">
-          <ModuleTableSection
-            description={movementModeConfig.description}
-            title={movementModeConfig.title}
-          >
+          <ModuleTableSection className="movement-register-table">
             <form className="ops-form movement-form" onSubmit={handleMovementSubmit}>
-              <div className="movement-register-layout">
-                <aside className="movement-register-sidebar">
-                  <section className="movement-register-section">
-                    <div className="movement-register-section-head">
+              <div className="movement-workbench">
+                <section className="movement-command-bar">
+                  <article className="movement-panel movement-panel--mode">
+                    <div className="movement-panel-head">
                       <strong>Operacion</strong>
-                      <p>Define si vas a registrar una salida o un ingreso.</p>
+                      <p>{movementModeConfig.description}</p>
                     </div>
                     <div className="movement-mode-switch" role="tablist" aria-label="Tipo de operacion">
                       {Object.entries(MOVEMENT_MODE_CONFIG).map(([mode, config]) => (
@@ -319,114 +330,144 @@ export function InventoryMovementsPage() {
                         </button>
                       ))}
                     </div>
-                  </section>
+                  </article>
 
-                  <section className="movement-register-section">
-                    <div className="movement-register-section-head">
-                      <strong>Buscar articulo</strong>
-                      <p>La lista aparece solo cuando escribes.</p>
+                  <article className="movement-panel movement-panel--search">
+                    <div className="movement-panel-head">
+                      <strong>Articulo</strong>
+                      <p>Busca por nombre o codigo y selecciona lo que vas a mover.</p>
                     </div>
-                    <div className="movement-article-search">
-                      <label>
-                        Buscar articulo
-                        <div className="movement-search-input">
-                          <SearchIcon />
-                          <input
-                            onChange={(event) => setArticleSearch(event.target.value)}
-                            placeholder={movementModeConfig.searchPlaceholder}
-                            type="search"
-                            value={articleSearch}
-                          />
+                    <label className="movement-search-field" htmlFor="movement-article-search">
+                      Buscar articulo
+                    </label>
+                    <div className="movement-search-input">
+                      <SearchIcon />
+                      <input
+                        id="movement-article-search"
+                        onChange={(event) => setArticleSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                          }
+                        }}
+                        placeholder={movementModeConfig.searchPlaceholder}
+                        type="search"
+                        value={articleSearch}
+                      />
+                    </div>
+
+                    {deferredArticleQuery ? (
+                      suggestedArticles.length ? (
+                        <div className="movement-picker-results" role="listbox">
+                          {suggestedArticles.map((article) => (
+                            <button
+                              className={`movement-picker-item ${
+                                String(article.id) === String(movementForm.article_id)
+                                  ? 'is-selected'
+                                  : ''
+                              }`}
+                              key={article.id}
+                              onClick={() => selectMovementArticle(article)}
+                              type="button"
+                            >
+                              <div className="movement-picker-copy">
+                                <strong>{article.name}</strong>
+                                <p>{article.internal_code}</p>
+                              </div>
+                              <div className="movement-picker-meta">
+                                <span className={`status-pill ${getArticleStockTone(article)}`}>
+                                  {getArticleStockLabel(article)}
+                                </span>
+                                <small>{formatQuantity(article.available_stock)} disp.</small>
+                              </div>
+                            </button>
+                          ))}
                         </div>
-                      </label>
-                    </div>
-
-                    <div className="movement-picker-results">
-                      {!deferredArticleQuery ? (
-                        <p className="module-empty-copy">Escribe para buscar un articulo.</p>
-                      ) : suggestedArticles.length ? (
-                        suggestedArticles.map((article) => (
-                          <button
-                            className={`movement-picker-item ${
-                              String(article.id) === String(movementForm.article_id) ? 'is-selected' : ''
-                            }`}
-                            key={article.id}
-                            onClick={() => {
-                              setMovementForm((current) => ({
-                                ...current,
-                                article_id: String(article.id),
-                              }))
-                              setArticleSearch(`${article.internal_code} ${article.name}`)
-                            }}
-                            type="button"
-                          >
-                            <div className="movement-picker-copy">
-                              <strong>{article.name}</strong>
-                              <p>{article.internal_code}</p>
-                            </div>
-                            <div className="movement-picker-meta">
-                              <span className={`status-pill ${getArticleStockTone(article)}`}>
-                                {getArticleStockLabel(article)}
-                              </span>
-                              <small>{formatQuantity(article.available_stock)} disp.</small>
-                            </div>
-                          </button>
-                        ))
                       ) : (
-                        <p className="module-empty-copy">No se encontraron articulos con esa busqueda.</p>
-                      )}
-                    </div>
-                  </section>
-                </aside>
-
-                <div className="movement-register-main">
-                  <section className="movement-register-section">
-                    <div className="movement-register-section-head">
-                      <strong>Articulo seleccionado</strong>
-                      <p>Resumen operativo del item sobre el que vas a trabajar.</p>
-                    </div>
-
-                    {selectedMovementArticle ? (
-                      <div className="movement-selected-article">
-                        <div className="movement-selected-head">
-                          <div>
-                            <strong>{selectedMovementArticle.name}</strong>
-                            <p>
-                              {selectedMovementArticle.internal_code} / {selectedMovementArticle.article_type_label}
-                            </p>
-                          </div>
-                          <span className={`status-pill ${getArticleStockTone(selectedMovementArticle)}`}>
-                            {getArticleStockLabel(selectedMovementArticle)}
-                          </span>
-                        </div>
-                        <div className="movement-selected-grid">
-                          <article>
-                            <span>Stock actual</span>
-                            <strong>{formatQuantity(selectedMovementArticle.current_stock)}</strong>
-                          </article>
-                          <article>
-                            <span>Disponible</span>
-                            <strong>{formatQuantity(selectedMovementArticle.available_stock)}</strong>
-                          </article>
-                          <article>
-                            <span>Ubicacion base</span>
-                            <strong>{selectedMovementArticle.primary_location || '-'}</strong>
-                          </article>
-                        </div>
-                      </div>
+                        <p className="module-empty-copy">
+                          No se encontraron articulos con esa busqueda.
+                        </p>
+                      )
                     ) : (
-                      <p className="module-empty-copy">Busca y selecciona un articulo para continuar.</p>
+                      <p className="module-empty-copy movement-search-helper">
+                        Escribe para ver sugerencias al instante.
+                      </p>
                     )}
-                  </section>
+                  </article>
 
-                  <section className="movement-register-section">
-                    <div className="movement-register-section-head">
-                      <strong>Datos del movimiento</strong>
-                      <p>Carga solo los datos necesarios para este tipo de operacion.</p>
+                  <article className="movement-panel movement-panel--action">
+                    <div className="movement-panel-head">
+                      <strong>Registrar</strong>
+                      <p>La accion principal siempre queda visible en esta zona.</p>
+                    </div>
+                    <div className="movement-action-summary">
+                      <span>Articulo</span>
+                      <strong>
+                        {selectedMovementArticle ? selectedMovementArticle.name : 'Sin seleccionar'}
+                      </strong>
+                      <p>
+                        {selectedMovementArticle
+                          ? `${selectedMovementArticle.internal_code} · ${movementModeConfig.label}`
+                          : 'Elige un articulo y completa la cantidad para habilitar el registro.'}
+                      </p>
                     </div>
 
-                    <div className="field-grid">
-                      <label>
+                    {unsupportedMovementMessage ? (
+                      <div className="form-error">{unsupportedMovementMessage}</div>
+                    ) : null}
+
+                    <PanelMessage error={movementFeedback.error} success={movementFeedback.success} />
+
+                    <button
+                      className="primary-button"
+                      disabled={!canSubmitMovement}
+                      type="submit"
+                    >
+                      {busyAction === 'movement' ? 'Registrando...' : movementModeConfig.submitLabel}
+                    </button>
+                  </article>
+                </section>
+
+                <section className="movement-panel movement-panel--form">
+                  <div className="movement-panel-head">
+                    <strong>Completar movimiento</strong>
+                    <p>Carga el contexto y los datos operativos desde un solo bloque.</p>
+                  </div>
+
+                  {selectedMovementArticle ? (
+                    <div className="movement-selected-article">
+                      <div className="movement-selected-head">
+                        <div>
+                          <strong>{selectedMovementArticle.name}</strong>
+                          <p>
+                            {selectedMovementArticle.internal_code} / {selectedMovementArticle.article_type_label}
+                          </p>
+                        </div>
+                        <span className={`status-pill ${getArticleStockTone(selectedMovementArticle)}`}>
+                          {getArticleStockLabel(selectedMovementArticle)}
+                        </span>
+                      </div>
+                      <div className="movement-selected-grid">
+                        <article>
+                          <span>Stock actual</span>
+                          <strong>{formatQuantity(selectedMovementArticle.current_stock)}</strong>
+                        </article>
+                        <article>
+                          <span>Disponible</span>
+                          <strong>{formatQuantity(selectedMovementArticle.available_stock)}</strong>
+                        </article>
+                        <article>
+                          <span>Ubicacion base</span>
+                          <strong>{selectedMovementArticle.primary_location || '-'}</strong>
+                        </article>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="module-empty-copy">Busca y selecciona un articulo para continuar.</p>
+                  )}
+
+                  <div className="movement-form-fields">
+                    <label className="movement-form-field">
                         Cantidad
                         <input
                           onChange={(event) =>
@@ -440,7 +481,7 @@ export function InventoryMovementsPage() {
                       </label>
 
                       {movementUsesSource(movementForm.movement_type) ? (
-                        <label>
+                        <label className="movement-form-field">
                           Origen fisico
                           <select
                             onChange={(event) =>
@@ -462,7 +503,7 @@ export function InventoryMovementsPage() {
                       ) : null}
 
                       {movementUsesTarget(movementForm.movement_type) ? (
-                        <label>
+                        <label className="movement-form-field">
                           Destino fisico
                           <select
                             onChange={(event) =>
@@ -485,7 +526,7 @@ export function InventoryMovementsPage() {
 
                       {movementUsesReceiver(movementForm.movement_type) ? (
                         <>
-                          <label>
+                          <label className="movement-form-field">
                             Sector destino
                             <select
                               onChange={(event) =>
@@ -501,7 +542,7 @@ export function InventoryMovementsPage() {
                               ))}
                             </select>
                           </label>
-                          <label>
+                          <label className="movement-form-field">
                             Persona
                             <select
                               onChange={(event) =>
@@ -522,7 +563,7 @@ export function InventoryMovementsPage() {
 
                       {selectedMovementArticle?.requires_lot ? (
                         <>
-                          <label>
+                          <label className="movement-form-field">
                             Lote
                             <input
                               onChange={(event) =>
@@ -532,7 +573,7 @@ export function InventoryMovementsPage() {
                             />
                           </label>
                           {selectedMovementArticle.requires_expiry ? (
-                            <label>
+                            <label className="movement-form-field">
                               Vencimiento
                               <input
                                 onChange={(event) =>
@@ -549,7 +590,7 @@ export function InventoryMovementsPage() {
                         </>
                       ) : null}
 
-                      <label className="field-span-2">
+                      <label className="movement-form-field movement-form-field--wide">
                         Motivo
                         <input
                           onChange={(event) =>
@@ -567,7 +608,7 @@ export function InventoryMovementsPage() {
                         />
                       </label>
 
-                      <label className="field-span-2">
+                      <label className="movement-form-field movement-form-field--wide">
                         Observaciones
                         <input
                           onChange={(event) =>
@@ -577,34 +618,18 @@ export function InventoryMovementsPage() {
                           value={movementForm.notes}
                         />
                       </label>
-                    </div>
-                  </section>
+                  </div>
 
-                  <section className="movement-register-section movement-register-actions">
-                    <div className="movement-register-section-head">
-                      <strong>Accion</strong>
-                      <p>Revisa el contexto y confirma el movimiento.</p>
-                    </div>
-
-                    {unsupportedMovementMessage ? (
-                      <div className="form-error">{unsupportedMovementMessage}</div>
-                    ) : null}
-
-                    <PanelMessage error={movementFeedback.error} success={movementFeedback.success} />
-
+                  <div className="movement-mobile-action">
                     <button
                       className="primary-button"
-                      disabled={
-                        !permissions.can_record_movement ||
-                        busyAction === 'movement' ||
-                        Boolean(unsupportedMovementMessage)
-                      }
+                      disabled={!canSubmitMovement}
                       type="submit"
                     >
                       {busyAction === 'movement' ? 'Registrando...' : movementModeConfig.submitLabel}
                     </button>
-                  </section>
-                </div>
+                  </div>
+                </section>
               </div>
             </form>
           </ModuleTableSection>

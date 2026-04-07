@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     article_detail,
+    article_export_excel,
     article_import_excel,
     articles,
     balances,
@@ -15,6 +16,7 @@ from .views import (
     discrepancies,
     discrepancy_resolve,
     inventory_safety_alerts,
+    inventory_minimum_stock_digest,
     inventory_overview,
     inventory_alarms,
     movements,
@@ -25,6 +27,7 @@ urlpatterns = [
     path("dashboard/", dashboard, name="dashboard"),
     path("catalogs/", catalogs, name="catalogs"),
     path("articles/", articles, name="articles"),
+    path("articles/export-excel/", article_export_excel, name="article-export-excel"),
     path("articles/import-excel/", article_import_excel, name="article-import-excel"),
     path("articles/<int:article_id>/", article_detail, name="article-detail"),
     path("balances/", balances, name="balances"),
@@ -39,5 +42,6 @@ urlpatterns = [
     path("discrepancies/<int:discrepancy_id>/resolve/", discrepancy_resolve, name="discrepancy-resolve"),
     path("inventory/alarms/", inventory_alarms, name="inventory-alarms"),
     path("inventory/safety-alerts/", inventory_safety_alerts, name="inventory-safety-alerts"),
+    path("inventory/minimum-stock-digest/", inventory_minimum_stock_digest, name="inventory-minimum-stock-digest"),
     path("inventory/overview/", inventory_overview, name="inventory-overview"),
 ]

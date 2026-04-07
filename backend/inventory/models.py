@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import FileExtensionValidator
+from datetime import time
+
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -389,11 +391,109 @@ class SafetyStockAlertRule(AuditedModel):
     def __str__(self):
         return f"Alarma {self.article.internal_code}"
 
-    def clean(self):
-        if self.article.safety_stock is None:
-            raise ValidationError(
-                {"article": "El articulo debe tener stock de seguridad para usar alarmas automaticas."}
-            )
+
+class MinimumStockDigestConfig(AuditedModel):
+    class Frequency(models.TextChoices):
+        DAILY = "daily", "Diario"
+        WEEKLY = "weekly", "Semanal"
+
+    class DeliveryStatus(models.TextChoices):
+        NEVER = "never", "Sin ejecuciones"
+        SUCCESS = "success", "Enviado"
+        WARNING = "warning", "Con advertencias"
+        ERROR = "error", "Error"
+        SKIPPED = "skipped", "Sin envio"
+
+    key = models.CharField(max_length=32, unique=True, default="default")
+    is_enabled = models.BooleanField(default=True)
+    frequency = models.CharField(
+        max_length=16,
+        choices=Frequency.choices,
+        default=Frequency.DAILY,
+    )
+    run_at = models.TimeField(default=time(8, 0))
+    run_weekday = models.PositiveSmallIntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(6)],
+    )
+    recipients = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="inventory_minimum_stock_digest_configs",
+    )
+    additional_emails = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    last_notified_at = models.DateTimeField(null=True, blank=True)
+    last_email_error = models.TextField(blank=True)
+    last_summary_count = models.PositiveIntegerField(null=True, blank=True)
+    last_period_key = models.CharField(max_length=64, blank=True)
+    inflight_period_key = models.CharField(max_length=64, blank=True)
+    inflight_started_at = models.DateTimeField(null=True, blank=True)
+    last_delivery_status = models.CharField(
+        max_length=16,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.NEVER,
+    )
+    last_recipient_warning = models.TextField(blank=True)
+    force_send_next = models.BooleanField(
+        default=False,
+        help_text="Marca para forzar el envío en el próximo ciclo (se auto-resetea después)",
+    )
+
+    class Meta:
+        ordering = ["key"]
+        verbose_name = "Resumen periodico de stock minimo"
+        verbose_name_plural = "Resumenes periodicos de stock minimo"
+
+    def __str__(self):
+        return "Resumen periodico de stock minimo"
+
+
+class InventoryAutomationTaskState(AuditedModel):
+    class RuntimeState(models.TextChoices):
+        IDLE = "idle", "Inactiva"
+        RUNNING = "running", "En ejecucion"
+        DISABLED = "disabled", "Deshabilitada"
+
+    class LastRunStatus(models.TextChoices):
+        NEVER = "never", "Sin ejecuciones"
+        SUCCESS = "success", "Correcta"
+        WARNING = "warning", "Con advertencias"
+        ERROR = "error", "Error"
+        SKIPPED = "skipped", "Sin trabajo"
+
+    key = models.CharField(max_length=48, unique=True)
+    runtime_state = models.CharField(
+        max_length=16,
+        choices=RuntimeState.choices,
+        default=RuntimeState.IDLE,
+    )
+    owner_token = models.CharField(max_length=80, blank=True)
+    owner_label = models.CharField(max_length=160, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    last_started_at = models.DateTimeField(null=True, blank=True)
+    last_finished_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_warning_at = models.DateTimeField(null=True, blank=True)
+    last_error_at = models.DateTimeField(null=True, blank=True)
+    last_run_status = models.CharField(
+        max_length=16,
+        choices=LastRunStatus.choices,
+        default=LastRunStatus.NEVER,
+    )
+    last_error_message = models.TextField(blank=True)
+    last_warning_message = models.TextField(blank=True)
+    run_count = models.PositiveIntegerField(default=0)
+    last_processed_count = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["key"]
+        verbose_name = "Estado de automatizacion de inventario"
+        verbose_name_plural = "Estados de automatizacion de inventario"
+
+    def __str__(self):
+        return self.key
 
 
 class InventoryBatch(AuditedModel):

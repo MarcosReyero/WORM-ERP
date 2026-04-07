@@ -1,6 +1,7 @@
 import { useDeferredValue, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { createCheckout, returnCheckout } from '../../lib/api.js'
+import { SearchSelect } from '../SearchSelect.jsx'
 import {
   ModuleActionPanel,
   ModuleEmptyState,
@@ -199,64 +200,58 @@ export function InventoryCheckoutsPage() {
         >
           <form className="ops-form" onSubmit={handleCheckoutSubmit}>
             <div className="field-grid">
-              <label>
+              <label className="field-span-2">
                 Unidad
-                <select
-                  onChange={(event) =>
-                    setCheckoutForm((current) => ({
-                      ...current,
-                      tracked_unit_id: event.target.value,
-                    }))
-                  }
+                <SearchSelect
+                  options={availableUnits.map((unit) => ({
+                    id: unit.id,
+                    label: `${unit.internal_tag} - ${unit.article}`,
+                  }))}
                   value={checkoutForm.tracked_unit_id}
-                >
-                  <option value="">Seleccionar</option>
-                  {availableUnits.map((unit) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.internal_tag} - {unit.article}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) =>
+                    setCheckoutForm((current) => ({
+                      ...current,
+                      tracked_unit_id: id,
+                    }))
+                  }
+                  placeholder="Buscar unidad..."
+                />
               </label>
-              <label>
+              <label className="field-span-2">
                 Persona
-                <select
-                  onChange={(event) =>
-                    setCheckoutForm((current) => ({
-                      ...current,
-                      receiver_person_id: event.target.value,
-                    }))
-                  }
+                <SearchSelect
+                  options={catalogs.people.map((item) => ({
+                    id: item.id,
+                    label: item.full_name,
+                  }))}
                   value={checkoutForm.receiver_person_id}
-                >
-                  <option value="">Sin persona</option>
-                  {catalogs.people.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.full_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Sector
-                <select
-                  onChange={(event) =>
+                  onChange={(id) =>
                     setCheckoutForm((current) => ({
                       ...current,
-                      receiver_sector_id: event.target.value,
+                      receiver_person_id: id,
                     }))
                   }
-                  value={checkoutForm.receiver_sector_id}
-                >
-                  <option value="">Sin sector</option>
-                  {catalogs.sectors.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Buscar persona..."
+                />
               </label>
-              <label>
+              <label className="field-span-2">
+                Sector
+                <SearchSelect
+                  options={catalogs.sectors.map((item) => ({
+                    id: item.id,
+                    label: item.name,
+                  }))}
+                  value={checkoutForm.receiver_sector_id}
+                  onChange={(id) =>
+                    setCheckoutForm((current) => ({
+                      ...current,
+                      receiver_sector_id: id,
+                    }))
+                  }
+                  placeholder="Buscar sector..."
+                />
+              </label>
+              <label className="field-span-2">
                 Devolucion estimada
                 <input
                   onChange={(event) =>

@@ -1,7 +1,9 @@
 import json
+import logging
 import re
 import unicodedata
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -12,7 +14,9 @@ from django.db import transaction
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from openpyxl import load_workbook
+from django.utils.dateparse import parse_time
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils import get_column_letter
 
 from accounts.models import UserProfile
 from communications.services import (
@@ -23,6 +27,16 @@ from communications.services import (
     user_unread_message_count,
 )
 
+from .automation import (
+    TASK_KEY_MINIMUM_STOCK_DIGEST,
+    TASK_KEY_MINIMUM_STOCK_RECONCILE,
+    TASK_KEY_SCHEDULER,
+    ensure_automation_task_states,
+    get_automation_task_state,
+    get_minimum_stock_digest_due_context,
+    mark_minimum_stock_digest_result,
+    serialize_automation_task_state,
+)
 from .models import (
     Article,
     ArticleCategory,
@@ -30,6 +44,7 @@ from .models import (
     InventoryBalance,
     InventoryBatch,
     Location,
+    MinimumStockDigestConfig,
     Person,
     PhysicalCountSession,
     SafetyStockAlertRule,
@@ -41,6 +56,9 @@ from .models import (
     TrackedUnit,
     UnitOfMeasure,
 )
+
+
+DIGEST_AUTOMATION_LOGGER = logging.getLogger("inventory.automation.digest")
 
 
 class InventoryApiError(Exception):
@@ -233,6 +251,23 @@ def clean_casefold(value):
     return clean_string(value).casefold()
 
 
+def normalize_search_text(value):
+    normalized = unicodedata.normalize("NFD", str(value or ""))
+    ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"\s+", " ", ascii_only).casefold().strip()
+
+
+def build_search_target(values):
+    return normalize_search_text(" ".join(str(value) for value in values if value))
+
+
+def matches_normalized_query(target, query):
+    normalized_query = normalize_search_text(query)
+    if not normalized_query:
+        return True
+    return all(term in target for term in normalized_query.split())
+
+
 def parse_email_list(value):
     raw_value = str(value or "")
     if not raw_value.strip():
@@ -253,6 +288,49 @@ def parse_email_list(value):
         seen.add(email)
         emails.append(email)
     return emails
+
+
+def split_email_list(value):
+    raw_value = str(value or "")
+    if not raw_value.strip():
+        return [], []
+
+    valid_emails = []
+    invalid_emails = []
+    seen = set()
+    for item in re.split(r"[,\n;]+", raw_value):
+        email = clean_string(item).lower()
+        if not email:
+            continue
+        try:
+            validate_email(email)
+        except ValidationError:
+            invalid_emails.append(email)
+            continue
+        if email in seen:
+            continue
+        seen.add(email)
+        valid_emails.append(email)
+    return valid_emails, invalid_emails
+
+
+def parse_time_or_error(value, field_name, default=None):
+    raw_value = clean_string(value)
+    if not raw_value:
+        return default
+    parsed = parse_time(raw_value)
+    if not parsed:
+        raise InventoryApiError(f"El valor de {field_name} no es una hora valida.")
+    return parsed.replace(second=0, microsecond=0)
+
+
+def parse_weekday_or_error(value, field_name="run_weekday", default=0):
+    if value in (None, "", []):
+        return default
+    weekday = parse_optional_int(value, field_name)
+    if weekday is None or weekday < 0 or weekday > 6:
+        raise InventoryApiError("El dia de envio debe estar entre 0 y 6.")
+    return weekday
 
 
 def article_code_prefix(article_type):
@@ -542,7 +620,8 @@ def safety_alert_email_addresses(alert):
         seen.add(email)
         recipient_emails.append(email)
 
-    for email in parse_email_list(alert.additional_emails):
+    valid_extra_emails, _invalid_extra_emails = split_email_list(alert.additional_emails)
+    for email in valid_extra_emails:
         if email in seen:
             continue
         seen.add(email)
@@ -567,11 +646,12 @@ def serialize_safety_alert_rule(alert, quantity_map=None, unit_total_map=None):
         "status": alert.status,
         "status_label": alert.get_status_display(),
         "current_stock": serialize_decimal(current_stock),
-        "safety_stock": serialize_decimal(alert.article.safety_stock),
+        "minimum_stock": serialize_decimal(alert.article.minimum_stock),
+        "safety_stock": serialize_decimal(alert.article.minimum_stock),
         "triggered": alert.status == SafetyStockAlertRule.AlertStatus.TRIGGERED,
         "recipients": [serialize_contact(user) for user in recipients],
         "additional_emails": alert.additional_emails,
-        "additional_email_list": parse_email_list(alert.additional_emails),
+        "additional_email_list": split_email_list(alert.additional_emails)[0],
         "notes": alert.notes,
         "last_stock_value": serialize_decimal(alert.last_stock_value),
         "triggered_at": serialize_datetime(alert.triggered_at),
@@ -579,6 +659,230 @@ def serialize_safety_alert_rule(alert, quantity_map=None, unit_total_map=None):
         "last_notified_at": serialize_datetime(alert.last_notified_at),
         "last_email_error": alert.last_email_error,
     }
+
+
+def low_stock_articles_snapshot(serialized_articles=None):
+    articles = serialized_articles if serialized_articles is not None else list_articles()
+    return [article for article in articles if article.get("low_stock")]
+
+
+WEEKDAY_LABELS = {
+    0: "Lunes",
+    1: "Martes",
+    2: "Miercoles",
+    3: "Jueves",
+    4: "Viernes",
+    5: "Sabado",
+    6: "Domingo",
+}
+
+
+def serialize_digest_run_time(value):
+    if not value:
+        return "08:00"
+    return value.strftime("%H:%M")
+
+
+def resolve_digest_delivery_tone(status):
+    if status == MinimumStockDigestConfig.DeliveryStatus.SUCCESS:
+        return "ok"
+    if status == MinimumStockDigestConfig.DeliveryStatus.WARNING:
+        return "low"
+    if status == MinimumStockDigestConfig.DeliveryStatus.ERROR:
+        return "out"
+    if status == MinimumStockDigestConfig.DeliveryStatus.SKIPPED:
+        return "low"
+    return "out"
+
+
+def serialize_inventory_automation_status():
+    ensure_automation_task_states()
+    return {
+        "scheduler": serialize_automation_task_state(get_automation_task_state(TASK_KEY_SCHEDULER)),
+        "minimum_stock_reconcile": serialize_automation_task_state(
+            get_automation_task_state(TASK_KEY_MINIMUM_STOCK_RECONCILE)
+        ),
+        "minimum_stock_digest": serialize_automation_task_state(
+            get_automation_task_state(TASK_KEY_MINIMUM_STOCK_DIGEST)
+        ),
+    }
+
+
+def serialize_minimum_stock_digest_config(config=None, serialized_articles=None, save_warning=""):
+    low_stock_articles = low_stock_articles_snapshot(serialized_articles)
+    recipients = []
+    next_run_at = None
+    run_weekday_label = WEEKDAY_LABELS.get(0)
+    last_delivery_status = MinimumStockDigestConfig.DeliveryStatus.NEVER
+    if config is not None:
+        recipients = list(
+            config.recipients.select_related("profile__sector_default").order_by(
+                "first_name",
+                "last_name",
+                "username",
+            )
+        )
+        next_run_at = get_minimum_stock_digest_due_context(config).get("next_run_at")
+        run_weekday_label = WEEKDAY_LABELS.get(config.run_weekday, WEEKDAY_LABELS[0])
+        last_delivery_status = config.last_delivery_status
+
+    return {
+        "id": config.id if config else None,
+        "is_enabled": config.is_enabled if config else False,
+        "frequency": config.frequency if config else MinimumStockDigestConfig.Frequency.DAILY,
+        "frequency_label": (
+            config.get_frequency_display()
+            if config
+            else MinimumStockDigestConfig.Frequency.DAILY.label
+        ),
+        "recipients": [serialize_contact(user) for user in recipients],
+        "additional_emails": config.additional_emails if config else "",
+        "additional_email_list": split_email_list(config.additional_emails)[0] if config else [],
+        "notes": config.notes if config else "",
+        "run_at": serialize_digest_run_time(config.run_at) if config else "08:00",
+        "run_weekday": config.run_weekday if config else 0,
+        "run_weekday_label": run_weekday_label,
+        "next_run_at": serialize_datetime(next_run_at),
+        "last_notified_at": serialize_datetime(config.last_notified_at) if config else None,
+        "last_email_error": config.last_email_error if config else "",
+        "last_period_key": config.last_period_key if config else "",
+        "inflight_period_key": config.inflight_period_key if config else "",
+        "inflight_started_at": serialize_datetime(config.inflight_started_at) if config else None,
+        "last_delivery_status": last_delivery_status,
+        "last_delivery_status_label": (
+            config.get_last_delivery_status_display()
+            if config
+            else MinimumStockDigestConfig.DeliveryStatus.NEVER.label
+        ),
+        "last_delivery_tone": resolve_digest_delivery_tone(last_delivery_status),
+        "last_recipient_warning": config.last_recipient_warning if config else "",
+        "last_summary_count": config.last_summary_count if config else None,
+        "save_warning": save_warning,
+        "low_stock_count": len(low_stock_articles),
+        "preview_articles": [
+            {
+                "id": article["id"],
+                "name": article["name"],
+                "internal_code": article["internal_code"],
+                "current_stock": article["current_stock"],
+                "minimum_stock": article["minimum_stock"],
+            }
+            for article in low_stock_articles[:6]
+        ],
+    }
+
+
+def resolve_digest_frequency(value):
+    raw_value = clean_casefold(value or MinimumStockDigestConfig.Frequency.DAILY)
+    for option, _label in MinimumStockDigestConfig.Frequency.choices:
+        if clean_casefold(option) == raw_value:
+            return option
+    raise InventoryApiError("La frecuencia del resumen periodico no es valida.")
+
+
+def resolve_digest_recipients(config):
+    recipient_emails = []
+    discarded = []
+    seen = set()
+
+    recipient_users = list(
+        config.recipients.select_related("profile__sector_default").order_by(
+            "first_name",
+            "last_name",
+            "username",
+        )
+    )
+    for user in recipient_users:
+        profile = get_profile(user)
+        email = clean_string(user.email).lower()
+        label = user.get_full_name() or user.username
+        if profile.status != UserProfile.Status.ACTIVE:
+            discarded.append(f"{label}: usuario inactivo")
+            continue
+        if not email:
+            discarded.append(f"{label}: sin email")
+            continue
+        try:
+            validate_email(email)
+        except ValidationError:
+            discarded.append(f"{label}: email invalido")
+            continue
+        if email in seen:
+            continue
+        seen.add(email)
+        recipient_emails.append(email)
+
+    valid_extra_emails, invalid_extra_emails = split_email_list(config.additional_emails)
+    for invalid_email in invalid_extra_emails:
+        discarded.append(f"{invalid_email}: email invalido")
+    for email in valid_extra_emails:
+        if email in seen:
+            continue
+        seen.add(email)
+        recipient_emails.append(email)
+
+    warning_message = ""
+    if discarded:
+        warning_message = "Se ignoraron destinatarios: " + ", ".join(discarded)
+
+    return {
+        "emails": recipient_emails,
+        "discarded": discarded,
+        "warning_message": warning_message,
+    }
+
+
+def build_minimum_stock_digest_message(config, low_stock_articles):
+    subject = f"[Inventario] Resumen de stock minimo ({len(low_stock_articles)} articulos)"
+    lines = [
+        "Resumen automatico de articulos en o por debajo del stock minimo.",
+        "",
+        f"Total afectados: {len(low_stock_articles)}",
+        "",
+    ]
+
+    for article in low_stock_articles:
+        lines.extend(
+            [
+                f"- {article['name']} ({article['internal_code']})",
+                f"  Stock actual: {article['current_stock']}",
+                f"  Stock minimo: {article['minimum_stock']}",
+                f"  Sector responsable: {article['sector_responsible'] or 'Sin sector'}",
+                f"  Ubicacion principal: {article['primary_location'] or 'Sin ubicacion'}",
+                "",
+            ]
+        )
+
+    if clean_string(config.notes):
+        lines.extend(
+            [
+                "Notas:",
+                config.notes.strip(),
+            ]
+        )
+
+    return subject, "\n".join(lines).strip()
+
+
+def send_minimum_stock_digest_email(config, recipient_emails, low_stock_articles):
+    if not getattr(settings, "INVENTORY_ALARM_EMAILS_ENABLED", True):
+        return False, "El envio por mail esta desactivado en la configuracion."
+
+    subject, body = build_minimum_stock_digest_message(config, low_stock_articles)
+    try:
+        sent = send_mail(
+            subject=subject,
+            message=body,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
+            recipient_list=recipient_emails,
+            fail_silently=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+
+    if not sent:
+        return False, "No se pudo confirmar el envio del mail."
+    return True, ""
 
 
 def serialize_movement(movement):
@@ -784,16 +1088,16 @@ def send_safety_stock_alert_email(alert):
     article = alert.article
     current_stock = alert.last_stock_value if alert.last_stock_value is not None else current_stock_for_article(article)
     location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
-    subject = f"[Inventario] Stock de seguridad activado: {article.name} ({article.internal_code})"
+    subject = f"[Inventario] Stock minimo alcanzado: {article.name} ({article.internal_code})"
     body = "\n".join(
         [
-            "Se activo una alarma automatica por stock de seguridad.",
+            "Se activo una alarma automatica por stock minimo.",
             "",
             f"Articulo: {article.name}",
             f"Codigo interno: {article.internal_code}",
             f"Tipo: {article.get_article_type_display()}",
             f"Stock actual: {serialize_decimal(current_stock)}",
-            f"Stock de seguridad: {serialize_decimal(article.safety_stock)}",
+            f"Stock minimo: {serialize_decimal(article.minimum_stock)}",
             f"Sector responsable: {article.sector_responsible.name}",
             f"Ubicacion principal: {location_name}",
             "",
@@ -827,55 +1131,100 @@ def send_safety_stock_alert_email(alert):
 
 
 def evaluate_safety_stock_alert(article):
-    alert = getattr(article, "safety_alert_rule", None)
-    if not alert:
-        alert = (
-            SafetyStockAlertRule.objects.select_related(
-                "article__sector_responsible",
-                "article__primary_location",
+    """
+    Evalúa el alert de seguridad de stock de un artículo de forma idempotente.
+    
+    Garantías:
+    - La evaluación es transaccional (SELECT FOR UPDATE)
+    - El email se envía SOLO en la transición MONITORING -> TRIGGERED
+    - Ante concurrencia, el último cambio gana y el estado es consistente
+    - Errores de email no rompen la transacción de cambio de estado
+    """
+    try:
+        with transaction.atomic():
+            # SELECT FOR UPDATE garantiza exclusividad en la transacción
+            alert = (
+                SafetyStockAlertRule.objects.select_for_update()
+                .select_related(
+                    "article__sector_responsible",
+                    "article__primary_location",
+                )
+                .prefetch_related("recipients__profile__sector_default")
+                .filter(article=article, is_enabled=True)
+                .first()
             )
-            .prefetch_related("recipients__profile__sector_default")
-            .filter(article=article)
-            .first()
+            
+            if not alert:
+                # No hay regla habilitada
+                return None
+            
+            current_stock = current_stock_for_article(article)
+            is_under_minimum = article.minimum_stock is not None and current_stock <= article.minimum_stock
+            
+            # Lógica de transición de estado
+            old_status = alert.status
+            new_status = SafetyStockAlertRule.AlertStatus.TRIGGERED if is_under_minimum else SafetyStockAlertRule.AlertStatus.MONITORING
+            
+            # *** CLAVE: Email solo en transición MONITORING -> TRIGGERED ***
+            should_send_email = (
+                old_status == SafetyStockAlertRule.AlertStatus.MONITORING and 
+                new_status == SafetyStockAlertRule.AlertStatus.TRIGGERED
+            )
+            
+            # Actualiza campos de estado
+            alert.status = new_status
+            alert.last_stock_value = current_stock
+            
+            if should_send_email:
+                alert.triggered_at = timezone.now()
+                alert.resolved_at = None
+                alert.last_notified_at = timezone.now()
+                alert.last_email_error = ""
+            elif old_status == SafetyStockAlertRule.AlertStatus.TRIGGERED and new_status == SafetyStockAlertRule.AlertStatus.MONITORING:
+                # Transición inversa: volvió arriba del mínimo
+                alert.resolved_at = timezone.now()
+                alert.last_email_error = ""
+            
+            # Guardaguarda el estado ANTES de intentar enviar email
+            save_validated(alert)
+            
+            # DESPUÉS de guardar estado, intenta enviar SI aplica
+            if should_send_email:
+                try:
+                    send_safety_stock_alert_email(alert)
+                except Exception as exc:  # noqa: BLE001
+                    # Error de email: registralo pero no rompas la transacción
+                    logging.getLogger("inventory.automation.alert").error(
+                        "alert_email_send_failed",
+                        extra={
+                            "article_id": article.id,
+                            "rule_id": alert.id,
+                            "error": str(exc),
+                        },
+                        exc_info=True
+                    )
+                    # NOTA: last_email_error debe ser actualizado en send_safety_stock_alert_email
+                    # Si falló en send_mail, ya está poblado allá
+            
+            return alert
+    
+    except SafetyStockAlertRule.DoesNotExist:
+        # No hay regla o no está habilitada; no hacer nada
+        logging.getLogger("inventory.automation.alert").debug(
+            f"alert_rule_not_found_or_disabled article_id={article.id}"
         )
-    if not alert:
         return None
-
-    current_stock = current_stock_for_article(article)
-    is_triggered = article.safety_stock is not None and current_stock <= article.safety_stock
-    changed = False
-    should_send_email = False
-
-    if not alert.is_enabled or article.safety_stock is None:
-        if alert.status == SafetyStockAlertRule.AlertStatus.TRIGGERED:
-            alert.status = SafetyStockAlertRule.AlertStatus.MONITORING
-            alert.resolved_at = timezone.now()
-            changed = True
-    elif is_triggered:
-        if alert.status != SafetyStockAlertRule.AlertStatus.TRIGGERED:
-            alert.status = SafetyStockAlertRule.AlertStatus.TRIGGERED
-            alert.triggered_at = timezone.now()
-            alert.resolved_at = None
-            alert.last_email_error = ""
-            changed = True
-            should_send_email = True
-    elif alert.status == SafetyStockAlertRule.AlertStatus.TRIGGERED:
-        alert.status = SafetyStockAlertRule.AlertStatus.MONITORING
-        alert.resolved_at = timezone.now()
-        alert.last_email_error = ""
-        changed = True
-
-    if alert.last_stock_value != current_stock:
-        alert.last_stock_value = current_stock
-        changed = True
-
-    if changed:
-        save_validated(alert)
-
-    if should_send_email:
-        send_safety_stock_alert_email(alert)
-
-    return alert
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("inventory.automation.alert").error(
+            "alert_evaluation_error",
+            extra={
+                "article_id": article.id,
+                "error": str(exc),
+            },
+            exc_info=True
+        )
+        # No relanzar: errores en evaluación no deben romper cambios de stock
+        return None
 
 
 def list_safety_stock_alerts(user):
@@ -901,8 +1250,8 @@ def list_safety_stock_alerts(user):
 def save_safety_stock_alert_rule(user, payload):
     require_role(user, ALARM_ROLES)
     article = resolve_instance(Article, payload.get("article_id"), "article")
-    if article.safety_stock is None:
-        raise InventoryApiError("El articulo debe tener stock de seguridad para activar una alarma automatica.")
+    if article.minimum_stock is None:
+        raise InventoryApiError("El articulo debe tener stock minimo para activar una alarma automatica.")
 
     recipient_ids = payload.get("recipient_user_ids") or []
     if isinstance(recipient_ids, str):
@@ -939,6 +1288,219 @@ def save_safety_stock_alert_rule(user, payload):
         .get(pk=alert.id)
     )
     return serialize_safety_alert_rule(refreshed_alert)
+
+
+def get_minimum_stock_digest_config(user, serialized_articles=None):
+    require_role(user, ALARM_ROLES)
+    config = (
+        MinimumStockDigestConfig.objects.prefetch_related("recipients__profile__sector_default")
+        .filter(key="default")
+        .first()
+    )
+    return serialize_minimum_stock_digest_config(config, serialized_articles=serialized_articles)
+
+
+def save_minimum_stock_digest_config(user, payload):
+    require_role(user, ALARM_ROLES)
+
+    recipient_ids = payload.get("recipient_user_ids") or []
+    if isinstance(recipient_ids, str):
+        recipient_ids = [item for item in re.split(r"[,\s]+", recipient_ids) if item]
+
+    recipients = validate_alarm_rule_recipients(recipient_ids)
+    additional_emails = payload.get("additional_emails") or ""
+    validated_extra_emails, invalid_extra_emails = split_email_list(additional_emails)
+    is_enabled = parse_boolean(payload.get("is_enabled"))
+    frequency = resolve_digest_frequency(payload.get("frequency"))
+    run_at = parse_time_or_error(payload.get("run_at"), "run_at", default=parse_time("08:00"))
+    run_weekday = parse_weekday_or_error(payload.get("run_weekday"), default=0)
+
+    if is_enabled and not (recipients or validated_extra_emails):
+        raise InventoryApiError("Selecciona al menos un destinatario o agrega un email adicional.")
+
+    save_warning = ""
+    if invalid_extra_emails:
+        save_warning = (
+            "Se ignoraron emails invalidos al guardar: " + ", ".join(invalid_extra_emails)
+        )
+
+    with transaction.atomic():
+        config, created = MinimumStockDigestConfig.objects.get_or_create(
+            key="default",
+            defaults={
+                "created_by": user,
+                "updated_by": user,
+            },
+        )
+        config.is_enabled = is_enabled
+        config.frequency = frequency
+        config.run_at = run_at
+        config.run_weekday = run_weekday
+        config.additional_emails = "\n".join(validated_extra_emails)
+        config.notes = payload.get("notes") or ""
+        update_audit(config, user, is_new=created)
+        save_validated(config)
+        config.recipients.set(recipients)
+
+    refreshed_config = (
+        MinimumStockDigestConfig.objects.prefetch_related("recipients__profile__sector_default")
+        .filter(pk=config.pk)
+        .first()
+    )
+    return serialize_minimum_stock_digest_config(refreshed_config, save_warning=save_warning)
+
+
+def dispatch_minimum_stock_digest(config_id, due_key):
+    config = (
+        MinimumStockDigestConfig.objects.prefetch_related("recipients__profile__sector_default")
+        .filter(pk=config_id)
+        .first()
+    )
+    if not config or not config.is_enabled:
+        mark_minimum_stock_digest_result(
+            config_id,
+            due_key,
+            MinimumStockDigestConfig.DeliveryStatus.SKIPPED,
+            now=timezone.now(),
+            summary_count=0,
+            consume_period=True,
+        )
+        DIGEST_AUTOMATION_LOGGER.info(
+            "digest_skipped_disabled",
+            extra={"period_key": due_key},
+        )
+        return {
+            "delivery_status": MinimumStockDigestConfig.DeliveryStatus.SKIPPED,
+            "summary_count": 0,
+            "recipient_warning": "",
+            "email_error": "",
+        }
+
+    low_stock_articles = low_stock_articles_snapshot()
+    if not low_stock_articles:
+        mark_minimum_stock_digest_result(
+            config_id,
+            due_key,
+            MinimumStockDigestConfig.DeliveryStatus.SKIPPED,
+            now=timezone.now(),
+            summary_count=0,
+            consume_period=True,
+            email_error="",
+            recipient_warning="",
+        )
+        DIGEST_AUTOMATION_LOGGER.info(
+            "digest_skipped_no_items",
+            extra={"period_key": due_key},
+        )
+        return {
+            "delivery_status": MinimumStockDigestConfig.DeliveryStatus.SKIPPED,
+            "summary_count": 0,
+            "recipient_warning": "",
+            "email_error": "",
+        }
+
+    recipient_resolution = resolve_digest_recipients(config)
+    recipient_emails = recipient_resolution["emails"]
+    recipient_warning = recipient_resolution["warning_message"]
+    if recipient_warning:
+        DIGEST_AUTOMATION_LOGGER.warning(
+            "digest_recipients_warning",
+            extra={
+                "period_key": due_key,
+                "recipient_count": len(recipient_emails),
+                "discarded_recipient_count": len(recipient_resolution["discarded"]),
+            },
+        )
+
+    if not recipient_emails:
+        recipient_warning = recipient_warning or "No hay destinatarios validos para el resumen."
+        mark_minimum_stock_digest_result(
+            config_id,
+            due_key,
+            MinimumStockDigestConfig.DeliveryStatus.WARNING,
+            now=timezone.now(),
+            summary_count=len(low_stock_articles),
+            recipient_warning=recipient_warning,
+            email_error="",
+            consume_period=True,
+        )
+        return {
+            "delivery_status": MinimumStockDigestConfig.DeliveryStatus.WARNING,
+            "summary_count": len(low_stock_articles),
+            "recipient_warning": recipient_warning,
+            "email_error": "",
+        }
+
+    DIGEST_AUTOMATION_LOGGER.info(
+        "digest_send_start",
+        extra={
+            "period_key": due_key,
+            "recipient_count": len(recipient_emails),
+            "discarded_recipient_count": len(recipient_resolution["discarded"]),
+            "summary_count": len(low_stock_articles),
+        },
+    )
+    sent, email_error = send_minimum_stock_digest_email(
+        config,
+        recipient_emails,
+        low_stock_articles,
+    )
+    if not sent:
+        mark_minimum_stock_digest_result(
+            config_id,
+            due_key,
+            MinimumStockDigestConfig.DeliveryStatus.ERROR,
+            now=timezone.now(),
+            summary_count=len(low_stock_articles),
+            recipient_warning=recipient_warning,
+            email_error=email_error,
+            consume_period=False,
+        )
+        DIGEST_AUTOMATION_LOGGER.error(
+            "digest_send_error",
+            extra={
+                "period_key": due_key,
+                "recipient_count": len(recipient_emails),
+                "summary_count": len(low_stock_articles),
+            },
+        )
+        return {
+            "delivery_status": MinimumStockDigestConfig.DeliveryStatus.ERROR,
+            "summary_count": len(low_stock_articles),
+            "recipient_warning": recipient_warning,
+            "email_error": email_error,
+        }
+
+    delivery_status = (
+        MinimumStockDigestConfig.DeliveryStatus.WARNING
+        if recipient_warning
+        else MinimumStockDigestConfig.DeliveryStatus.SUCCESS
+    )
+    mark_minimum_stock_digest_result(
+        config_id,
+        due_key,
+        delivery_status,
+        now=timezone.now(),
+        summary_count=len(low_stock_articles),
+        recipient_warning=recipient_warning,
+        email_error="",
+        consume_period=True,
+    )
+    DIGEST_AUTOMATION_LOGGER.info(
+        "digest_send_success",
+        extra={
+            "period_key": due_key,
+            "recipient_count": len(recipient_emails),
+            "discarded_recipient_count": len(recipient_resolution["discarded"]),
+            "summary_count": len(low_stock_articles),
+        },
+    )
+    return {
+        "delivery_status": delivery_status,
+        "summary_count": len(low_stock_articles),
+        "recipient_warning": recipient_warning,
+        "email_error": "",
+    }
 
 
 def build_dashboard(user=None):
@@ -1139,6 +1701,12 @@ def build_inventory_overview(user):
         ],
         "alarms": list_inventory_alarms(user),
         "safety_alerts": list_safety_stock_alerts(user) if can_manage_alarms else [],
+        "minimum_stock_digest": (
+            get_minimum_stock_digest_config(user, serialized_articles=serialized_articles)
+            if can_manage_alarms
+            else None
+        ),
+        "automation_status": serialize_inventory_automation_status() if can_manage_alarms else None,
     }
 
 
@@ -2586,3 +3154,118 @@ def list_articles():
         )
         for article in articles
     ]
+
+
+def article_matches_stock_query(article, query):
+    target = build_search_target(
+        [
+            article.get("name"),
+            article.get("internal_code"),
+            article.get("article_type_label"),
+            article.get("status_label"),
+            article.get("category"),
+            article.get("subcategory"),
+            article.get("primary_location"),
+            article.get("sector_responsible"),
+        ]
+    )
+    return matches_normalized_query(target, query)
+
+
+def article_matches_stock_alert(article, alert_filter):
+    normalized_filter = clean_casefold(alert_filter or "all")
+    current_stock = article.get("current_stock") or 0
+
+    if normalized_filter == "low":
+        return article.get("low_stock", False)
+    if normalized_filter == "healthy":
+        return not article.get("low_stock", False) and current_stock > 0
+    if normalized_filter == "out":
+        return current_stock <= 0
+    return True
+
+
+def filter_articles_for_stock_view(articles, filters=None):
+    filters = filters or {}
+    global_query = filters.get("global_query", "")
+    stock_query = filters.get("stock_query", "")
+    article_type_filter = clean_casefold(filters.get("article_type") or "all")
+    status_filter = clean_casefold(filters.get("status") or "all")
+    alert_filter = filters.get("alert") or "all"
+
+    return [
+        article
+        for article in articles
+        if article_matches_stock_query(article, global_query)
+        and article_matches_stock_query(article, stock_query)
+        and (article_type_filter == "all" or clean_casefold(article.get("article_type")) == article_type_filter)
+        and (status_filter == "all" or clean_casefold(article.get("status")) == status_filter)
+        and article_matches_stock_alert(article, alert_filter)
+    ]
+
+
+def get_article_stock_label(article):
+    if article.get("minimum_stock") is None:
+        return "Sin minimo"
+    if (article.get("current_stock") or 0) <= 0:
+        return "Sin stock"
+    if article.get("low_stock"):
+        return "Bajo minimo"
+    return "En nivel"
+
+
+STOCK_EXPORT_COLUMNS = (
+    "Codigo interno",
+    "Articulo",
+    "Tipo",
+    "Unidad",
+    "Stock actual",
+    "Stock disponible",
+    "Stock minimo",
+    "Ubicacion principal",
+    "Sector responsable",
+    "Estado stock",
+    "Estado articulo",
+)
+
+
+def build_stock_export_excel(filters=None):
+    articles = filter_articles_for_stock_view(list_articles(), filters=filters)
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Stock"
+    sheet.append(STOCK_EXPORT_COLUMNS)
+
+    for article in articles:
+        sheet.append(
+            [
+                article.get("internal_code") or "",
+                article.get("name") or "",
+                article.get("article_type_label") or "",
+                article.get("unit_of_measure", {}).get("code")
+                or article.get("unit_of_measure", {}).get("name")
+                or "",
+                article.get("current_stock"),
+                article.get("available_stock"),
+                article.get("minimum_stock"),
+                article.get("primary_location") or "",
+                article.get("sector_responsible") or "",
+                get_article_stock_label(article),
+                article.get("status_label") or "",
+            ]
+        )
+
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = f"A1:{get_column_letter(len(STOCK_EXPORT_COLUMNS))}{sheet.max_row}"
+
+    column_widths = [18, 34, 24, 12, 14, 16, 14, 22, 22, 18, 18]
+    for index, width in enumerate(column_widths, start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=5, max_col=7):
+        for cell in row:
+            cell.number_format = "0.###"
+
+    output = BytesIO()
+    workbook.save(output)
+    return f"stock-{timezone.localdate().isoformat()}.xlsx", output.getvalue()

@@ -32,6 +32,24 @@ async function request(path, options = {}) {
   return data
 }
 
+function parseDownloadFilename(contentDisposition, fallback = 'download.xlsx') {
+  if (!contentDisposition) {
+    return fallback
+  }
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1])
+  }
+
+  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+  if (plainMatch?.[1]) {
+    return plainMatch[1]
+  }
+
+  return fallback
+}
+
 export function fetchCsrfCookie() {
   return request('/api/auth/csrf/')
 }
@@ -107,6 +125,46 @@ export function importArticlesFromExcel(file, options = {}) {
     },
     body,
   })
+}
+
+export async function exportArticlesToExcel(filters = {}) {
+  const search = new URLSearchParams({
+    global_query: filters.globalQuery || '',
+    stock_query: filters.stockQuery || '',
+    article_type: filters.articleType || 'all',
+    status: filters.status || 'all',
+    alert: filters.alert || 'all',
+  })
+
+  const response = await fetch(`/api/articles/export-excel/?${search.toString()}`, {
+    credentials: 'include',
+    method: 'GET',
+  })
+
+  if (!response.ok) {
+    const isJson = response.headers.get('content-type')?.includes('application/json')
+    const data = isJson ? await response.json() : null
+    const error = new Error(data?.detail || 'No se pudo exportar el Excel.')
+    error.status = response.status
+    throw error
+  }
+
+  const blob = await response.blob()
+  const filename = parseDownloadFilename(
+    response.headers.get('content-disposition'),
+    'stock.xlsx',
+  )
+  const downloadUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = downloadUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(downloadUrl)
+
+  return { filename }
 }
 
 export function fetchProfile() {
@@ -292,6 +350,16 @@ export function fetchInventorySafetyAlerts() {
 
 export function saveInventorySafetyAlert(payload) {
   return request('/api/inventory/safety-alerts/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function saveInventoryMinimumStockDigest(payload) {
+  return request('/api/inventory/minimum-stock-digest/', {
     method: 'POST',
     headers: {
       'X-CSRFToken': getCookie('csrftoken'),

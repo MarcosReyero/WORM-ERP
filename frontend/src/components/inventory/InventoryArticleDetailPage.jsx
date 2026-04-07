@@ -215,7 +215,7 @@ export function InventoryArticleDetailPage() {
 
   if (detailState.loading && !detailState.data) {
     return (
-      <div className="module-page-stack">
+      <div className="module-page-stack stock-titled-page">
         <ModuleEmptyState
           description="Cargando informacion del articulo, stock y trazabilidad reciente."
           title="Cargando ficha"
@@ -226,7 +226,7 @@ export function InventoryArticleDetailPage() {
 
   if (detailState.error || !detailState.data || !form) {
     return (
-      <div className="module-page-stack">
+      <div className="module-page-stack stock-titled-page">
         <PanelMessage error={detailState.error || 'No se encontro el articulo.'} success="" />
         <Link className="ghost-link" to="/inventario/stock">
           Volver a stock
@@ -238,7 +238,7 @@ export function InventoryArticleDetailPage() {
   const { article, balances, movements, tracked_units: trackedUnits } = detailState.data
 
   return (
-    <div className="module-page-stack">
+    <div className="module-page-stack stock-titled-page">
       <ModulePageHeader
         actions={
           <>

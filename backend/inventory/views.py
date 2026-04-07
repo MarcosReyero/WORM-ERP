@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET, require_http_methods
 
 from communications.services import (
@@ -19,10 +19,12 @@ from .models import (
 from .services import (
     InventoryApiError,
     add_count_line,
+    build_stock_export_excel,
     build_dashboard,
     build_inventory_overview,
     create_article,
     get_article_detail,
+    get_minimum_stock_digest_config,
     create_count_session,
     create_discrepancy,
     create_movement,
@@ -33,6 +35,7 @@ from .services import (
     parse_json,
     resolve_discrepancy,
     return_checkout,
+    save_minimum_stock_digest_config,
     save_safety_stock_alert_rule,
     serialize_article,
     serialize_balance,
@@ -138,6 +141,23 @@ def article_import_excel(request):
         status = 201 if result["mode"] == "confirm" else 200
         detail = "Excel imported" if result["mode"] == "confirm" else "Excel analyzed"
         return JsonResponse({"detail": detail, "item": result}, status=status)
+
+    return _handle_inventory_call(handler)
+
+
+@require_GET
+def article_export_excel(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    def handler():
+        filename, payload = build_stock_export_excel(request.GET)
+        response = HttpResponse(
+            payload,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
     return _handle_inventory_call(handler)
 
@@ -368,5 +388,22 @@ def inventory_safety_alerts(request):
     def handler():
         item = save_safety_stock_alert_rule(request.user, parse_json(request))
         return JsonResponse({"detail": "Safety alert saved", "item": item}, status=201)
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["GET", "POST"])
+def inventory_minimum_stock_digest(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    if request.method == "GET":
+        return _handle_inventory_call(
+            lambda: JsonResponse({"item": get_minimum_stock_digest_config(request.user)})
+        )
+
+    def handler():
+        item = save_minimum_stock_digest_config(request.user, parse_json(request))
+        return JsonResponse({"detail": "Minimum stock digest saved", "item": item}, status=201)
 
     return _handle_inventory_call(handler)

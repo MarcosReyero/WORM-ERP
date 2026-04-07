@@ -1,6 +1,6 @@
 import { useDeferredValue, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
-import { createArticle, importArticlesFromExcel } from '../../lib/api.js'
+import { createArticle, exportArticlesToExcel, importArticlesFromExcel } from '../../lib/api.js'
 import { CloseIcon, SearchIcon } from '../Icons.jsx'
 import {
   ModuleActionPanel,
@@ -71,6 +71,7 @@ export function InventoryStockPage() {
     success: '',
     summary: null,
   })
+  const [exportFeedback, setExportFeedback] = useState({ error: '', success: '' })
   const [articleForm, setArticleForm] = useState({
     name: '',
     article_type: 'consumable',
@@ -117,6 +118,25 @@ export function InventoryStockPage() {
     setTypeFilter('all')
     setStatusFilter('all')
     setAlertFilter('all')
+  }
+
+  async function handleExportArticles() {
+    setExportFeedback({ error: '', success: '' })
+    setBusyAction('export')
+
+    try {
+      await exportArticlesToExcel({
+        globalQuery: deferredGlobalQuery,
+        stockQuery: deferredStockQuery,
+        articleType: typeFilter,
+        status: statusFilter,
+        alert: alertFilter,
+      })
+    } catch (error) {
+      setExportFeedback({ error: error.message, success: '' })
+    } finally {
+      setBusyAction('')
+    }
   }
 
   async function handleArticleSubmit(event) {
@@ -228,7 +248,7 @@ export function InventoryStockPage() {
   }
 
   return (
-    <div className="module-page-stack">
+    <div className="module-page-stack stock-titled-page">
       <ModulePageHeader
         actions={
           <span className="module-chip">
@@ -248,7 +268,7 @@ export function InventoryStockPage() {
             description="Busca por nombre, codigo interno o categoria y combina la busqueda con filtros operativos sin perder contexto."
             title="Existencias"
             toolbar={
-              <ModuleToolbar>
+              <ModuleToolbar className="module-toolbar--stock-table">
                 <div className="module-filter-group module-filter-group--stock">
                   <label className="module-search-field">
                     Buscar articulo
@@ -311,6 +331,16 @@ export function InventoryStockPage() {
                   {hasActiveSearch && deferredGlobalQuery ? (
                     <span className="module-chip is-muted">Busqueda global activa</span>
                   ) : null}
+                  <button
+                    className="inline-action"
+                    disabled={busyAction === 'export'}
+                    onClick={() => {
+                      void handleExportArticles()
+                    }}
+                    type="button"
+                  >
+                    {busyAction === 'export' ? 'Exportando...' : 'Exportar Excel'}
+                  </button>
                   {isFilteredView ? (
                     <button className="inline-action" onClick={resetStockView} type="button">
                       Limpiar vista
@@ -320,9 +350,10 @@ export function InventoryStockPage() {
               </ModuleToolbar>
             }
           >
+            <PanelMessage error={exportFeedback.error} success={exportFeedback.success} />
             {filteredArticles.length ? (
               <div className="module-table-wrap">
-                <table className="module-table">
+                <table className="module-table module-table--stock">
                   <thead>
                     <tr>
                       <th>Articulo</th>
@@ -332,7 +363,6 @@ export function InventoryStockPage() {
                       <th>Minimo</th>
                       <th>Ubicacion</th>
                       <th>Estado</th>
-                      <th>Ficha</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -371,11 +401,6 @@ export function InventoryStockPage() {
                             <span className={`status-pill ${getArticleStockTone(article)}`}>
                               {getArticleStockLabel(article)}
                             </span>
-                          </td>
-                          <td>
-                            <Link className="inline-action" to={articleDetailPath}>
-                              Abrir
-                            </Link>
                           </td>
                         </tr>
                       )

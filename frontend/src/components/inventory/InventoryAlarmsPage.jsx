@@ -2,8 +2,10 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   createInventoryAlarmRequest,
+  saveInventoryMinimumStockDigest,
   saveInventorySafetyAlert,
 } from '../../lib/api.js'
+import { SearchSelect } from '../SearchSelect.jsx'
 import {
   ModuleActionPanel,
   ModuleEmptyState,
@@ -12,6 +14,16 @@ import {
   PanelMessage,
 } from '../modules/ModuleWorkspace.jsx'
 import { formatDateTime, formatQuantity } from './utils.js'
+
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: 'Lunes' },
+  { value: 1, label: 'Martes' },
+  { value: 2, label: 'Miercoles' },
+  { value: 3, label: 'Jueves' },
+  { value: 4, label: 'Viernes' },
+  { value: 5, label: 'Sabado' },
+  { value: 6, label: 'Domingo' },
+]
 
 function defaultSafetyForm(articleId = '') {
   return {
@@ -30,6 +42,18 @@ function buildSafetyFormFromRule(rule) {
     recipient_user_ids: rule.recipients.map((recipient) => String(recipient.id)),
     additional_emails: rule.additional_emails || '',
     notes: rule.notes || '',
+  }
+}
+
+function defaultPeriodicForm(config = {}) {
+  return {
+    is_enabled: config.is_enabled ?? true,
+    frequency: config.frequency || 'daily',
+    run_at: config.run_at || '08:00',
+    run_weekday: String(config.run_weekday ?? 0),
+    recipient_user_ids: config.recipients?.map((recipient) => String(recipient.id)) || [],
+    additional_emails: config.additional_emails || '',
+    notes: config.notes || '',
   }
 }
 
@@ -94,14 +118,57 @@ function getSafetyAlertLabel(rule) {
   return 'Monitoreando'
 }
 
+function getAutomationTone(taskState) {
+  if (!taskState) {
+    return 'out'
+  }
+  if (taskState.is_stale) {
+    return 'out'
+  }
+  if (taskState.runtime_state === 'running') {
+    return 'ok'
+  }
+  if (taskState.last_run_status === 'error') {
+    return 'out'
+  }
+  if (taskState.last_run_status === 'warning') {
+    return 'low'
+  }
+  return 'ok'
+}
+
+function getAutomationLabel(taskState) {
+  if (!taskState) {
+    return 'Sin estado'
+  }
+  if (taskState.is_stale) {
+    return 'Lease vencido'
+  }
+  if (taskState.runtime_state === 'running') {
+    return 'Activo'
+  }
+  if (taskState.last_run_status === 'warning') {
+    return 'Con aviso'
+  }
+  if (taskState.last_run_status === 'error') {
+    return 'Con error'
+  }
+  return taskState.last_run_status_label || 'En espera'
+}
+
 export function InventoryAlarmsPage() {
   const { inventoryOverview, refreshInventoryModule, searchValue } = useOutletContext()
   const deferredQuery = useDeferredValue(searchValue.trim().toLowerCase())
+  const [automaticMode, setAutomaticMode] = useState('individual')
   const [savingSafetyRule, setSavingSafetyRule] = useState(false)
+  const [savingPeriodicRule, setSavingPeriodicRule] = useState(false)
   const [sendingManualAlarm, setSendingManualAlarm] = useState(false)
   const [safetyFeedback, setSafetyFeedback] = useState({ error: '', success: '' })
+  const [periodicFeedback, setPeriodicFeedback] = useState({ error: '', success: '' })
   const [manualFeedback, setManualFeedback] = useState({ error: '', success: '' })
   const [safetyForm, setSafetyForm] = useState(defaultSafetyForm())
+  const [periodicForm, setPeriodicForm] = useState(defaultPeriodicForm())
+  const [expandedTooltip, setExpandedTooltip] = useState(null)
   const [manualForm, setManualForm] = useState({
     target_user_id: '',
     priority: 'high',
@@ -112,7 +179,7 @@ export function InventoryAlarmsPage() {
 
   const safetyEligibleArticles = useMemo(
     () =>
-      (inventoryOverview?.articles || []).filter((article) => article.safety_stock !== null),
+      (inventoryOverview?.articles || []).filter((article) => article.minimum_stock !== null),
     [inventoryOverview?.articles],
   )
 
@@ -135,6 +202,8 @@ export function InventoryAlarmsPage() {
   const selectedArticle = safetyEligibleArticles.find(
     (article) => String(article.id) === String(safetyForm.article_id),
   )
+  const minimumStockDigest = inventoryOverview.minimum_stock_digest || null
+  const automationStatus = inventoryOverview.automation_status || null
 
   const selectedRule =
     (inventoryOverview?.safety_alerts || []).find(
@@ -163,6 +232,10 @@ export function InventoryAlarmsPage() {
     })
   }, [inventoryOverview, inventoryOverview?.safety_alerts, safetyEligibleArticles])
 
+  useEffect(() => {
+    setPeriodicForm(defaultPeriodicForm(minimumStockDigest || {}))
+  }, [minimumStockDigest])
+
   if (!inventoryOverview) {
     return null
   }
@@ -181,11 +254,24 @@ export function InventoryAlarmsPage() {
       (rule) => String(rule.article_id) === String(articleId),
     )
     setSafetyFeedback({ error: '', success: '' })
+    setAutomaticMode('individual')
     setSafetyForm(nextRule ? buildSafetyFormFromRule(nextRule) : defaultSafetyForm(articleId))
   }
 
   function handleToggleRecipient(userId) {
     setSafetyForm((current) => {
+      const nextIds = current.recipient_user_ids.includes(userId)
+        ? current.recipient_user_ids.filter((item) => item !== userId)
+        : [...current.recipient_user_ids, userId]
+      return {
+        ...current,
+        recipient_user_ids: nextIds,
+      }
+    })
+  }
+
+  function handleTogglePeriodicRecipient(userId) {
+    setPeriodicForm((current) => {
       const nextIds = current.recipient_user_ids.includes(userId)
         ? current.recipient_user_ids.filter((item) => item !== userId)
         : [...current.recipient_user_ids, userId]
@@ -218,6 +304,31 @@ export function InventoryAlarmsPage() {
       })
     } finally {
       setSavingSafetyRule(false)
+    }
+  }
+
+  async function handlePeriodicSubmit(event) {
+    event.preventDefault()
+    setSavingPeriodicRule(true)
+    setPeriodicFeedback({ error: '', success: '' })
+
+    try {
+      const response = await saveInventoryMinimumStockDigest(periodicForm)
+      await refreshInventoryModule()
+      setPeriodicForm(defaultPeriodicForm(response.item))
+      setPeriodicFeedback({
+        error: '',
+        success: response.item.save_warning
+          ? `Resumen periodico guardado. ${response.item.save_warning}`
+          : 'Resumen periodico guardado correctamente.',
+      })
+    } catch (error) {
+      setPeriodicFeedback({
+        error: error.message || 'No se pudo guardar el resumen periodico.',
+        success: '',
+      })
+    } finally {
+      setSavingPeriodicRule(false)
     }
   }
 
@@ -254,7 +365,7 @@ export function InventoryAlarmsPage() {
   return (
     <div className="module-page-stack">
       <ModulePageHeader
-        description="Configura destinatarios y envia correos automaticos cuando un articulo caiga en stock de seguridad. Tambien puedes seguir disparando alarmas internas manuales."
+        description="Configura destinatarios y envia correos automaticos cuando un articulo llegue a stock minimo. Tambien puedes seguir disparando alarmas internas manuales."
         eyebrow="Inventario / Alarmas"
         title="Alarmas operativas"
       />
@@ -263,8 +374,8 @@ export function InventoryAlarmsPage() {
         <div className="module-main-stack">
           <ModuleTableSection
             actions={<span className="module-chip">{triggeredCount} activas</span>}
-            description="Reglas automaticas por articulo. El mail se envia cuando el stock cruza el umbral de seguridad y no se repite hasta que el articulo salga y vuelva a entrar en estado critico."
-            title="Stock de seguridad"
+            description="Reglas automaticas por articulo. El mail se envia cuando el stock llega al minimo configurado y no se repite hasta que el articulo salga y vuelva a entrar en estado critico."
+            title="Stock minimo"
           >
             {safetyAlerts.length ? (
               <div className="module-table-wrap">
@@ -273,7 +384,7 @@ export function InventoryAlarmsPage() {
                     <tr>
                       <th>Articulo</th>
                       <th>Stock actual</th>
-                      <th>Seguridad</th>
+                      <th>Minimo</th>
                       <th>Estado</th>
                       <th>Destinatarios</th>
                       <th>Ultimo mail</th>
@@ -292,7 +403,7 @@ export function InventoryAlarmsPage() {
                           </div>
                         </td>
                         <td>{formatQuantity(rule.current_stock)}</td>
-                        <td>{formatQuantity(rule.safety_stock)}</td>
+                        <td>{formatQuantity(rule.minimum_stock)}</td>
                         <td>
                           <div className="module-table-item">
                             <span className={`status-pill ${getSafetyAlertTone(rule)}`}>
@@ -345,10 +456,115 @@ export function InventoryAlarmsPage() {
               <ModuleEmptyState
                 description={
                   safetyEligibleArticles.length
-                    ? 'Todavia no hay reglas configuradas para los articulos con stock de seguridad.'
-                    : 'Primero define stock de seguridad en los articulos para poder activar estas alarmas.'
+                    ? 'Todavia no hay reglas configuradas para los articulos con stock minimo.'
+                    : 'Primero define stock minimo en los articulos para poder activar estas alarmas.'
                 }
                 title="Sin reglas automaticas"
+              />
+            )}
+          </ModuleTableSection>
+
+          <ModuleTableSection
+            actions={
+              <span className="module-chip">
+                {minimumStockDigest?.low_stock_count || 0} articulos hoy
+              </span>
+            }
+            description="Resumen general para enviar periodicamente el estado de todos los articulos en o por debajo del stock minimo."
+            title="Resumen periodico"
+          >
+            {minimumStockDigest?.id ? (
+              <div className="module-table-wrap">
+                <table className="module-table">
+                  <thead>
+                    <tr>
+                      <th>Modo</th>
+                      <th>Frecuencia</th>
+                      <th>Programacion</th>
+                      <th>Destinatarios</th>
+                      <th>Cobertura actual</th>
+                      <th>Estado</th>
+                      <th>Accion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Periodico</td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>{minimumStockDigest.frequency_label}</strong>
+                          <span>
+                            {minimumStockDigest.frequency === 'weekly'
+                              ? minimumStockDigest.run_weekday_label
+                              : 'Todos los dias'}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>{minimumStockDigest.run_at}</strong>
+                          <span>
+                            Proximo envio {formatDateTime(minimumStockDigest.next_run_at)}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>
+                            {minimumStockDigest.recipients.length +
+                              (minimumStockDigest.additional_email_list?.length || 0)}{' '}
+                            destinatarios
+                          </strong>
+                          <span>
+                            {[
+                              ...minimumStockDigest.recipients.map((recipient) => recipient.full_name),
+                              ...(minimumStockDigest.additional_email_list || []),
+                            ]
+                              .filter(Boolean)
+                              .join(', ') || 'Sin destinatarios'}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>{minimumStockDigest.low_stock_count} articulos</strong>
+                          <span>
+                            {(minimumStockDigest.preview_articles || [])
+                              .map((article) => article.name)
+                              .join(', ') || 'Sin articulos en minimo'}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>{minimumStockDigest.last_delivery_status_label}</strong>
+                          <span>
+                            {minimumStockDigest.last_email_error ||
+                              minimumStockDigest.last_recipient_warning ||
+                              `Ultimo envio ${formatDateTime(minimumStockDigest.last_notified_at)}`}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <button
+                          className="inline-action"
+                          onClick={() => {
+                            setAutomaticMode('periodic')
+                            setPeriodicFeedback({ error: '', success: '' })
+                          }}
+                          type="button"
+                        >
+                          Editar
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ModuleEmptyState
+                description="Todavia no hay un resumen periodico configurado para los articulos en stock minimo."
+                title="Sin resumen periodico"
               />
             )}
           </ModuleTableSection>
@@ -401,27 +617,44 @@ export function InventoryAlarmsPage() {
 
         <aside className="module-side-stack">
           <ModuleActionPanel
-            description="Selecciona el articulo, define destinatarios y deja activa la regla para que el sistema envie el mail apenas entre en stock de seguridad."
-            title="Configurar alarma automatica"
+            description="Elige si quieres una alerta por articulo individual o un resumen periodico de todos los articulos en stock minimo."
+            title="Configurar alerta automatica"
           >
-            <PanelMessage error={safetyFeedback.error} success={safetyFeedback.success} />
+            <div className="alarm-mode-tabs">
+              <button
+                className={`alarm-mode-tab ${automaticMode === 'individual' ? 'is-active' : ''}`}
+                onClick={() => setAutomaticMode('individual')}
+                type="button"
+              >
+                <strong>Individual</strong>
+                <span>Por articulo</span>
+              </button>
+              <button
+                className={`alarm-mode-tab ${automaticMode === 'periodic' ? 'is-active' : ''}`}
+                onClick={() => setAutomaticMode('periodic')}
+                type="button"
+              >
+                <strong>Periodico</strong>
+                <span>Resumen general</span>
+              </button>
+            </div>
 
-            {safetyEligibleArticles.length ? (
+            {automaticMode === 'individual' ? (
+              <>
+                <PanelMessage error={safetyFeedback.error} success={safetyFeedback.success} />
+                {safetyEligibleArticles.length ? (
               <form className="ops-form" onSubmit={handleSafetySubmit}>
-                <label>
-                  Articulo con stock de seguridad
-                  <select
-                    onChange={(event) => handleSelectSafetyArticle(event.target.value)}
-                    required
+                <label className="field-span-2">
+                  Articulo con stock minimo
+                  <SearchSelect
+                    options={safetyEligibleArticles.map((article) => ({
+                      id: article.id,
+                      label: `${article.name} - ${article.internal_code}`,
+                    }))}
                     value={safetyForm.article_id}
-                  >
-                    <option value="">Seleccionar articulo</option>
-                    {safetyEligibleArticles.map((article) => (
-                      <option key={article.id} value={article.id}>
-                        {article.name} - {article.internal_code}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(id) => handleSelectSafetyArticle(id)}
+                    placeholder="Buscar artículo..."
+                  />
                 </label>
 
                 {selectedArticle ? (
@@ -434,7 +667,7 @@ export function InventoryAlarmsPage() {
                     </div>
                     <p>
                       Stock actual <strong>{formatQuantity(selectedArticle.current_stock)}</strong> -
-                      Seguridad <strong>{formatQuantity(selectedArticle.safety_stock)}</strong>
+                      Minimo <strong>{formatQuantity(selectedArticle.minimum_stock)}</strong>
                     </p>
                   </div>
                 ) : null}
@@ -518,9 +751,240 @@ export function InventoryAlarmsPage() {
               </form>
             ) : (
               <ModuleEmptyState
-                description="Carga stock de seguridad en algun articulo desde su ficha para poder activar correos automaticos."
+                description="Carga stock minimo en algun articulo desde su ficha para poder activar correos automaticos."
                 title="Sin articulos elegibles"
               />
+                )}
+              </>
+            ) : (
+              <>
+                <PanelMessage error={periodicFeedback.error} success={periodicFeedback.success} />
+                <form className="ops-form" onSubmit={handlePeriodicSubmit}>
+                  <div className="alarm-rule-context">
+                    <div className="alarm-rule-context-head">
+                      <span className="module-chip">
+                        {minimumStockDigest?.low_stock_count || 0} articulos hoy
+                      </span>
+                      <span className={`status-pill ${periodicForm.is_enabled ? 'ok' : 'out'}`}>
+                        {periodicForm.is_enabled ? 'Activa' : 'Deshabilitada'}
+                      </span>
+                    </div>
+                    <p>
+                      El resumen incluira todos los articulos que esten en o por debajo del stock
+                      minimo al momento del envio.
+                    </p>
+                    <div className="alarm-digest-meta">
+                      <span>
+                        Proximo envio <strong>{formatDateTime(minimumStockDigest?.next_run_at)}</strong>
+                      </span>
+                      <span>
+                        Ultimo resultado{' '}
+                        <strong>{minimumStockDigest?.last_delivery_status_label || 'Sin ejecuciones'}</strong>
+                      </span>
+                    </div>
+                    {(minimumStockDigest?.preview_articles || []).length ? (
+                      <div className="alarm-digest-preview">
+                        {(minimumStockDigest.preview_articles || []).map((article) => (
+                          <span className="module-chip is-muted" key={article.id}>
+                            {article.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="checkbox-row">
+                    <label>
+                      <input
+                        checked={periodicForm.is_enabled}
+                        onChange={(event) =>
+                          setPeriodicForm((current) => ({
+                            ...current,
+                            is_enabled: event.target.checked,
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      Resumen habilitado
+                    </label>
+                  </div>
+
+                  <div className="alarm-schedule-grid">
+                    <label>
+                      Frecuencia
+                      <select
+                        onChange={(event) =>
+                          setPeriodicForm((current) => ({
+                            ...current,
+                            frequency: event.target.value,
+                          }))
+                        }
+                        value={periodicForm.frequency}
+                      >
+                        <option value="daily">Diario</option>
+                        <option value="weekly">Semanal</option>
+                      </select>
+                    </label>
+
+                    <label>
+                      Hora de envio
+                      <input
+                        onChange={(event) =>
+                          setPeriodicForm((current) => ({
+                            ...current,
+                            run_at: event.target.value,
+                          }))
+                        }
+                        required
+                        type="time"
+                        value={periodicForm.run_at}
+                      />
+                    </label>
+
+                    {periodicForm.frequency === 'weekly' ? (
+                      <label>
+                        Dia de envio
+                        <select
+                          onChange={(event) =>
+                            setPeriodicForm((current) => ({
+                              ...current,
+                              run_weekday: event.target.value,
+                            }))
+                          }
+                          value={periodicForm.run_weekday}
+                        >
+                          {WEEKDAY_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+
+                  <div className="alarm-recipient-list">
+                    <span className="alarm-recipient-label">Perfiles destinatarios</span>
+                    {(inventoryOverview.catalogs?.alarm_recipients || []).length ? (
+                      <div className="alarm-recipient-options">
+                        {inventoryOverview.catalogs.alarm_recipients.map((recipient) => (
+                          <label className="alarm-recipient-option" key={recipient.id}>
+                            <input
+                              checked={periodicForm.recipient_user_ids.includes(String(recipient.id))}
+                              onChange={() => handleTogglePeriodicRecipient(String(recipient.id))}
+                              type="checkbox"
+                            />
+                            <span>
+                              <strong>{recipient.full_name}</strong>
+                              <small>{recipient.email || 'Sin email cargado'}</small>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="module-empty-copy">No hay perfiles activos disponibles.</p>
+                    )}
+                  </div>
+
+                  <label>
+                    Emails adicionales
+                    <textarea
+                      onChange={(event) =>
+                        setPeriodicForm((current) => ({
+                          ...current,
+                          additional_emails: event.target.value,
+                        }))
+                      }
+                      placeholder="uno@empresa.com&#10;dos@empresa.com"
+                      rows="4"
+                      value={periodicForm.additional_emails}
+                    />
+                  </label>
+
+                  <label>
+                    Nota para el resumen
+                    <textarea
+                      onChange={(event) =>
+                        setPeriodicForm((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                      placeholder="Contexto operativo que quieras agregar al resumen."
+                      rows="4"
+                      value={periodicForm.notes}
+                    />
+                  </label>
+
+                  <div className="alarm-automation-status">
+                    <strong>Salud de la automatizacion</strong>
+                    <div className="alarm-automation-status-list">
+                      {[
+                        {
+                          key: 'scheduler',
+                          label: 'Runner',
+                          state: automationStatus?.scheduler,
+                          description: 'Proceso ejecutor central de la automatización. Verifica cada 60s si hay tareas pendientes (reconciliación, envío de digests).'
+                        },
+                        {
+                          key: 'minimum_stock_reconcile',
+                          label: 'Reconciliacion',
+                          state: automationStatus?.minimum_stock_reconcile,
+                          description: 'Evalúa todos los artículos y actualiza su estado de alerta según el stock actual. Se ejecuta cada 10 minutos.'
+                        },
+                        {
+                          key: 'minimum_stock_digest',
+                          label: 'Digest',
+                          state: automationStatus?.minimum_stock_digest,
+                          description: 'Envía resumen periódico de artículos en stock mínimo. Se ejecuta según la configuración (diario/semanal a la hora especificada).'
+                        },
+                      ].map((item) => (
+                        <div className="alarm-automation-item" key={item.key}>
+                          <div className="alarm-automation-item-head">
+                            <div className="alarm-automation-item-label-container">
+                              <span>{item.label}</span>
+                              <button
+                                type="button"
+                                className="info-button"
+                                onClick={() => setExpandedTooltip(expandedTooltip === item.key ? null : item.key)}
+                                title="Ver explicación"
+                              >
+                                ?
+                              </button>
+                            </div>
+                            <span className={`status-pill ${getAutomationTone(item.state)}`}>
+                              {getAutomationLabel(item.state)}
+                            </span>
+                          </div>
+                          {expandedTooltip === item.key && (
+                            <div className="alarm-automation-tooltip">
+                              {item.description}
+                            </div>
+                          )}
+                          <p>
+                            Heartbeat {formatDateTime(item.state?.heartbeat_at)} - Ultimo estado{' '}
+                            {item.state?.last_run_status_label || 'Sin ejecuciones'}
+                          </p>
+                          {item.state?.last_error_message ? (
+                            <p>{item.state.last_error_message}</p>
+                          ) : null}
+                          {!item.state?.last_error_message && item.state?.last_warning_message ? (
+                            <p>{item.state.last_warning_message}</p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    className="primary-button"
+                    disabled={savingPeriodicRule}
+                    type="submit"
+                  >
+                    {savingPeriodicRule ? 'Guardando...' : 'Guardar resumen periodico'}
+                  </button>
+                </form>
+              </>
             )}
           </ModuleActionPanel>
 
