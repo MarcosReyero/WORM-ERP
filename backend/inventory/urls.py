@@ -1,0 +1,43 @@
+from django.urls import path
+
+from .views import (
+    article_detail,
+    article_import_excel,
+    articles,
+    balances,
+    batches,
+    catalogs,
+    checkout_return,
+    checkouts,
+    count_session_lines,
+    count_sessions,
+    dashboard,
+    discrepancies,
+    discrepancy_resolve,
+    inventory_safety_alerts,
+    inventory_overview,
+    inventory_alarms,
+    movements,
+    tracked_units,
+)
+
+urlpatterns = [
+    path("dashboard/", dashboard, name="dashboard"),
+    path("catalogs/", catalogs, name="catalogs"),
+    path("articles/", articles, name="articles"),
+    path("articles/import-excel/", article_import_excel, name="article-import-excel"),
+    path("articles/<int:article_id>/", article_detail, name="article-detail"),
+    path("balances/", balances, name="balances"),
+    path("batches/", batches, name="batches"),
+    path("tracked-units/", tracked_units, name="tracked-units"),
+    path("movements/", movements, name="movements"),
+    path("checkouts/", checkouts, name="checkouts"),
+    path("checkouts/<int:checkout_id>/return/", checkout_return, name="checkout-return"),
+    path("counts/", count_sessions, name="count-sessions"),
+    path("counts/<int:session_id>/lines/", count_session_lines, name="count-session-lines"),
+    path("discrepancies/", discrepancies, name="discrepancies"),
+    path("discrepancies/<int:discrepancy_id>/resolve/", discrepancy_resolve, name="discrepancy-resolve"),
+    path("inventory/alarms/", inventory_alarms, name="inventory-alarms"),
+    path("inventory/safety-alerts/", inventory_safety_alerts, name="inventory-safety-alerts"),
+    path("inventory/overview/", inventory_overview, name="inventory-overview"),
+]
