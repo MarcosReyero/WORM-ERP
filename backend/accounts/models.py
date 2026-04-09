@@ -62,3 +62,189 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} ({self.get_role_display()})"
+
+
+class PermissionModule(models.Model):
+    """Módulos/secciones de la plataforma que pueden requerir permisos"""
+
+    class Module(models.TextChoices):
+        INVENTORY_OVERVIEW = "inventory_overview", "Panel de Inventario"
+        STOCK_MANAGEMENT = "stock_management", "Gestión de Stock"
+        MOVEMENTS = "movements", "Movimientos"
+        CHECKOUTS = "checkouts", "Retiros"
+        ALARMS = "alarms", "Alarmas"
+        COUNTS = "counts", "Conteos"
+        DISCREPANCIES = "discrepancies", "Discrepancias"
+        ADMIN_USERS = "admin_users", "Administración de Usuarios"
+        REPORTS = "reports", "Reportes"
+        SETTINGS = "settings", "Configuración"
+
+    code = models.CharField(
+        max_length=50,
+        choices=Module.choices,
+        unique=True,
+        primary_key=True,
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "name"]
+        verbose_name = "Módulo de Permiso"
+        verbose_name_plural = "Módulos de Permisos"
+
+    def __str__(self):
+        return self.name
+
+
+class PermissionAction(models.Model):
+    """Acciones que se pueden realizar dentro de un módulo"""
+
+    class Action(models.TextChoices):
+        VIEW = "view", "Ver"
+        CREATE = "create", "Crear"
+        CHANGE = "change", "Editar"
+        DELETE = "delete", "Eliminar"
+        EXPORT = "export", "Exportar"
+        APPROVE = "approve", "Aprobar"
+
+    code = models.CharField(
+        max_length=50,
+        choices=Action.choices,
+        unique=True,
+        primary_key=True,
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Acción de Permiso"
+        verbose_name_plural = "Acciones de Permisos"
+
+    def __str__(self):
+        return self.name
+
+
+class RolePermission(models.Model):
+    """Permisos asignados a cada rol (grupo)"""
+
+    role = models.CharField(
+        max_length=32,
+        choices=UserProfile.Role.choices,
+    )
+    module = models.ForeignKey(
+        PermissionModule,
+        on_delete=models.CASCADE,
+        related_name="role_permissions",
+    )
+    actions = models.ManyToManyField(
+        PermissionAction,
+        related_name="role_permissions",
+        help_text="Acciones permitidas en este módulo",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("role", "module")
+        verbose_name = "Permiso de Rol"
+        verbose_name_plural = "Permisos de Roles"
+        ordering = ["role", "module"]
+
+    def __str__(self):
+        return f"{self.get_role_display()} - {self.module.name}"
+
+    def get_role_display(self):
+        return dict(UserProfile.Role.choices).get(self.role, self.role)
+
+
+class UserPermission(models.Model):
+    """Permisos específicos por usuario que pueden sobrescribir los del rol"""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="permissions",
+    )
+    inherit_role_permissions = models.BooleanField(
+        default=True,
+        help_text="Si está marcado, hereda todos los permisos de su rol. "
+        "Los permisos específicos se suman a los del rol.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Permiso de Usuario"
+        verbose_name_plural = "Permisos de Usuarios"
+
+    def __str__(self):
+        return f"Permisos de {self.user.username}"
+
+
+class UserModulePermission(models.Model):
+    """Permisos específicos de usuario por módulo"""
+
+    user_permission = models.ForeignKey(
+        UserPermission,
+        on_delete=models.CASCADE,
+        related_name="module_permissions",
+    )
+    module = models.ForeignKey(
+        PermissionModule,
+        on_delete=models.CASCADE,
+        related_name="user_module_permissions",
+    )
+    actions = models.ManyToManyField(
+        PermissionAction,
+        related_name="user_module_permissions",
+        help_text="Acciones permitidas para este usuario en este módulo",
+    )
+    allow = models.BooleanField(
+        default=True,
+        help_text="Si está marcado, permite estas acciones. "
+        "Si no, las deniega (sobrescribe permiso del rol)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user_permission", "module")
+        verbose_name = "Permiso de Módulo del Usuario"
+        verbose_name_plural = "Permisos de Módulos del Usuario"
+        ordering = ["user_permission", "module"]
+
+    def __str__(self):
+        action = "Permite" if self.allow else "Deniega"
+        return f"{self.user_permission.user.username} - {self.module.name} - {action}"
+
+
+class SectorPermission(models.Model):
+    """Permisos de acceso a sectores específicos"""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sector_permissions",
+    )
+    sector = models.ForeignKey(
+        "inventory.Sector",
+        on_delete=models.CASCADE,
+        related_name="user_permissions",
+    )
+    can_view = models.BooleanField(default=True)
+    can_edit = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "sector")
+        verbose_name = "Permiso de Sector"
+        verbose_name_plural = "Permisos de Sectores"
+        ordering = ["user", "sector"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.sector.name}"
