@@ -8,7 +8,7 @@ from io import BytesIO
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage, send_mail
 from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Count, Sum
@@ -28,12 +28,15 @@ from communications.services import (
 )
 
 from .automation import (
+    TASK_KEY_FULL_STOCK_REPORT,
     TASK_KEY_MINIMUM_STOCK_DIGEST,
     TASK_KEY_MINIMUM_STOCK_RECONCILE,
     TASK_KEY_SCHEDULER,
     ensure_automation_task_states,
     get_automation_task_state,
+    get_full_stock_report_due_context,
     get_minimum_stock_digest_due_context,
+    mark_full_stock_report_result,
     mark_minimum_stock_digest_result,
     serialize_automation_task_state,
 )
@@ -41,6 +44,7 @@ from .models import (
     Article,
     ArticleCategory,
     AssetCheckout,
+    FullStockReportConfig,
     InventoryBalance,
     InventoryBatch,
     Location,
@@ -59,6 +63,7 @@ from .models import (
 
 
 DIGEST_AUTOMATION_LOGGER = logging.getLogger("inventory.automation.digest")
+FULL_STOCK_REPORT_AUTOMATION_LOGGER = logging.getLogger("inventory.automation.full_stock_report")
 
 
 class InventoryApiError(Exception):
@@ -705,6 +710,9 @@ def serialize_inventory_automation_status():
         "minimum_stock_digest": serialize_automation_task_state(
             get_automation_task_state(TASK_KEY_MINIMUM_STOCK_DIGEST)
         ),
+        "full_stock_report": serialize_automation_task_state(
+            get_automation_task_state(TASK_KEY_FULL_STOCK_REPORT)
+        ),
     }
 
 
@@ -768,6 +776,75 @@ def serialize_minimum_stock_digest_config(config=None, serialized_articles=None,
                 "minimum_stock": article["minimum_stock"],
             }
             for article in low_stock_articles[:6]
+        ],
+    }
+
+
+def full_stock_articles_snapshot(serialized_articles=None):
+    return serialized_articles if serialized_articles is not None else list_articles()
+
+
+def serialize_full_stock_report_config(config=None, serialized_articles=None, save_warning=""):
+    articles = full_stock_articles_snapshot(serialized_articles)
+    recipients = []
+    next_run_at = None
+    run_weekday_label = WEEKDAY_LABELS.get(0)
+    last_delivery_status = FullStockReportConfig.DeliveryStatus.NEVER
+    if config is not None:
+        recipients = list(
+            config.recipients.select_related("profile__sector_default").order_by(
+                "first_name",
+                "last_name",
+                "username",
+            )
+        )
+        next_run_at = get_full_stock_report_due_context(config).get("next_run_at")
+        run_weekday_label = WEEKDAY_LABELS.get(config.run_weekday, WEEKDAY_LABELS[0])
+        last_delivery_status = config.last_delivery_status
+
+    return {
+        "id": config.id if config else None,
+        "is_enabled": config.is_enabled if config else False,
+        "frequency": config.frequency if config else FullStockReportConfig.Frequency.DAILY,
+        "frequency_label": (
+            config.get_frequency_display()
+            if config
+            else FullStockReportConfig.Frequency.DAILY.label
+        ),
+        "recipients": [serialize_contact(user) for user in recipients],
+        "additional_emails": config.additional_emails if config else "",
+        "additional_email_list": split_email_list(config.additional_emails)[0] if config else [],
+        "notes": config.notes if config else "",
+        "run_at": serialize_digest_run_time(config.run_at) if config else "08:00",
+        "run_weekday": config.run_weekday if config else 0,
+        "run_weekday_label": run_weekday_label,
+        "next_run_at": serialize_datetime(next_run_at),
+        "last_notified_at": serialize_datetime(config.last_notified_at) if config else None,
+        "last_email_error": config.last_email_error if config else "",
+        "last_period_key": config.last_period_key if config else "",
+        "inflight_period_key": config.inflight_period_key if config else "",
+        "inflight_started_at": serialize_datetime(config.inflight_started_at) if config else None,
+        "last_delivery_status": last_delivery_status,
+        "last_delivery_status_label": (
+            config.get_last_delivery_status_display()
+            if config
+            else FullStockReportConfig.DeliveryStatus.NEVER.label
+        ),
+        "last_delivery_tone": resolve_digest_delivery_tone(last_delivery_status),
+        "last_recipient_warning": config.last_recipient_warning if config else "",
+        "last_summary_count": config.last_summary_count if config else None,
+        "save_warning": save_warning,
+        "article_count": len(articles),
+        "preview_articles": [
+            {
+                "id": article["id"],
+                "name": article["name"],
+                "internal_code": article["internal_code"],
+                "current_stock": article["current_stock"],
+                "available_stock": article["available_stock"],
+                "minimum_stock": article["minimum_stock"],
+            }
+            for article in articles[:6]
         ],
     }
 
@@ -1300,6 +1377,16 @@ def get_minimum_stock_digest_config(user, serialized_articles=None):
     return serialize_minimum_stock_digest_config(config, serialized_articles=serialized_articles)
 
 
+def get_full_stock_report_config(user, serialized_articles=None):
+    require_role(user, ALARM_ROLES)
+    config = (
+        FullStockReportConfig.objects.prefetch_related("recipients__profile__sector_default")
+        .filter(key="default")
+        .first()
+    )
+    return serialize_full_stock_report_config(config, serialized_articles=serialized_articles)
+
+
 def save_minimum_stock_digest_config(user, payload):
     require_role(user, ALARM_ROLES)
 
@@ -1350,6 +1437,56 @@ def save_minimum_stock_digest_config(user, payload):
     return serialize_minimum_stock_digest_config(refreshed_config, save_warning=save_warning)
 
 
+def save_full_stock_report_config(user, payload):
+    require_role(user, ALARM_ROLES)
+
+    recipient_ids = payload.get("recipient_user_ids") or []
+    if isinstance(recipient_ids, str):
+        recipient_ids = [item for item in re.split(r"[,\s]+", recipient_ids) if item]
+
+    recipients = validate_alarm_rule_recipients(recipient_ids)
+    additional_emails = payload.get("additional_emails") or ""
+    validated_extra_emails, invalid_extra_emails = split_email_list(additional_emails)
+    is_enabled = parse_boolean(payload.get("is_enabled"))
+    frequency = resolve_digest_frequency(payload.get("frequency"))
+    run_at = parse_time_or_error(payload.get("run_at"), "run_at", default=parse_time("08:00"))
+    run_weekday = parse_weekday_or_error(payload.get("run_weekday"), default=0)
+
+    if is_enabled and not (recipients or validated_extra_emails):
+        raise InventoryApiError("Selecciona al menos un destinatario o agrega un email adicional.")
+
+    save_warning = ""
+    if invalid_extra_emails:
+        save_warning = (
+            "Se ignoraron emails invalidos al guardar: " + ", ".join(invalid_extra_emails)
+        )
+
+    with transaction.atomic():
+        config, created = FullStockReportConfig.objects.get_or_create(
+            key="default",
+            defaults={
+                "created_by": user,
+                "updated_by": user,
+            },
+        )
+        config.is_enabled = is_enabled
+        config.frequency = frequency
+        config.run_at = run_at
+        config.run_weekday = run_weekday
+        config.additional_emails = "\n".join(validated_extra_emails)
+        config.notes = payload.get("notes") or ""
+        update_audit(config, user, is_new=created)
+        save_validated(config)
+        config.recipients.set(recipients)
+
+    refreshed_config = (
+        FullStockReportConfig.objects.prefetch_related("recipients__profile__sector_default")
+        .filter(pk=config.pk)
+        .first()
+    )
+    return serialize_full_stock_report_config(refreshed_config, save_warning=save_warning)
+
+
 def dispatch_minimum_stock_digest(config_id, due_key):
     config = (
         MinimumStockDigestConfig.objects.prefetch_related("recipients__profile__sector_default")
@@ -1375,6 +1512,15 @@ def dispatch_minimum_stock_digest(config_id, due_key):
             "recipient_warning": "",
             "email_error": "",
         }
+
+    # Marca el periodo como inflight para reflejar estado incluso si se llama fuera del runner.
+    started_at = timezone.now()
+    MinimumStockDigestConfig.objects.filter(pk=config_id).update(
+        inflight_period_key=due_key,
+        inflight_started_at=started_at,
+    )
+    config.inflight_period_key = due_key
+    config.inflight_started_at = started_at
 
     low_stock_articles = low_stock_articles_snapshot()
     if not low_stock_articles:
@@ -1498,6 +1644,208 @@ def dispatch_minimum_stock_digest(config_id, due_key):
     return {
         "delivery_status": delivery_status,
         "summary_count": len(low_stock_articles),
+        "recipient_warning": recipient_warning,
+        "email_error": "",
+    }
+
+
+def build_full_stock_report_message(config, article_count, report_filename, due_key=""):
+    report_label = ""
+    if due_key and ":" in str(due_key):
+        report_label = due_key.split(":", 1)[1]
+
+    subject_suffix = report_label or timezone.localdate().isoformat()
+    subject = f"[Inventario] Reporte de stock completo ({subject_suffix})"
+    lines = [
+        "Reporte automatico del stock completo (archivo Excel adjunto).",
+        "",
+        f"Total articulos: {article_count}",
+        f"Archivo: {report_filename}",
+        "",
+    ]
+
+    if clean_string(config.notes):
+        lines.extend(
+            [
+                "Notas:",
+                config.notes.strip(),
+            ]
+        )
+
+    return subject, "\n".join(lines).strip()
+
+
+def send_full_stock_report_email(config, recipient_emails, report_filename, report_payload, article_count, due_key=""):
+    if not getattr(settings, "INVENTORY_ALARM_EMAILS_ENABLED", True):
+        return False, "El envio por mail esta desactivado en la configuracion."
+
+    subject, body = build_full_stock_report_message(
+        config,
+        article_count,
+        report_filename,
+        due_key=due_key,
+    )
+    try:
+        message = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
+            to=recipient_emails,
+        )
+        message.attach(
+            report_filename,
+            report_payload,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        sent = message.send(fail_silently=False)
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+
+    if not sent:
+        return False, "No se pudo confirmar el envio del mail."
+    return True, ""
+
+
+def dispatch_full_stock_report(config_id, due_key):
+    config = (
+        FullStockReportConfig.objects.prefetch_related("recipients__profile__sector_default")
+        .filter(pk=config_id)
+        .first()
+    )
+    if not config or not config.is_enabled:
+        mark_full_stock_report_result(
+            config_id,
+            due_key,
+            FullStockReportConfig.DeliveryStatus.SKIPPED,
+            now=timezone.now(),
+            summary_count=0,
+            consume_period=True,
+        )
+        FULL_STOCK_REPORT_AUTOMATION_LOGGER.info(
+            "stock_report_skipped_disabled",
+            extra={"period_key": due_key},
+        )
+        return {
+            "delivery_status": FullStockReportConfig.DeliveryStatus.SKIPPED,
+            "summary_count": 0,
+            "recipient_warning": "",
+            "email_error": "",
+        }
+
+    # Marca el periodo como inflight para reflejar estado incluso si se llama fuera del runner.
+    started_at = timezone.now()
+    FullStockReportConfig.objects.filter(pk=config_id).update(
+        inflight_period_key=due_key,
+        inflight_started_at=started_at,
+    )
+    config.inflight_period_key = due_key
+    config.inflight_started_at = started_at
+
+    articles = filter_articles_for_stock_view(list_articles())
+    report_filename, report_payload = build_stock_export_excel_from_articles(articles)
+
+    recipient_resolution = resolve_digest_recipients(config)
+    recipient_emails = recipient_resolution["emails"]
+    recipient_warning = recipient_resolution["warning_message"]
+    if recipient_warning:
+        FULL_STOCK_REPORT_AUTOMATION_LOGGER.warning(
+            "stock_report_recipients_warning",
+            extra={
+                "period_key": due_key,
+                "recipient_count": len(recipient_emails),
+                "discarded_recipient_count": len(recipient_resolution["discarded"]),
+            },
+        )
+
+    if not recipient_emails:
+        recipient_warning = recipient_warning or "No hay destinatarios validos para el reporte."
+        mark_full_stock_report_result(
+            config_id,
+            due_key,
+            FullStockReportConfig.DeliveryStatus.WARNING,
+            now=timezone.now(),
+            summary_count=len(articles),
+            recipient_warning=recipient_warning,
+            email_error="",
+            consume_period=True,
+        )
+        return {
+            "delivery_status": FullStockReportConfig.DeliveryStatus.WARNING,
+            "summary_count": len(articles),
+            "recipient_warning": recipient_warning,
+            "email_error": "",
+        }
+
+    FULL_STOCK_REPORT_AUTOMATION_LOGGER.info(
+        "stock_report_send_start",
+        extra={
+            "period_key": due_key,
+            "recipient_count": len(recipient_emails),
+            "discarded_recipient_count": len(recipient_resolution["discarded"]),
+            "summary_count": len(articles),
+        },
+    )
+    sent, email_error = send_full_stock_report_email(
+        config,
+        recipient_emails,
+        report_filename,
+        report_payload,
+        len(articles),
+        due_key=due_key,
+    )
+    if not sent:
+        mark_full_stock_report_result(
+            config_id,
+            due_key,
+            FullStockReportConfig.DeliveryStatus.ERROR,
+            now=timezone.now(),
+            summary_count=len(articles),
+            recipient_warning=recipient_warning,
+            email_error=email_error,
+            consume_period=False,
+        )
+        FULL_STOCK_REPORT_AUTOMATION_LOGGER.error(
+            "stock_report_send_error",
+            extra={
+                "period_key": due_key,
+                "recipient_count": len(recipient_emails),
+                "summary_count": len(articles),
+            },
+        )
+        return {
+            "delivery_status": FullStockReportConfig.DeliveryStatus.ERROR,
+            "summary_count": len(articles),
+            "recipient_warning": recipient_warning,
+            "email_error": email_error,
+        }
+
+    delivery_status = (
+        FullStockReportConfig.DeliveryStatus.WARNING
+        if recipient_warning
+        else FullStockReportConfig.DeliveryStatus.SUCCESS
+    )
+    mark_full_stock_report_result(
+        config_id,
+        due_key,
+        delivery_status,
+        now=timezone.now(),
+        summary_count=len(articles),
+        recipient_warning=recipient_warning,
+        email_error="",
+        consume_period=True,
+    )
+    FULL_STOCK_REPORT_AUTOMATION_LOGGER.info(
+        "stock_report_send_success",
+        extra={
+            "period_key": due_key,
+            "recipient_count": len(recipient_emails),
+            "discarded_recipient_count": len(recipient_resolution["discarded"]),
+            "summary_count": len(articles),
+        },
+    )
+    return {
+        "delivery_status": delivery_status,
+        "summary_count": len(articles),
         "recipient_warning": recipient_warning,
         "email_error": "",
     }
@@ -1703,6 +2051,11 @@ def build_inventory_overview(user):
         "safety_alerts": list_safety_stock_alerts(user) if can_manage_alarms else [],
         "minimum_stock_digest": (
             get_minimum_stock_digest_config(user, serialized_articles=serialized_articles)
+            if can_manage_alarms
+            else None
+        ),
+        "full_stock_report": (
+            get_full_stock_report_config(user, serialized_articles=serialized_articles)
             if can_manage_alarms
             else None
         ),
@@ -3231,6 +3584,10 @@ STOCK_EXPORT_COLUMNS = (
 
 def build_stock_export_excel(filters=None):
     articles = filter_articles_for_stock_view(list_articles(), filters=filters)
+    return build_stock_export_excel_from_articles(articles)
+
+
+def build_stock_export_excel_from_articles(articles):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Stock"

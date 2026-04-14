@@ -449,6 +449,63 @@ class MinimumStockDigestConfig(AuditedModel):
         return "Resumen periodico de stock minimo"
 
 
+class FullStockReportConfig(AuditedModel):
+    class Frequency(models.TextChoices):
+        DAILY = "daily", "Diario"
+        WEEKLY = "weekly", "Semanal"
+
+    class DeliveryStatus(models.TextChoices):
+        NEVER = "never", "Sin ejecuciones"
+        SUCCESS = "success", "Enviado"
+        WARNING = "warning", "Con advertencias"
+        ERROR = "error", "Error"
+        SKIPPED = "skipped", "Sin envio"
+
+    key = models.CharField(max_length=32, unique=True, default="default")
+    is_enabled = models.BooleanField(default=True)
+    frequency = models.CharField(
+        max_length=16,
+        choices=Frequency.choices,
+        default=Frequency.DAILY,
+    )
+    run_at = models.TimeField(default=time(8, 0))
+    run_weekday = models.PositiveSmallIntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(6)],
+    )
+    recipients = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="inventory_full_stock_report_configs",
+    )
+    additional_emails = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    last_notified_at = models.DateTimeField(null=True, blank=True)
+    last_email_error = models.TextField(blank=True)
+    last_summary_count = models.PositiveIntegerField(null=True, blank=True)
+    last_period_key = models.CharField(max_length=64, blank=True)
+    inflight_period_key = models.CharField(max_length=64, blank=True)
+    inflight_started_at = models.DateTimeField(null=True, blank=True)
+    last_delivery_status = models.CharField(
+        max_length=16,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.NEVER,
+    )
+    last_recipient_warning = models.TextField(blank=True)
+    force_send_next = models.BooleanField(
+        default=False,
+        help_text="Marca para forzar el envío en el próximo ciclo (se auto-resetea después)",
+    )
+
+    class Meta:
+        ordering = ["key"]
+        verbose_name = "Reporte periodico de stock completo"
+        verbose_name_plural = "Reportes periodicos de stock completo"
+
+    def __str__(self):
+        return "Reporte periodico de stock completo"
+
+
 class InventoryAutomationTaskState(AuditedModel):
     class RuntimeState(models.TextChoices):
         IDLE = "idle", "Inactiva"

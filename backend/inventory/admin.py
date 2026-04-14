@@ -4,6 +4,7 @@ from .models import (
     Article,
     ArticleCategory,
     AssetCheckout,
+    FullStockReportConfig,
     InternalRequest,
     InternalRequestLine,
     InventoryAutomationTaskState,
@@ -101,6 +102,34 @@ class MinimumStockDigestConfigAdmin(admin.ModelAdmin):
         ("Ejecución de Prueba", {
             "fields": ("force_send_next",),
             "description": "Marca 'Forzar envío próximo' para enviar el digest en el próximo ciclo del scheduler, "
+                          "ignorando la configuración de horario. Se resetea automáticamente después del envío."
+        }),
+        ("Últimos Resultados", {
+            "fields": ("last_notified_at", "last_summary_count", "last_delivery_status", "last_email_error", "last_period_key"),
+            "classes": ("collapse",)
+        }),
+        ("Notas", {
+            "fields": ("notes",),
+            "classes": ("collapse",)
+        }),
+    )
+    readonly_fields = ("last_notified_at", "last_summary_count", "last_delivery_status", "last_email_error", "last_period_key")
+
+
+@admin.register(FullStockReportConfig)
+class FullStockReportConfigAdmin(admin.ModelAdmin):
+    list_display = ("key", "frequency", "is_enabled", "last_notified_at", "force_send_next")
+    list_filter = ("frequency", "is_enabled")
+    fieldsets = (
+        ("Configuración General", {
+            "fields": ("key", "is_enabled", "frequency", "run_at", "run_weekday")
+        }),
+        ("Destinatarios", {
+            "fields": ("recipients", "additional_emails")
+        }),
+        ("Ejecución de Prueba", {
+            "fields": ("force_send_next",),
+            "description": "Marca 'Forzar envío próximo' para enviar el reporte en el próximo ciclo del scheduler, "
                           "ignorando la configuración de horario. Se resetea automáticamente después del envío."
         }),
         ("Últimos Resultados", {

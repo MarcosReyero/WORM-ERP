@@ -17,6 +17,7 @@ from .views import (
     discrepancy_resolve,
     inventory_safety_alerts,
     inventory_minimum_stock_digest,
+    inventory_full_stock_report,
     inventory_overview,
     inventory_alarms,
     movements,
@@ -43,5 +44,6 @@ urlpatterns = [
     path("inventory/alarms/", inventory_alarms, name="inventory-alarms"),
     path("inventory/safety-alerts/", inventory_safety_alerts, name="inventory-safety-alerts"),
     path("inventory/minimum-stock-digest/", inventory_minimum_stock_digest, name="inventory-minimum-stock-digest"),
+    path("inventory/full-stock-report/", inventory_full_stock_report, name="inventory-full-stock-report"),
     path("inventory/overview/", inventory_overview, name="inventory-overview"),
 ]

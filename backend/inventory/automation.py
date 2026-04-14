@@ -13,21 +13,29 @@ from django.db import IntegrityError, close_old_connections
 from django.db.models import F, Q
 from django.utils import timezone
 
-from .models import InventoryAutomationTaskState, MinimumStockDigestConfig, SafetyStockAlertRule
+from .models import (
+    FullStockReportConfig,
+    InventoryAutomationTaskState,
+    MinimumStockDigestConfig,
+    SafetyStockAlertRule,
+)
 
 AUTOMATION_LOGGER = logging.getLogger("inventory.automation")
 BOOTSTRAP_LOGGER = logging.getLogger("inventory.automation.bootstrap")
 LEASE_LOGGER = logging.getLogger("inventory.automation.lease")
 RECONCILE_LOGGER = logging.getLogger("inventory.automation.reconcile")
 DIGEST_LOGGER = logging.getLogger("inventory.automation.digest")
+FULL_STOCK_REPORT_LOGGER = logging.getLogger("inventory.automation.full_stock_report")
 
 TASK_KEY_SCHEDULER = "scheduler"
 TASK_KEY_MINIMUM_STOCK_RECONCILE = "minimum_stock_reconcile"
 TASK_KEY_MINIMUM_STOCK_DIGEST = "minimum_stock_digest"
+TASK_KEY_FULL_STOCK_REPORT = "full_stock_report"
 AUTOMATION_TASK_KEYS = (
     TASK_KEY_SCHEDULER,
     TASK_KEY_MINIMUM_STOCK_RECONCILE,
     TASK_KEY_MINIMUM_STOCK_DIGEST,
+    TASK_KEY_FULL_STOCK_REPORT,
 )
 
 _RUNNER_LOCK = threading.Lock()
@@ -312,6 +320,34 @@ def get_minimum_stock_digest_due_context(config, now=None):
     }
 
 
+def get_full_stock_report_due_context(config, now=None):
+    now = timezone.localtime(now or timezone.now())
+    run_at = config.run_at
+
+    if config.frequency == FullStockReportConfig.Frequency.WEEKLY:
+        week_start = now.date() - timedelta(days=now.weekday())
+        target_date = week_start + timedelta(days=config.run_weekday)
+        scheduled_at = _localize_schedule(datetime.combine(target_date, run_at))
+        due_key = f"weekly:{target_date.isoformat()}" if now >= scheduled_at else ""
+        next_run_at = scheduled_at if now < scheduled_at else scheduled_at + timedelta(days=7)
+        return {
+            "due": bool(due_key),
+            "due_key": due_key,
+            "due_at": scheduled_at,
+            "next_run_at": next_run_at,
+        }
+
+    scheduled_at = _localize_schedule(datetime.combine(now.date(), run_at))
+    due_key = f"daily:{now.date().isoformat()}" if now >= scheduled_at else ""
+    next_run_at = scheduled_at if now < scheduled_at else scheduled_at + timedelta(days=1)
+    return {
+        "due": bool(due_key),
+        "due_key": due_key,
+        "due_at": scheduled_at,
+        "next_run_at": next_run_at,
+    }
+
+
 def is_reconcile_due(now=None):
     now = now or timezone.now()
     task_state = ensure_automation_task_state(TASK_KEY_MINIMUM_STOCK_RECONCILE)
@@ -400,6 +436,80 @@ def mark_minimum_stock_digest_result(
     MinimumStockDigestConfig.objects.filter(pk=config_id).update(**update_kwargs)
 
 
+def claim_full_stock_report_period(config, due_key, now=None):
+    now = now or timezone.now()
+    claim_timeout = timedelta(
+        seconds=getattr(settings, "INVENTORY_AUTOMATION_DIGEST_LEASE_SECONDS", 300)
+    )
+    stale_before = now - claim_timeout
+    previous_config = FullStockReportConfig.objects.filter(pk=config.pk).first()
+    if not previous_config:
+        return False, False
+    if previous_config.last_period_key == due_key:
+        return False, False
+    if (
+        previous_config.inflight_period_key == due_key
+        and previous_config.last_delivery_status == FullStockReportConfig.DeliveryStatus.ERROR
+    ):
+        return False, False
+
+    takeover = bool(
+        previous_config.inflight_period_key == due_key
+        and previous_config.inflight_started_at
+        and previous_config.inflight_started_at < stale_before
+        and previous_config.last_delivery_status != FullStockReportConfig.DeliveryStatus.ERROR
+    )
+    updated = (
+        FullStockReportConfig.objects.filter(pk=config.pk)
+        .exclude(last_period_key=due_key)
+        .filter(
+            Q(inflight_period_key="")
+            | ~Q(inflight_period_key=due_key)
+            | Q(inflight_started_at__isnull=True)
+            | Q(inflight_started_at__lt=stale_before)
+        )
+        .update(
+            inflight_period_key=due_key,
+            inflight_started_at=now,
+        )
+    )
+    if updated:
+        FULL_STOCK_REPORT_LOGGER.info(
+            "stock_report_claimed",
+            extra={
+                "period_key": due_key,
+                "takeover": takeover,
+            },
+        )
+    return bool(updated), takeover and bool(updated)
+
+
+def mark_full_stock_report_result(
+    config_id,
+    due_key,
+    delivery_status,
+    now=None,
+    summary_count=None,
+    email_error="",
+    recipient_warning="",
+    consume_period=False,
+):
+    now = now or timezone.now()
+    update_kwargs = {
+        "last_delivery_status": delivery_status,
+        "last_summary_count": summary_count,
+        "last_email_error": email_error,
+        "last_recipient_warning": recipient_warning,
+    }
+    if consume_period:
+        update_kwargs["last_period_key"] = due_key
+        update_kwargs["inflight_period_key"] = ""
+        update_kwargs["inflight_started_at"] = None
+    if delivery_status == FullStockReportConfig.DeliveryStatus.SUCCESS:
+        update_kwargs["last_notified_at"] = now
+    FullStockReportConfig.objects.filter(pk=config_id).update(**update_kwargs)
+
+
 def _detect_management_command(argv):
     if len(argv) < 2:
         return ""
@@ -473,7 +583,8 @@ class InventoryAutomationRunner(threading.Thread):
                 if is_reconcile_due(now=now):
                     self.run_reconcile_job()
                 self.run_digest_job_if_due()
-            
+                self.run_full_stock_report_job_if_due()
+             
             return True
         except Exception as e:
             AUTOMATION_LOGGER.error(f"simulate_tick_failed: {e}")
@@ -559,6 +670,7 @@ class InventoryAutomationRunner(threading.Thread):
         if is_reconcile_due():
             self.run_reconcile_job()
         self.run_digest_job_if_due()
+        self.run_full_stock_report_job_if_due()
 
     def run_reconcile_job(self):
         now = timezone.now()
@@ -879,6 +991,157 @@ class InventoryAutomationRunner(threading.Thread):
                 "digest_unhandled_error",
                 extra={
                     "task_key": TASK_KEY_MINIMUM_STOCK_DIGEST,
+                    "owner_token": job_owner_token,
+                },
+            )
+
+
+    def run_full_stock_report_job_if_due(self):
+        config = FullStockReportConfig.objects.filter(key="default").first()
+        if not config or not config.is_enabled:
+            return
+        due_context = get_full_stock_report_due_context(config)
+        # Permite envío si es hora o si se forzó desde admin
+        if not due_context["due"] and not config.force_send_next:
+            return
+
+        now = timezone.now()
+        job_owner_token = f"{TASK_KEY_FULL_STOCK_REPORT}-{uuid.uuid4().hex}"
+        job_owner_label = _runner_owner_label(f"{self.name}:{TASK_KEY_FULL_STOCK_REPORT}")
+        LEASE_LOGGER.info(
+            "lease_acquire_attempt",
+            extra={
+                "task_key": TASK_KEY_FULL_STOCK_REPORT,
+                "owner_token": job_owner_token,
+                "owner_label": job_owner_label,
+            },
+        )
+        lease = try_acquire_lease(
+            TASK_KEY_FULL_STOCK_REPORT,
+            job_owner_token,
+            job_owner_label,
+            getattr(settings, "INVENTORY_AUTOMATION_DIGEST_LEASE_SECONDS", 300),
+            now=now,
+        )
+        if not lease.acquired:
+            if self._busy_log_allowed(TASK_KEY_FULL_STOCK_REPORT):
+                LEASE_LOGGER.info(
+                    "lease_busy",
+                    extra={
+                        "task_key": TASK_KEY_FULL_STOCK_REPORT,
+                        "owner_token": job_owner_token,
+                        "owner_label": job_owner_label,
+                    },
+                )
+            return
+
+        from .services import dispatch_full_stock_report
+
+        processed_count = 0
+        try:
+            config = FullStockReportConfig.objects.prefetch_related(
+                "recipients__profile__sector_default"
+            ).filter(pk=config.pk).first()
+            if not config or not config.is_enabled:
+                finish_task_run(
+                    TASK_KEY_FULL_STOCK_REPORT,
+                    job_owner_token,
+                    InventoryAutomationTaskState.LastRunStatus.SKIPPED,
+                    now=timezone.now(),
+                    processed_count=0,
+                )
+                return
+
+            due_context = get_full_stock_report_due_context(config)
+            # Permite envío si es hora o si se forzó desde admin
+            if not due_context["due"] and not config.force_send_next:
+                finish_task_run(
+                    TASK_KEY_FULL_STOCK_REPORT,
+                    job_owner_token,
+                    InventoryAutomationTaskState.LastRunStatus.SKIPPED,
+                    now=timezone.now(),
+                    processed_count=0,
+                )
+                return
+
+            due_key = due_context["due_key"]
+            FULL_STOCK_REPORT_LOGGER.info(
+                "stock_report_due",
+                extra={
+                    "period_key": due_key,
+                    "owner_token": job_owner_token,
+                },
+            )
+            claimed, takeover = claim_full_stock_report_period(config, due_key, now=timezone.now())
+            if not claimed:
+                finish_task_run(
+                    TASK_KEY_FULL_STOCK_REPORT,
+                    job_owner_token,
+                    InventoryAutomationTaskState.LastRunStatus.SKIPPED,
+                    now=timezone.now(),
+                    processed_count=0,
+                    warning_message="El periodo ya estaba consumido o en curso.",
+                )
+                return
+            if takeover:
+                FULL_STOCK_REPORT_LOGGER.warning(
+                    "runner_recovered_after_takeover",
+                    extra={
+                        "period_key": due_key,
+                        "owner_token": job_owner_token,
+                    },
+                )
+
+            result = dispatch_full_stock_report(config.pk, due_key)
+            processed_count = result.get("summary_count") or 0
+            if result["delivery_status"] == FullStockReportConfig.DeliveryStatus.ERROR:
+                finish_task_run(
+                    TASK_KEY_FULL_STOCK_REPORT,
+                    job_owner_token,
+                    InventoryAutomationTaskState.LastRunStatus.ERROR,
+                    now=timezone.now(),
+                    processed_count=processed_count,
+                    error_message=result.get("email_error", ""),
+                    warning_message=result.get("recipient_warning", ""),
+                )
+                return
+
+            outcome = InventoryAutomationTaskState.LastRunStatus.SUCCESS
+            warning_message = result.get("recipient_warning", "")
+            if result["delivery_status"] in {
+                FullStockReportConfig.DeliveryStatus.WARNING,
+                FullStockReportConfig.DeliveryStatus.SKIPPED,
+            }:
+                outcome = InventoryAutomationTaskState.LastRunStatus.WARNING
+            finish_task_run(
+                TASK_KEY_FULL_STOCK_REPORT,
+                job_owner_token,
+                outcome,
+                now=timezone.now(),
+                processed_count=processed_count,
+                warning_message=warning_message,
+            )
+
+            # Resetea el flag de forzar envío si fue marcado desde admin
+            if config.force_send_next:
+                FullStockReportConfig.objects.filter(pk=config.pk).update(force_send_next=False)
+                FULL_STOCK_REPORT_LOGGER.info(
+                    "force_send_flag_reset",
+                    extra={"period_key": due_key},
+                )
+        except Exception as exc:  # noqa: BLE001
+            finish_task_run(
+                TASK_KEY_FULL_STOCK_REPORT,
+                job_owner_token,
+                InventoryAutomationTaskState.LastRunStatus.ERROR,
+                now=timezone.now(),
+                processed_count=processed_count,
+                error_message=str(exc),
+            )
+            FULL_STOCK_REPORT_LOGGER.exception(
+                "stock_report_unhandled_error",
+                extra={
+                    "task_key": TASK_KEY_FULL_STOCK_REPORT,
                     "owner_token": job_owner_token,
                 },
             )

@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   createInventoryAlarmRequest,
+  saveInventoryFullStockReport,
   saveInventoryMinimumStockDigest,
   saveInventorySafetyAlert,
 } from '../../lib/api.js'
@@ -162,12 +163,15 @@ export function InventoryAlarmsPage() {
   const [automaticMode, setAutomaticMode] = useState('individual')
   const [savingSafetyRule, setSavingSafetyRule] = useState(false)
   const [savingPeriodicRule, setSavingPeriodicRule] = useState(false)
+  const [savingFullStockReport, setSavingFullStockReport] = useState(false)
   const [sendingManualAlarm, setSendingManualAlarm] = useState(false)
   const [safetyFeedback, setSafetyFeedback] = useState({ error: '', success: '' })
   const [periodicFeedback, setPeriodicFeedback] = useState({ error: '', success: '' })
+  const [fullStockFeedback, setFullStockFeedback] = useState({ error: '', success: '' })
   const [manualFeedback, setManualFeedback] = useState({ error: '', success: '' })
   const [safetyForm, setSafetyForm] = useState(defaultSafetyForm())
   const [periodicForm, setPeriodicForm] = useState(defaultPeriodicForm())
+  const [fullStockForm, setFullStockForm] = useState(defaultPeriodicForm())
   const [expandedTooltip, setExpandedTooltip] = useState(null)
   const [manualForm, setManualForm] = useState({
     target_user_id: '',
@@ -203,6 +207,7 @@ export function InventoryAlarmsPage() {
     (article) => String(article.id) === String(safetyForm.article_id),
   )
   const minimumStockDigest = inventoryOverview.minimum_stock_digest || null
+  const fullStockReport = inventoryOverview.full_stock_report || null
   const automationStatus = inventoryOverview.automation_status || null
 
   const selectedRule =
@@ -235,6 +240,10 @@ export function InventoryAlarmsPage() {
   useEffect(() => {
     setPeriodicForm(defaultPeriodicForm(minimumStockDigest || {}))
   }, [minimumStockDigest])
+
+  useEffect(() => {
+    setFullStockForm(defaultPeriodicForm(fullStockReport || {}))
+  }, [fullStockReport])
 
   if (!inventoryOverview) {
     return null
@@ -272,6 +281,18 @@ export function InventoryAlarmsPage() {
 
   function handleTogglePeriodicRecipient(userId) {
     setPeriodicForm((current) => {
+      const nextIds = current.recipient_user_ids.includes(userId)
+        ? current.recipient_user_ids.filter((item) => item !== userId)
+        : [...current.recipient_user_ids, userId]
+      return {
+        ...current,
+        recipient_user_ids: nextIds,
+      }
+    })
+  }
+
+  function handleToggleFullStockRecipient(userId) {
+    setFullStockForm((current) => {
       const nextIds = current.recipient_user_ids.includes(userId)
         ? current.recipient_user_ids.filter((item) => item !== userId)
         : [...current.recipient_user_ids, userId]
@@ -329,6 +350,31 @@ export function InventoryAlarmsPage() {
       })
     } finally {
       setSavingPeriodicRule(false)
+    }
+  }
+
+  async function handleFullStockReportSubmit(event) {
+    event.preventDefault()
+    setSavingFullStockReport(true)
+    setFullStockFeedback({ error: '', success: '' })
+
+    try {
+      const response = await saveInventoryFullStockReport(fullStockForm)
+      await refreshInventoryModule()
+      setFullStockForm(defaultPeriodicForm(response.item))
+      setFullStockFeedback({
+        error: '',
+        success: response.item.save_warning
+          ? `Reporte guardado. ${response.item.save_warning}`
+          : 'Reporte guardado correctamente.',
+      })
+    } catch (error) {
+      setFullStockFeedback({
+        error: error.message || 'No se pudo guardar el reporte diario.',
+        success: '',
+      })
+    } finally {
+      setSavingFullStockReport(false)
     }
   }
 
@@ -565,6 +611,102 @@ export function InventoryAlarmsPage() {
               <ModuleEmptyState
                 description="Todavia no hay un resumen periodico configurado para los articulos en stock minimo."
                 title="Sin resumen periodico"
+              />
+            )}
+          </ModuleTableSection>
+
+          <ModuleTableSection
+            actions={<span className="module-chip">{fullStockReport?.article_count || 0} articulos</span>}
+            description="Reporte (Excel) con el stock completo, enviado automaticamente segun la programacion."
+            title="Reporte de stock completo"
+          >
+            {fullStockReport?.id ? (
+              <div className="module-table-wrap">
+                <table className="module-table">
+                  <thead>
+                    <tr>
+                      <th>Modo</th>
+                      <th>Frecuencia</th>
+                      <th>Programacion</th>
+                      <th>Destinatarios</th>
+                      <th>Cobertura actual</th>
+                      <th>Estado</th>
+                      <th>Accion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Reporte</td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>{fullStockReport.frequency_label}</strong>
+                          <span>
+                            {fullStockReport.frequency === 'weekly'
+                              ? fullStockReport.run_weekday_label
+                              : 'Todos los dias'}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>{fullStockReport.run_at}</strong>
+                          <span>Proximo envio {formatDateTime(fullStockReport.next_run_at)}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>
+                            {fullStockReport.recipients.length +
+                              (fullStockReport.additional_email_list?.length || 0)}{' '}
+                            destinatarios
+                          </strong>
+                          <span>
+                            {[
+                              ...fullStockReport.recipients.map((recipient) => recipient.full_name),
+                              ...(fullStockReport.additional_email_list || []),
+                            ]
+                              .filter(Boolean)
+                              .join(', ') || 'Sin destinatarios'}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>{fullStockReport.article_count} articulos</strong>
+                          <span>
+                            {(fullStockReport.preview_articles || [])
+                              .map((article) => article.name)
+                              .join(', ') || 'Sin articulos'}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="module-table-item">
+                          <strong>{fullStockReport.last_delivery_status_label}</strong>
+                          <span>
+                            {fullStockReport.last_email_error ||
+                              fullStockReport.last_recipient_warning ||
+                              `Ultimo envio ${formatDateTime(fullStockReport.last_notified_at)}`}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <button
+                          className="inline-action"
+                          onClick={() => setFullStockFeedback({ error: '', success: '' })}
+                          type="button"
+                        >
+                          Editar
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ModuleEmptyState
+                description="Todavia no hay un reporte de stock completo configurado."
+                title="Sin reporte"
               />
             )}
           </ModuleTableSection>
@@ -938,6 +1080,12 @@ export function InventoryAlarmsPage() {
                           state: automationStatus?.minimum_stock_digest,
                           description: 'Envía resumen periódico de artículos en stock mínimo. Se ejecuta según la configuración (diario/semanal a la hora especificada).'
                         },
+                        {
+                          key: 'full_stock_report',
+                          label: 'Reporte stock',
+                          state: automationStatus?.full_stock_report,
+                          description: 'Envía el reporte periódico del stock completo en Excel. Se ejecuta según la configuración (diario/semanal a la hora especificada).'
+                        },
                       ].map((item) => (
                         <div className="alarm-automation-item" key={item.key}>
                           <div className="alarm-automation-item-head">
@@ -986,6 +1134,170 @@ export function InventoryAlarmsPage() {
                 </form>
               </>
             )}
+          </ModuleActionPanel>
+
+          <ModuleActionPanel
+            description="Envía automaticamente un Excel con el stock completo (todos los articulos) segun la programacion."
+            title="Reporte de stock completo"
+          >
+            <PanelMessage error={fullStockFeedback.error} success={fullStockFeedback.success} />
+
+            <form className="ops-form" onSubmit={handleFullStockReportSubmit}>
+              <div className="alarm-rule-context">
+                <div className="alarm-rule-context-head">
+                  <span className="module-chip">{fullStockReport?.article_count || 0} articulos</span>
+                  <span className={`status-pill ${fullStockForm.is_enabled ? 'ok' : 'out'}`}>
+                    {fullStockForm.is_enabled ? 'Activo' : 'Deshabilitado'}
+                  </span>
+                </div>
+                <p>El reporte adjuntara un Excel con el stock completo al momento del envio.</p>
+                <div className="alarm-digest-meta">
+                  <span>
+                    Proximo envio <strong>{formatDateTime(fullStockReport?.next_run_at)}</strong>
+                  </span>
+                  <span>
+                    Ultimo resultado{' '}
+                    <strong>{fullStockReport?.last_delivery_status_label || 'Sin ejecuciones'}</strong>
+                  </span>
+                </div>
+                {(fullStockReport?.preview_articles || []).length ? (
+                  <div className="alarm-digest-preview">
+                    {(fullStockReport.preview_articles || []).map((article) => (
+                      <span className="module-chip is-muted" key={article.id}>
+                        {article.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="checkbox-row">
+                <label>
+                  <input
+                    checked={fullStockForm.is_enabled}
+                    onChange={(event) =>
+                      setFullStockForm((current) => ({
+                        ...current,
+                        is_enabled: event.target.checked,
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  Reporte habilitado
+                </label>
+              </div>
+
+              <div className="alarm-schedule-grid">
+                <label>
+                  Frecuencia
+                  <select
+                    onChange={(event) =>
+                      setFullStockForm((current) => ({
+                        ...current,
+                        frequency: event.target.value,
+                      }))
+                    }
+                    value={fullStockForm.frequency}
+                  >
+                    <option value="daily">Diario</option>
+                    <option value="weekly">Semanal</option>
+                  </select>
+                </label>
+
+                <label>
+                  Hora de envio
+                  <input
+                    onChange={(event) =>
+                      setFullStockForm((current) => ({
+                        ...current,
+                        run_at: event.target.value,
+                      }))
+                    }
+                    required
+                    type="time"
+                    value={fullStockForm.run_at}
+                  />
+                </label>
+
+                {fullStockForm.frequency === 'weekly' ? (
+                  <label>
+                    Dia de envio
+                    <select
+                      onChange={(event) =>
+                        setFullStockForm((current) => ({
+                          ...current,
+                          run_weekday: event.target.value,
+                        }))
+                      }
+                      value={fullStockForm.run_weekday}
+                    >
+                      {WEEKDAY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </div>
+
+              <div className="alarm-recipient-list">
+                <span className="alarm-recipient-label">Perfiles destinatarios</span>
+                {(inventoryOverview.catalogs?.alarm_recipients || []).length ? (
+                  <div className="alarm-recipient-options">
+                    {inventoryOverview.catalogs.alarm_recipients.map((recipient) => (
+                      <label className="alarm-recipient-option" key={recipient.id}>
+                        <input
+                          checked={fullStockForm.recipient_user_ids.includes(String(recipient.id))}
+                          onChange={() => handleToggleFullStockRecipient(String(recipient.id))}
+                          type="checkbox"
+                        />
+                        <span>
+                          <strong>{recipient.full_name}</strong>
+                          <small>{recipient.email || 'Sin email cargado'}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="module-empty-copy">No hay perfiles activos disponibles.</p>
+                )}
+              </div>
+
+              <label>
+                Emails adicionales
+                <textarea
+                  onChange={(event) =>
+                    setFullStockForm((current) => ({
+                      ...current,
+                      additional_emails: event.target.value,
+                    }))
+                  }
+                  placeholder="uno@empresa.com&#10;dos@empresa.com"
+                  rows="4"
+                  value={fullStockForm.additional_emails}
+                />
+              </label>
+
+              <label>
+                Nota para el reporte
+                <textarea
+                  onChange={(event) =>
+                    setFullStockForm((current) => ({
+                      ...current,
+                      notes: event.target.value,
+                    }))
+                  }
+                  placeholder="Contexto operativo que quieras agregar al reporte."
+                  rows="4"
+                  value={fullStockForm.notes}
+                />
+              </label>
+
+              <button className="primary-button" disabled={savingFullStockReport} type="submit">
+                {savingFullStockReport ? 'Guardando...' : 'Guardar reporte'}
+              </button>
+            </form>
           </ModuleActionPanel>
 
           <ModuleActionPanel

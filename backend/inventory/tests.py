@@ -18,11 +18,14 @@ from openpyxl import Workbook, load_workbook
 from accounts.models import UserProfile
 from inventory.automation import (
     InventoryAutomationRunner,
+    TASK_KEY_FULL_STOCK_REPORT,
     TASK_KEY_MINIMUM_STOCK_DIGEST,
     TASK_KEY_MINIMUM_STOCK_RECONCILE,
     TASK_KEY_SCHEDULER,
+    claim_full_stock_report_period,
     claim_minimum_stock_digest_period,
     ensure_automation_task_state,
+    get_full_stock_report_due_context,
     get_minimum_stock_digest_due_context,
     maybe_start_inventory_automation,
     renew_lease,
@@ -33,6 +36,7 @@ from inventory.automation import (
 from inventory.models import (
     Article,
     AssetCheckout,
+    FullStockReportConfig,
     InventoryBalance,
     InventoryAutomationTaskState,
     Location,
@@ -44,7 +48,7 @@ from inventory.models import (
     TrackedUnit,
     UnitOfMeasure,
 )
-from inventory.services import dispatch_minimum_stock_digest
+from inventory.services import dispatch_full_stock_report, dispatch_minimum_stock_digest
 
 
 class InventoryApiTests(TestCase):
@@ -105,10 +109,13 @@ class InventoryApiTests(TestCase):
         self.assertIn("articles", payload)
         self.assertIn("catalogs", payload)
         self.assertIn("minimum_stock_digest", payload)
+        self.assertIn("full_stock_report", payload)
         self.assertIn("automation_status", payload)
         self.assertGreaterEqual(len(payload["articles"]), 1)
         self.assertIsNone(payload["minimum_stock_digest"]["id"])
+        self.assertIsNone(payload["full_stock_report"]["id"])
         self.assertIn("scheduler", payload["automation_status"])
+        self.assertIn("full_stock_report", payload["automation_status"])
 
     def test_consumable_article_requires_minimum_stock(self):
         self.client.force_login(self.storekeeper)
@@ -457,6 +464,39 @@ class InventoryApiTests(TestCase):
         self.assertEqual(config.run_at.strftime("%H:%M"), "07:30")
         self.assertEqual(config.run_weekday, 3)
         self.assertEqual(config.notes, "Resumen semanal de articulos criticos.")
+
+    def test_full_stock_report_config_can_be_saved(self):
+        self.client.force_login(self.storekeeper)
+
+        response = self.client.post(
+            "/api/inventory/full-stock-report/",
+            data=json.dumps(
+                {
+                    "is_enabled": True,
+                    "frequency": "daily",
+                    "run_at": "06:15",
+                    "recipient_user_ids": [self.supervisor.id],
+                    "notes": "Reporte diario de stock completo.",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["item"]
+        self.assertEqual(payload["frequency"], "daily")
+        self.assertEqual(payload["frequency_label"], "Diario")
+        self.assertEqual(payload["run_at"], "06:15")
+        self.assertEqual(payload["run_weekday"], 0)
+        self.assertEqual(len(payload["recipients"]), 1)
+        self.assertEqual(payload["recipients"][0]["id"], self.supervisor.id)
+
+        config = FullStockReportConfig.objects.get(key="default")
+        self.assertTrue(config.is_enabled)
+        self.assertEqual(config.frequency, FullStockReportConfig.Frequency.DAILY)
+        self.assertEqual(config.run_at.strftime("%H:%M"), "06:15")
+        self.assertEqual(config.run_weekday, 0)
+        self.assertEqual(config.notes, "Reporte diario de stock completo.")
 
     def test_quantity_movement_updates_balance(self):
         self.client.force_login(self.storekeeper)
@@ -844,6 +884,20 @@ class InventoryAutomationBehaviorTests(TestCase):
             config.recipients.add(recipient_user)
         return config
 
+    def create_full_stock_report_config(self, *, recipient_user=None, additional_emails="", **overrides):
+        config = FullStockReportConfig.objects.create(
+            key="default",
+            is_enabled=overrides.get("is_enabled", True),
+            frequency=overrides.get("frequency", FullStockReportConfig.Frequency.DAILY),
+            run_at=overrides.get("run_at", datetime.strptime("08:00", "%H:%M").time()),
+            run_weekday=overrides.get("run_weekday", 0),
+            additional_emails=additional_emails,
+            notes=overrides.get("notes", ""),
+        )
+        if recipient_user:
+            config.recipients.add(recipient_user)
+        return config
+
     def test_should_bootstrap_inventory_automation_skips_unwanted_commands(self):
         self.assertFalse(should_bootstrap_inventory_automation(argv=["manage.py", "test"]))
         self.assertFalse(
@@ -885,10 +939,12 @@ class InventoryAutomationBehaviorTests(TestCase):
         with mock.patch.object(runner, "_ensure_scheduler_lease", return_value=False):
             with mock.patch.object(runner, "run_reconcile_job") as reconcile_mock:
                 with mock.patch.object(runner, "run_digest_job_if_due") as digest_mock:
-                    runner.run_cycle()
+                    with mock.patch.object(runner, "run_full_stock_report_job_if_due") as report_mock:
+                        runner.run_cycle()
 
         reconcile_mock.assert_not_called()
         digest_mock.assert_not_called()
+        report_mock.assert_not_called()
 
     def test_digest_due_context_and_next_run_are_computed(self):
         config = self.create_digest_config(
@@ -900,6 +956,21 @@ class InventoryAutomationBehaviorTests(TestCase):
         now = timezone.make_aware(datetime(2026, 4, 7, 9, 0))
 
         due_context = get_minimum_stock_digest_due_context(config, now=now)
+
+        self.assertTrue(due_context["due"])
+        self.assertEqual(due_context["due_key"], "weekly:2026-04-07")
+        self.assertEqual(timezone.localtime(due_context["next_run_at"]).date().isoformat(), "2026-04-14")
+
+    def test_full_stock_report_due_context_and_next_run_are_computed(self):
+        config = self.create_full_stock_report_config(
+            recipient_user=self.supervisor,
+            frequency=FullStockReportConfig.Frequency.WEEKLY,
+            run_at=datetime.strptime("07:30", "%H:%M").time(),
+            run_weekday=1,
+        )
+        now = timezone.make_aware(datetime(2026, 4, 7, 9, 0))
+
+        due_context = get_full_stock_report_due_context(config, now=now)
 
         self.assertTrue(due_context["due"])
         self.assertEqual(due_context["due_key"], "weekly:2026-04-07")
@@ -928,6 +999,36 @@ class InventoryAutomationBehaviorTests(TestCase):
             last_delivery_status=MinimumStockDigestConfig.DeliveryStatus.NEVER,
         )
         stale_claim, stale_takeover = claim_minimum_stock_digest_period(
+            config,
+            due_key,
+            now=now,
+        )
+        self.assertTrue(stale_claim)
+        self.assertTrue(stale_takeover)
+
+    def test_claim_full_stock_report_period_supports_stale_takeover(self):
+        config = self.create_full_stock_report_config(recipient_user=self.supervisor)
+        due_key = "daily:2026-04-07"
+        now = timezone.now()
+
+        first_claim, first_takeover = claim_full_stock_report_period(config, due_key, now=now)
+        self.assertTrue(first_claim)
+        self.assertFalse(first_takeover)
+
+        second_claim, second_takeover = claim_full_stock_report_period(
+            config,
+            due_key,
+            now=now + timedelta(minutes=1),
+        )
+        self.assertFalse(second_claim)
+        self.assertFalse(second_takeover)
+
+        FullStockReportConfig.objects.filter(pk=config.pk).update(
+            inflight_period_key=due_key,
+            inflight_started_at=now - timedelta(hours=2),
+            last_delivery_status=FullStockReportConfig.DeliveryStatus.NEVER,
+        )
+        stale_claim, stale_takeover = claim_full_stock_report_period(
             config,
             due_key,
             now=now,
@@ -974,6 +1075,73 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertEqual(config.inflight_period_key, "daily:2026-04-07")
         self.assertEqual(config.last_period_key, "")
         self.assertTrue(any("digest_send_start" in line for line in info_logs.output))
+
+    def test_dispatch_full_stock_report_records_warning_when_all_recipients_are_discarded(self):
+        self.create_quantity_article("WARN-REPORT", on_hand="1", minimum_stock="2")
+        config = self.create_full_stock_report_config(recipient_user=self.supervisor)
+        self.supervisor.email = ""
+        self.supervisor.save(update_fields=["email"])
+
+        with self.assertLogs("inventory.automation.full_stock_report", level="WARNING") as captured_logs:
+            result = dispatch_full_stock_report(config.pk, "daily:2026-04-07")
+
+        config.refresh_from_db()
+        self.assertEqual(
+            result["delivery_status"],
+            FullStockReportConfig.DeliveryStatus.WARNING,
+        )
+        self.assertEqual(config.last_delivery_status, FullStockReportConfig.DeliveryStatus.WARNING)
+        self.assertIn("sin email", config.last_recipient_warning.lower())
+        self.assertEqual(config.last_email_error, "")
+        self.assertEqual(config.last_period_key, "daily:2026-04-07")
+        self.assertTrue(
+            any("stock_report_recipients_warning" in line for line in captured_logs.output)
+        )
+
+    def test_dispatch_full_stock_report_sends_email_with_attachment(self):
+        self.create_quantity_article("OK-REPORT", on_hand="5", minimum_stock="2")
+        config = self.create_full_stock_report_config(recipient_user=self.supervisor)
+
+        result = dispatch_full_stock_report(config.pk, "daily:2026-04-07")
+
+        config.refresh_from_db()
+        self.assertEqual(
+            result["delivery_status"],
+            FullStockReportConfig.DeliveryStatus.SUCCESS,
+        )
+        self.assertEqual(config.last_delivery_status, FullStockReportConfig.DeliveryStatus.SUCCESS)
+        self.assertEqual(config.last_period_key, "daily:2026-04-07")
+        self.assertIsNotNone(config.last_notified_at)
+
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertIn("Reporte de stock completo", message.subject)
+        self.assertIn(self.supervisor.email, message.to)
+        self.assertEqual(len(message.attachments), 1)
+        attachment_name, attachment_payload, attachment_type = message.attachments[0]
+        self.assertTrue(attachment_name.startswith("stock-"))
+        self.assertIn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", attachment_type)
+        self.assertGreater(len(attachment_payload), 200)
+
+    def test_dispatch_full_stock_report_records_real_send_error_separately(self):
+        self.create_quantity_article("ERR-REPORT", on_hand="1", minimum_stock="2")
+        config = self.create_full_stock_report_config(recipient_user=self.supervisor)
+
+        with mock.patch("inventory.services.EmailMessage.send", side_effect=RuntimeError("smtp down")):
+            with self.assertLogs("inventory.automation.full_stock_report", level="INFO") as info_logs:
+                result = dispatch_full_stock_report(config.pk, "daily:2026-04-07")
+
+        config.refresh_from_db()
+        self.assertEqual(
+            result["delivery_status"],
+            FullStockReportConfig.DeliveryStatus.ERROR,
+        )
+        self.assertEqual(config.last_delivery_status, FullStockReportConfig.DeliveryStatus.ERROR)
+        self.assertIn("smtp down", config.last_email_error)
+        self.assertEqual(config.last_recipient_warning, "")
+        self.assertEqual(config.inflight_period_key, "daily:2026-04-07")
+        self.assertEqual(config.last_period_key, "")
+        self.assertTrue(any("stock_report_send_start" in line for line in info_logs.output))
 
     @override_settings(INVENTORY_AUTOMATION_BATCH_SIZE=2)
     def test_reconcile_job_marks_warning_when_an_item_fails_mid_batch(self):

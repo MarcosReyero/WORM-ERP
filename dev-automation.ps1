@@ -51,7 +51,7 @@ if ($null -eq $env:VIRTUAL_ENV) {
 # Mensaje de bienvenida
 Write-Host ""
 Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  🚀 MODO DESARROLLO - Automatización de Stock Mínimo      ║" -ForegroundColor Cyan
+Write-Host "║   MODO DESARROLLO - Automatización de Stock Mínimo      ║" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Configuración:" -ForegroundColor Green

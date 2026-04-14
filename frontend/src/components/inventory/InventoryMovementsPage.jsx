@@ -1,7 +1,7 @@
 import { useDeferredValue, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { createMovement } from '../../lib/api.js'
-import { SearchIcon } from '../Icons.jsx'
+import { CloseIcon, SearchIcon } from '../Icons.jsx'
 import {
   ModuleEmptyState,
   ModulePageHeader,
@@ -40,10 +40,9 @@ const MOVEMENT_MODE_CONFIG = {
   },
 }
 
-function createEmptyMovementForm(movementType = MOVEMENT_MODE_CONFIG.egress.defaultType) {
+function createEmptyMovementLine(articleId = '') {
   return {
-    movement_type: movementType,
-    article_id: '',
+    article_id: articleId,
     quantity: '',
     source_location_id: '',
     target_location_id: '',
@@ -141,21 +140,34 @@ export function InventoryMovementsPage() {
   const [movementTypeFilter, setMovementTypeFilter] = useState('all')
   const [busyAction, setBusyAction] = useState('')
   const [movementFeedback, setMovementFeedback] = useState({ error: '', success: '' })
-  const [movementForm, setMovementForm] = useState(createEmptyMovementForm())
-
-  if (!inventoryOverview) {
-    return null
-  }
-
-  const { articles, catalogs, movements, permissions } = inventoryOverview
-  const movementMode = getMovementMode(movementForm.movement_type)
-  const movementModeConfig = MOVEMENT_MODE_CONFIG[movementMode]
-  const selectedMovementArticle =
-    articles.find((article) => String(article.id) === String(movementForm.article_id)) || null
-  const unsupportedMovementMessage = getUnsupportedMovementMessage(
-    selectedMovementArticle,
-    movementForm.movement_type,
+  const [registerMovementType, setRegisterMovementType] = useState(
+    MOVEMENT_MODE_CONFIG.egress.defaultType,
   )
+  const [movementLines, setMovementLines] = useState([])
+
+  const articles = inventoryOverview?.articles ?? []
+  const catalogs = inventoryOverview?.catalogs ?? {
+    movement_types: [],
+    locations: [],
+    sectors: [],
+    people: [],
+  }
+  const movements = inventoryOverview?.movements ?? []
+  const permissions = inventoryOverview?.permissions ?? { can_record_movement: false }
+  const movementMode = getMovementMode(registerMovementType)
+  const movementModeConfig = MOVEMENT_MODE_CONFIG[movementMode]
+  const articlesById = new Map(articles.map((article) => [String(article.id), article]))
+  const selectedArticleIds = new Set(movementLines.map((line) => String(line.article_id)))
+  const unsupportedLine = movementLines.find((line) => {
+    const article = articlesById.get(String(line.article_id))
+    return article && !supportsMovementTypeForArticle(article, registerMovementType)
+  })
+  const unsupportedMovementMessage = unsupportedLine
+    ? getUnsupportedMovementMessage(
+        articlesById.get(String(unsupportedLine.article_id)),
+        registerMovementType,
+      )
+    : ''
   const suggestedArticles = deferredArticleQuery
     ? articles
         .filter((article) => articleMatchesQuery(article, deferredArticleQuery))
@@ -167,44 +179,106 @@ export function InventoryMovementsPage() {
     .filter((movement) =>
       movementTypeFilter === 'all' ? true : movement.movement_type === movementTypeFilter,
     )
+  const pendingLinesWithoutQuantity = movementLines.filter((line) => !line.quantity).length
   const canSubmitMovement =
     permissions.can_record_movement &&
     busyAction !== 'movement' &&
-    Boolean(movementForm.article_id) &&
-    Boolean(movementForm.quantity) &&
+    movementLines.length > 0 &&
+    pendingLinesWithoutQuantity === 0 &&
     !unsupportedMovementMessage
 
   async function handleMovementSubmit(event) {
     event.preventDefault()
+    if (!movementLines.length || pendingLinesWithoutQuantity) {
+      return
+    }
+
     setBusyAction('movement')
     setMovementFeedback({ error: '', success: '' })
+    const snapshotLines = movementLines
+    let successCount = 0
 
     try {
-      await createMovement(sanitizeMovementPayload(movementForm, selectedMovementArticle))
+      for (const line of snapshotLines) {
+        const selectedArticle = articlesById.get(String(line.article_id))
+        await createMovement(
+          sanitizeMovementPayload(
+            { ...line, movement_type: registerMovementType },
+            selectedArticle,
+          ),
+        )
+        successCount += 1
+      }
       await refreshInventoryModule()
-      setMovementForm(createEmptyMovementForm(movementForm.movement_type))
+      setMovementLines([])
       setArticleSearch('')
-      setMovementFeedback({ error: '', success: 'Movimiento registrado.' })
+      setMovementFeedback({
+        error: '',
+        success:
+          snapshotLines.length === 1
+            ? 'Movimiento registrado.'
+            : `Movimientos registrados: ${snapshotLines.length}.`,
+      })
     } catch (error) {
-      setMovementFeedback({ error: error.message, success: '' })
+      if (successCount) {
+        await refreshInventoryModule()
+      }
+      setMovementLines(snapshotLines.slice(successCount))
+      setMovementFeedback({
+        error: error.message,
+        success: successCount
+          ? `${successCount} movimiento(s) registrado(s) antes del error.`
+          : '',
+      })
     } finally {
       setBusyAction('')
     }
   }
 
   function applyMovementMode(mode) {
-    setMovementForm((current) => ({
-      ...current,
-      movement_type: MOVEMENT_MODE_CONFIG[mode].defaultType,
-    }))
+    const nextMovementType = MOVEMENT_MODE_CONFIG[mode].defaultType
+    setRegisterMovementType(nextMovementType)
+    setMovementLines([])
+    setArticleSearch('')
+    setMovementFeedback({ error: '', success: '' })
   }
 
-  function selectMovementArticle(article) {
-    setMovementForm((current) => ({
-      ...current,
-      article_id: String(article.id),
-    }))
-    setArticleSearch(`${article.internal_code} ${article.name}`)
+  function addMovementLine(article) {
+    const unsupportedMessage = getUnsupportedMovementMessage(article, registerMovementType)
+
+    if (unsupportedMessage) {
+      setMovementFeedback({ error: unsupportedMessage, success: '' })
+      return
+    }
+
+    const nextArticleId = String(article.id)
+
+    setMovementFeedback({ error: '', success: '' })
+    setMovementLines((current) => {
+      if (current.some((line) => String(line.article_id) === nextArticleId)) {
+        return current
+      }
+      return [...current, createEmptyMovementLine(nextArticleId)]
+    })
+    setArticleSearch('')
+  }
+
+  function updateMovementLine(articleId, patch) {
+    setMovementLines((current) =>
+      current.map((line) =>
+        String(line.article_id) === String(articleId) ? { ...line, ...patch } : line,
+      ),
+    )
+  }
+
+  function removeMovementLine(articleId) {
+    setMovementLines((current) =>
+      current.filter((line) => String(line.article_id) !== String(articleId)),
+    )
+  }
+
+  if (!inventoryOverview) {
+    return null
   }
 
   return (
@@ -321,6 +395,7 @@ export function InventoryMovementsPage() {
                         <button
                           aria-selected={movementMode === mode}
                           className={`movement-mode-button ${movementMode === mode ? 'is-active' : ''}`}
+                          disabled={busyAction === 'movement'}
                           key={mode}
                           onClick={() => applyMovementMode(mode)}
                           type="button"
@@ -343,6 +418,7 @@ export function InventoryMovementsPage() {
                     <div className="movement-search-input">
                       <SearchIcon />
                       <input
+                        disabled={busyAction === 'movement'}
                         id="movement-article-search"
                         onChange={(event) => setArticleSearch(event.target.value)}
                         onKeyDown={(event) => {
@@ -362,12 +438,11 @@ export function InventoryMovementsPage() {
                           {suggestedArticles.map((article) => (
                             <button
                               className={`movement-picker-item ${
-                                String(article.id) === String(movementForm.article_id)
-                                  ? 'is-selected'
-                                  : ''
+                                selectedArticleIds.has(String(article.id)) ? 'is-selected' : ''
                               }`}
+                              disabled={busyAction === 'movement'}
                               key={article.id}
-                              onClick={() => selectMovementArticle(article)}
+                              onClick={() => addMovementLine(article)}
                               type="button"
                             >
                               <div className="movement-picker-copy">
@@ -401,14 +476,18 @@ export function InventoryMovementsPage() {
                       <p>La accion principal siempre queda visible en esta zona.</p>
                     </div>
                     <div className="movement-action-summary">
-                      <span>Articulo</span>
+                      <span>Items</span>
                       <strong>
-                        {selectedMovementArticle ? selectedMovementArticle.name : 'Sin seleccionar'}
+                        {movementLines.length
+                          ? `${movementLines.length} articulo${movementLines.length === 1 ? '' : 's'}`
+                          : 'Sin seleccionar'}
                       </strong>
                       <p>
-                        {selectedMovementArticle
-                          ? `${selectedMovementArticle.internal_code} · ${movementModeConfig.label}`
-                          : 'Elige un articulo y completa la cantidad para habilitar el registro.'}
+                        {movementLines.length
+                          ? pendingLinesWithoutQuantity
+                            ? 'Completa la cantidad en cada item para habilitar el registro.'
+                            : `Operacion: ${movementModeConfig.label}`
+                          : 'Elige uno o mas articulos y completa la cantidad en cada uno para registrar.'}
                       </p>
                     </div>
 
@@ -430,195 +509,226 @@ export function InventoryMovementsPage() {
 
                 <section className="movement-panel movement-panel--form">
                   <div className="movement-panel-head">
-                    <strong>Completar movimiento</strong>
-                    <p>Carga el contexto y los datos operativos desde un solo bloque.</p>
+                    <strong>Completar movimientos</strong>
+                    <p>Selecciona articulos y completa los datos operativos por item.</p>
                   </div>
 
-                  {selectedMovementArticle ? (
-                    <div className="movement-selected-article">
-                      <div className="movement-selected-head">
-                        <div>
-                          <strong>{selectedMovementArticle.name}</strong>
-                          <p>
-                            {selectedMovementArticle.internal_code} / {selectedMovementArticle.article_type_label}
-                          </p>
-                        </div>
-                        <span className={`status-pill ${getArticleStockTone(selectedMovementArticle)}`}>
-                          {getArticleStockLabel(selectedMovementArticle)}
-                        </span>
-                      </div>
-                      <div className="movement-selected-grid">
-                        <article>
-                          <span>Stock actual</span>
-                          <strong>{formatQuantity(selectedMovementArticle.current_stock)}</strong>
-                        </article>
-                        <article>
-                          <span>Disponible</span>
-                          <strong>{formatQuantity(selectedMovementArticle.available_stock)}</strong>
-                        </article>
-                        <article>
-                          <span>Ubicacion base</span>
-                          <strong>{selectedMovementArticle.primary_location || '-'}</strong>
-                        </article>
-                      </div>
+                  {movementLines.length ? (
+                    <div className="movement-selected-list">
+                      {movementLines.map((line) => {
+                        const selectedArticle = articlesById.get(String(line.article_id))
+
+                        if (!selectedArticle) {
+                          return null
+                        }
+
+                        return (
+                          <div className="movement-selected-article" key={line.article_id}>
+                            <div className="movement-selected-head">
+                              <div>
+                                <strong>{selectedArticle.name}</strong>
+                                <p>
+                                  {selectedArticle.internal_code} / {selectedArticle.article_type_label}
+                                </p>
+                              </div>
+                              <div className="movement-line-head-actions">
+                                <span className={`status-pill ${getArticleStockTone(selectedArticle)}`}>
+                                  {getArticleStockLabel(selectedArticle)}
+                                </span>
+                                <button
+                                  aria-label={`Quitar ${selectedArticle.name}`}
+                                  className="module-icon-button"
+                                  disabled={busyAction === 'movement'}
+                                  onClick={() => removeMovementLine(line.article_id)}
+                                  type="button"
+                                >
+                                  <CloseIcon />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="movement-selected-grid">
+                              <article>
+                                <span>Stock actual</span>
+                                <strong>{formatQuantity(selectedArticle.current_stock)}</strong>
+                              </article>
+                              <article>
+                                <span>Disponible</span>
+                                <strong>{formatQuantity(selectedArticle.available_stock)}</strong>
+                              </article>
+                              <article>
+                                <span>Ubicacion base</span>
+                                <strong>{selectedArticle.primary_location || '-'}</strong>
+                              </article>
+                            </div>
+
+                            <div className="movement-form-fields movement-form-fields--line">
+                              <label className="movement-form-field">
+                                Cantidad
+                                <input
+                                  disabled={busyAction === 'movement'}
+                                  onChange={(event) =>
+                                    updateMovementLine(line.article_id, { quantity: event.target.value })
+                                  }
+                                  placeholder="0"
+                                  step="0.001"
+                                  type="number"
+                                  value={line.quantity}
+                                />
+                              </label>
+
+                              {movementUsesSource(registerMovementType) ? (
+                                <label className="movement-form-field">
+                                  Origen fisico
+                                  <select
+                                    disabled={busyAction === 'movement'}
+                                    onChange={(event) =>
+                                      updateMovementLine(line.article_id, {
+                                        source_location_id: event.target.value,
+                                      })
+                                    }
+                                    value={line.source_location_id}
+                                  >
+                                    <option value="">Automatico / sin origen</option>
+                                    {catalogs.locations.map((item) => (
+                                      <option key={item.id} value={item.id}>
+                                        {item.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              ) : null}
+
+                              {movementUsesTarget(registerMovementType) ? (
+                                <label className="movement-form-field">
+                                  Destino fisico
+                                  <select
+                                    disabled={busyAction === 'movement'}
+                                    onChange={(event) =>
+                                      updateMovementLine(line.article_id, {
+                                        target_location_id: event.target.value,
+                                      })
+                                    }
+                                    value={line.target_location_id}
+                                  >
+                                    <option value="">Automatico / sin destino</option>
+                                    {catalogs.locations.map((item) => (
+                                      <option key={item.id} value={item.id}>
+                                        {item.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              ) : null}
+
+                              {movementUsesReceiver(registerMovementType) ? (
+                                <>
+                                  <label className="movement-form-field">
+                                    Sector destino
+                                    <select
+                                      disabled={busyAction === 'movement'}
+                                      onChange={(event) =>
+                                        updateMovementLine(line.article_id, { sector_id: event.target.value })
+                                      }
+                                      value={line.sector_id}
+                                    >
+                                      <option value="">Sin sector</option>
+                                      {catalogs.sectors.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                          {item.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="movement-form-field">
+                                    Persona
+                                    <select
+                                      disabled={busyAction === 'movement'}
+                                      onChange={(event) =>
+                                        updateMovementLine(line.article_id, { person_id: event.target.value })
+                                      }
+                                      value={line.person_id}
+                                    >
+                                      <option value="">Sin persona</option>
+                                      {catalogs.people.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                          {item.full_name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                </>
+                              ) : null}
+
+                              {selectedArticle.requires_lot ? (
+                                <>
+                                  <label className="movement-form-field">
+                                    Lote
+                                    <input
+                                      disabled={busyAction === 'movement'}
+                                      onChange={(event) =>
+                                        updateMovementLine(line.article_id, {
+                                          lot_code: event.target.value,
+                                        })
+                                      }
+                                      value={line.lot_code}
+                                    />
+                                  </label>
+                                  {selectedArticle.requires_expiry ? (
+                                    <label className="movement-form-field">
+                                      Vencimiento
+                                      <input
+                                        disabled={busyAction === 'movement'}
+                                        onChange={(event) =>
+                                          updateMovementLine(line.article_id, {
+                                            expiry_date: event.target.value,
+                                          })
+                                        }
+                                        type="date"
+                                        value={line.expiry_date}
+                                      />
+                                    </label>
+                                  ) : null}
+                                </>
+                              ) : null}
+
+                              <label className="movement-form-field movement-form-field--wide">
+                                Motivo
+                                <input
+                                  disabled={busyAction === 'movement'}
+                                  onChange={(event) =>
+                                    updateMovementLine(line.article_id, {
+                                      reason_text: event.target.value,
+                                    })
+                                  }
+                                  placeholder={
+                                    movementNeedsReason(registerMovementType)
+                                      ? 'Obligatorio en este movimiento'
+                                      : 'Opcional'
+                                  }
+                                  value={line.reason_text}
+                                />
+                              </label>
+
+                              <label className="movement-form-field movement-form-field--wide">
+                                Observaciones
+                                <input
+                                  disabled={busyAction === 'movement'}
+                                  onChange={(event) =>
+                                    updateMovementLine(line.article_id, { notes: event.target.value })
+                                  }
+                                  placeholder="Dato corto para contexto operativo"
+                                  value={line.notes}
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   ) : (
-                    <p className="module-empty-copy">Busca y selecciona un articulo para continuar.</p>
+                    <p className="module-empty-copy">Busca y selecciona articulos para continuar.</p>
                   )}
-
-                  <div className="movement-form-fields">
-                    <label className="movement-form-field">
-                        Cantidad
-                        <input
-                          onChange={(event) =>
-                            setMovementForm((current) => ({ ...current, quantity: event.target.value }))
-                          }
-                          placeholder="0"
-                          step="0.001"
-                          type="number"
-                          value={movementForm.quantity}
-                        />
-                      </label>
-
-                      {movementUsesSource(movementForm.movement_type) ? (
-                        <label className="movement-form-field">
-                          Origen fisico
-                          <select
-                            onChange={(event) =>
-                              setMovementForm((current) => ({
-                                ...current,
-                                source_location_id: event.target.value,
-                              }))
-                            }
-                            value={movementForm.source_location_id}
-                          >
-                            <option value="">Automatico / sin origen</option>
-                            {catalogs.locations.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      ) : null}
-
-                      {movementUsesTarget(movementForm.movement_type) ? (
-                        <label className="movement-form-field">
-                          Destino fisico
-                          <select
-                            onChange={(event) =>
-                              setMovementForm((current) => ({
-                                ...current,
-                                target_location_id: event.target.value,
-                              }))
-                            }
-                            value={movementForm.target_location_id}
-                          >
-                            <option value="">Automatico / sin destino</option>
-                            {catalogs.locations.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      ) : null}
-
-                      {movementUsesReceiver(movementForm.movement_type) ? (
-                        <>
-                          <label className="movement-form-field">
-                            Sector destino
-                            <select
-                              onChange={(event) =>
-                                setMovementForm((current) => ({ ...current, sector_id: event.target.value }))
-                              }
-                              value={movementForm.sector_id}
-                            >
-                              <option value="">Sin sector</option>
-                              {catalogs.sectors.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="movement-form-field">
-                            Persona
-                            <select
-                              onChange={(event) =>
-                                setMovementForm((current) => ({ ...current, person_id: event.target.value }))
-                              }
-                              value={movementForm.person_id}
-                            >
-                              <option value="">Sin persona</option>
-                              {catalogs.people.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.full_name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </>
-                      ) : null}
-
-                      {selectedMovementArticle?.requires_lot ? (
-                        <>
-                          <label className="movement-form-field">
-                            Lote
-                            <input
-                              onChange={(event) =>
-                                setMovementForm((current) => ({ ...current, lot_code: event.target.value }))
-                              }
-                              value={movementForm.lot_code}
-                            />
-                          </label>
-                          {selectedMovementArticle.requires_expiry ? (
-                            <label className="movement-form-field">
-                              Vencimiento
-                              <input
-                                onChange={(event) =>
-                                  setMovementForm((current) => ({
-                                    ...current,
-                                    expiry_date: event.target.value,
-                                  }))
-                                }
-                                type="date"
-                                value={movementForm.expiry_date}
-                              />
-                            </label>
-                          ) : null}
-                        </>
-                      ) : null}
-
-                      <label className="movement-form-field movement-form-field--wide">
-                        Motivo
-                        <input
-                          onChange={(event) =>
-                            setMovementForm((current) => ({
-                              ...current,
-                              reason_text: event.target.value,
-                            }))
-                          }
-                          placeholder={
-                            movementNeedsReason(movementForm.movement_type)
-                              ? 'Obligatorio en este movimiento'
-                              : 'Opcional'
-                          }
-                          value={movementForm.reason_text}
-                        />
-                      </label>
-
-                      <label className="movement-form-field movement-form-field--wide">
-                        Observaciones
-                        <input
-                          onChange={(event) =>
-                            setMovementForm((current) => ({ ...current, notes: event.target.value }))
-                          }
-                          placeholder="Dato corto para contexto operativo"
-                          value={movementForm.notes}
-                        />
-                      </label>
-                  </div>
 
                   <div className="movement-mobile-action">
                     <button

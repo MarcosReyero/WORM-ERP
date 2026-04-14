@@ -24,6 +24,7 @@ from .services import (
     build_inventory_overview,
     create_article,
     get_article_detail,
+    get_full_stock_report_config,
     get_minimum_stock_digest_config,
     create_count_session,
     create_discrepancy,
@@ -36,6 +37,7 @@ from .services import (
     resolve_discrepancy,
     return_checkout,
     save_minimum_stock_digest_config,
+    save_full_stock_report_config,
     save_safety_stock_alert_rule,
     serialize_article,
     serialize_balance,
@@ -405,5 +407,22 @@ def inventory_minimum_stock_digest(request):
     def handler():
         item = save_minimum_stock_digest_config(request.user, parse_json(request))
         return JsonResponse({"detail": "Minimum stock digest saved", "item": item}, status=201)
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["GET", "POST"])
+def inventory_full_stock_report(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    if request.method == "GET":
+        return _handle_inventory_call(
+            lambda: JsonResponse({"item": get_full_stock_report_config(request.user)})
+        )
+
+    def handler():
+        item = save_full_stock_report_config(request.user, parse_json(request))
+        return JsonResponse({"detail": "Full stock report saved", "item": item}, status=201)
 
     return _handle_inventory_call(handler)
