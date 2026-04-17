@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Inventary ERP">
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#5f6bff" />
+      <stop offset="100%" stop-color="#ff6b72" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bg)" />
+  <path d="M128 154h256v42H128zm0 72h256v42H128zm0 72h154v42H128z" fill="#fff" opacity=".2" />
+  <path d="M154 120h204a54 54 0 0 1 54 54v148l-102-48-54 38-54-38-102 48V174a54 54 0 0 1 54-54Z" fill="#fff" />
+  <path d="M206 192h100M206 248h100M206 304h56" fill="none" stroke="#413d92" stroke-linecap="round" stroke-width="24" />
+</svg>

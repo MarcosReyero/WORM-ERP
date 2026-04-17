@@ -85,6 +85,68 @@ export function fetchInventoryOverview() {
   return request('/api/inventory/overview/')
 }
 
+export function fetchDepositsOverview() {
+  return request('/api/deposits/overview/')
+}
+
+export function fetchDepositsLayout(locationId) {
+  return request(`/api/deposits/layout/${locationId}/`)
+}
+
+export function fetchPallets(filters = {}) {
+  const search = new URLSearchParams()
+
+  if (filters.locationId) {
+    search.set('location_id', filters.locationId)
+  }
+  if (filters.positionId) {
+    search.set('position_id', filters.positionId)
+  }
+  if (filters.status && filters.status !== 'all') {
+    search.set('status', filters.status)
+  }
+  if (filters.query) {
+    search.set('q', filters.query)
+  }
+
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  return request(`/api/pallets/${suffix}`)
+}
+
+export function createPallet(payload) {
+  return request('/api/pallets/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function fetchPalletDetail(palletId) {
+  return request(`/api/pallets/${palletId}/`)
+}
+
+export function updatePallet(palletId, payload) {
+  return request(`/api/pallets/${palletId}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function scanPallet(payload) {
+  return request('/api/pallets/scan/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
 export function fetchInventoryCatalogs() {
   return request('/api/catalogs/')
 }
@@ -119,6 +181,72 @@ export function importArticlesFromExcel(file, options = {}) {
   body.append('mode', options.mode || 'preview')
 
   return request('/api/articles/import-excel/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body,
+  })
+}
+
+export function fetchPersonalDailyReports() {
+  return request('/api/personal/reports/')
+}
+
+export function createPersonalDailyReport(payload) {
+  return request('/api/personal/reports/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updatePersonalDailyReport(reportId, payload) {
+  return request(`/api/personal/reports/${reportId}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deletePersonalDailyReport(reportId) {
+  return request(`/api/personal/reports/${reportId}/delete/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+  })
+}
+
+export function bulkDeletePersonalDailyReports(reportIds) {
+  return request('/api/personal/reports/bulk-delete/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify({ ids: reportIds }),
+  })
+}
+
+export function deleteAllPersonalDailyReports() {
+  return request('/api/personal/reports/bulk-delete/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify({ all: true }),
+  })
+}
+
+export function importPersonalDailyReportsFromExcel(file) {
+  const body = new FormData()
+  body.append('file', file)
+
+  return request('/api/personal/reports/import-excel/', {
     method: 'POST',
     headers: {
       'X-CSRFToken': getCookie('csrftoken'),

@@ -1,7 +1,12 @@
+﻿import { useEffect, useMemo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
 function classNames(...parts) {
   return parts.filter(Boolean).join(' ')
+}
+
+function supportsWindow() {
+  return typeof window !== 'undefined'
 }
 
 export function PanelMessage({ error, success }) {
@@ -29,15 +34,125 @@ export function ModuleWorkspaceLayout({
   navGroups,
   sidebarUtility,
   sidebarFooter,
+  sidebarCollapsible = false,
+  sidebarStorageKey = '',
+  variant = 'default',
+  workspaceClassName = '',
 }) {
   const resolvedHeaderLabel = headerLabel ?? moduleLabel
   const resolvedHeaderTitle = headerTitle ?? moduleTitle
   const resolvedHeaderSubtitle = headerSubtitle ?? moduleSubtitle
   const hasHeaderCopy = resolvedHeaderLabel || resolvedHeaderTitle || resolvedHeaderSubtitle
   const hasHeader = hasHeaderCopy || actions
+  const resolvedSidebarStorageKey = useMemo(() => {
+    if (sidebarStorageKey) {
+      return sidebarStorageKey
+    }
+
+    const baseLabel = (moduleTitle || resolvedHeaderTitle || 'module')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+
+    return `module-sidebar-collapsed:${baseLabel || 'module'}`
+  }, [moduleTitle, resolvedHeaderTitle, sidebarStorageKey])
+
+  const [isMobileSidebar, setIsMobileSidebar] = useState(() => {
+    if (!supportsWindow()) {
+      return false
+    }
+    return window.matchMedia('(max-width: 720px)').matches
+  })
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (!sidebarCollapsible || !supportsWindow()) {
+      return false
+    }
+    return window.localStorage.getItem(resolvedSidebarStorageKey) === '1'
+  })
+  const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState(false)
+
+  useEffect(() => {
+    if (!sidebarCollapsible || !supportsWindow()) {
+      return undefined
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 720px)')
+    const syncMobileState = () => {
+      const mobile = mediaQuery.matches
+      setIsMobileSidebar(mobile)
+      if (mobile) {
+        setIsSidebarOpenMobile(false)
+      }
+    }
+
+    syncMobileState()
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', syncMobileState)
+      return () => mediaQuery.removeEventListener('change', syncMobileState)
+    }
+
+    mediaQuery.addListener(syncMobileState)
+    return () => mediaQuery.removeListener(syncMobileState)
+  }, [sidebarCollapsible])
+
+  useEffect(() => {
+    if (!sidebarCollapsible || !supportsWindow()) {
+      return
+    }
+    window.localStorage.setItem(resolvedSidebarStorageKey, isSidebarCollapsed ? '1' : '0')
+  }, [isSidebarCollapsed, resolvedSidebarStorageKey, sidebarCollapsible])
+
+  function handleSidebarToggle() {
+    if (!sidebarCollapsible) {
+      return
+    }
+
+    if (isMobileSidebar) {
+      setIsSidebarOpenMobile((current) => !current)
+      return
+    }
+
+    setIsSidebarCollapsed((current) => !current)
+  }
+
+  function handleMobileSidebarClose() {
+    if (isMobileSidebar) {
+      setIsSidebarOpenMobile(false)
+    }
+  }
+
+  const workspaceClasses = classNames(
+    'module-workspace',
+    variant === 'erp' && 'is-erp',
+    workspaceClassName,
+    sidebarCollapsible && 'is-sidebar-collapsible',
+    sidebarCollapsible && !isMobileSidebar && isSidebarCollapsed && 'is-sidebar-collapsed',
+    sidebarCollapsible && isMobileSidebar && 'is-sidebar-mobile',
+    sidebarCollapsible && isMobileSidebar && isSidebarOpenMobile && 'is-sidebar-open',
+  )
+  const isSidebarCondensed = Boolean(sidebarCollapsible && !isMobileSidebar && isSidebarCollapsed)
+  const showMobileTrigger = Boolean(sidebarCollapsible && isMobileSidebar && !isSidebarOpenMobile)
+  const showSidebarBackdrop = Boolean(sidebarCollapsible && isMobileSidebar && isSidebarOpenMobile)
+  const sidebarToggleTitle = isMobileSidebar
+    ? isSidebarOpenMobile
+      ? 'Cerrar menu'
+      : 'Abrir menu'
+    : isSidebarCollapsed
+      ? 'Expandir menu'
+      : 'Colapsar menu'
 
   return (
-    <div className="module-workspace">
+    <div className={workspaceClasses}>
+      {showSidebarBackdrop ? (
+        <button
+          aria-label="Cerrar menu lateral"
+          className="module-sidebar-backdrop"
+          onClick={handleMobileSidebarClose}
+          type="button"
+        />
+      ) : null}
+
       <aside className="module-sidebar">
         <div className="module-sidebar-main">
           <div className="module-sidebar-brand">
@@ -46,12 +161,25 @@ export function ModuleWorkspaceLayout({
                 {moduleLabel ? <p className="module-sidebar-eyebrow">{moduleLabel}</p> : null}
                 {moduleTitle ? <h1>{moduleTitle}</h1> : null}
               </div>
-              {sidebarActions ? <div className="module-sidebar-actions">{sidebarActions}</div> : null}
+              <div className="module-sidebar-brand-tools">
+                {sidebarActions ? <div className="module-sidebar-actions">{sidebarActions}</div> : null}
+                {sidebarCollapsible ? (
+                  <button
+                    aria-label={sidebarToggleTitle}
+                    className="module-sidebar-toggle"
+                    onClick={handleSidebarToggle}
+                    title={sidebarToggleTitle}
+                    type="button"
+                  >
+                    {isMobileSidebar ? 'Cerrar' : isSidebarCollapsed ? 'Expandir' : 'Colapsar'}
+                  </button>
+                ) : null}
+              </div>
             </div>
             {moduleSubtitle ? <p>{moduleSubtitle}</p> : null}
           </div>
 
-          <ModuleSidebarNav groups={navGroups} />
+          <ModuleSidebarNav groups={navGroups} isCondensed={isSidebarCondensed} onNavigate={handleMobileSidebarClose} />
         </div>
 
         {sidebarUtility || sidebarFooter ? (
@@ -63,6 +191,17 @@ export function ModuleWorkspaceLayout({
       </aside>
 
       <div className="module-canvas">
+        {showMobileTrigger ? (
+          <button
+            aria-label="Abrir menu lateral"
+            className="module-mobile-nav-toggle"
+            onClick={handleSidebarToggle}
+            type="button"
+          >
+            Menu
+          </button>
+        ) : null}
+
         {hasHeader ? (
           <header className={classNames('module-header', !hasHeaderCopy && 'is-actions-only')}>
             {hasHeaderCopy ? (
@@ -82,7 +221,7 @@ export function ModuleWorkspaceLayout({
   )
 }
 
-export function ModuleSidebarNav({ groups }) {
+export function ModuleSidebarNav({ groups = [], isCondensed = false, onNavigate }) {
   return (
     <nav className="module-sidebar-nav" aria-label="Navegacion del modulo">
       {groups.map((group) => (
@@ -96,6 +235,8 @@ export function ModuleSidebarNav({ groups }) {
                 }
                 end={item.end}
                 key={item.to}
+                onClick={onNavigate}
+                title={isCondensed ? item.label : undefined}
                 to={item.to}
               >
                 <span className="module-nav-mark">{item.shortLabel || item.label.slice(0, 1)}</span>
@@ -225,3 +366,4 @@ export function ModuleEmptyState({ description, title }) {
     </div>
   )
 }
+

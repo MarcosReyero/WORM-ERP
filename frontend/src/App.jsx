@@ -4,6 +4,9 @@ import { AppLayout } from './components/AppLayout.jsx'
 import { LoginView } from './components/LoginView.jsx'
 import { MessagesPage } from './components/messages/MessagesPage.jsx'
 import { ModuleHub } from './components/ModuleHub.jsx'
+import { DepositsLayout } from './components/deposits/DepositsLayout.jsx'
+import { DepositsRegistryPage } from './components/deposits/DepositsRegistryPage.jsx'
+import { DepositsScanPage } from './components/deposits/DepositsScanPage.jsx'
 import { InventoryAlarmsPage } from './components/inventory/InventoryAlarmsPage.jsx'
 import { InventoryCheckoutsPage } from './components/inventory/InventoryCheckoutsPage.jsx'
 import { InventoryArticleDetailPage } from './components/inventory/InventoryArticleDetailPage.jsx'
@@ -13,6 +16,8 @@ import { InventoryLayout } from './components/inventory/InventoryLayout.jsx'
 import { InventoryMovementsPage } from './components/inventory/InventoryMovementsPage.jsx'
 import { InventoryOverviewPage } from './components/inventory/InventoryOverviewPage.jsx'
 import { InventoryStockPage } from './components/inventory/InventoryStockPage.jsx'
+import { PersonalLayout } from './components/personal/PersonalLayout.jsx'
+import { PersonalReportsPage } from './components/personal/PersonalReportsPage.jsx'
 import { ProfileDetailsPage } from './components/profile/ProfileDetailsPage.jsx'
 import { ProfileLayout } from './components/profile/ProfileLayout.jsx'
 import { ProfileUsersPage } from './components/profile/ProfileUsersPage.jsx'
@@ -260,6 +265,16 @@ function App() {
           <Route path="conteos" element={<InventoryCountsPage />} />
           <Route path="diferencias" element={<InventoryDiscrepanciesPage />} />
           <Route path="alarmas" element={<InventoryAlarmsPage />} />
+        </Route>
+        <Route path="depositos" element={<DepositsLayout />}>
+          <Route index element={<Navigate replace to="resumen" />} />
+          <Route path="resumen" element={<DepositsRegistryPage />} />
+          <Route path="registro" element={<DepositsScanPage />} />
+          <Route path="escaneo" element={<Navigate replace to="../registro" />} />
+        </Route>
+        <Route path="personal" element={<PersonalLayout />}>
+          <Route index element={<Navigate replace to="informes" />} />
+          <Route path="informes" element={<PersonalReportsPage />} />
         </Route>
       </Route>
       <Route

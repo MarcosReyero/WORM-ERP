@@ -78,6 +78,10 @@ class PermissionModule(models.Model):
         ADMIN_USERS = "admin_users", "Administración de Usuarios"
         REPORTS = "reports", "Reportes"
         SETTINGS = "settings", "Configuración"
+        DEPOSITS_OVERVIEW = "deposits_overview", "Panel de Depósitos"
+        PALLET_REGISTRY = "pallet_registry", "Registro de Pallets"
+        DEPOSIT_LAYOUT = "deposit_layout", "Plano de Depósitos"
+        PALLET_SCANS = "pallet_scans", "Escaneo de Pallets"
 
     code = models.CharField(
         max_length=50,

@@ -73,6 +73,30 @@ class Command(BaseCommand):
                 "description": "Configuración del sistema",
                 "order": 10,
             },
+            {
+                "code": "deposits_overview",
+                "name": "Panel de Depósitos",
+                "description": "Vista general del módulo Depósitos",
+                "order": 11,
+            },
+            {
+                "code": "pallet_registry",
+                "name": "Registro de Pallets",
+                "description": "Alta, consulta y mantenimiento de pallets",
+                "order": 12,
+            },
+            {
+                "code": "deposit_layout",
+                "name": "Plano de Depósitos",
+                "description": "Visualización y gestión del plano físico",
+                "order": 13,
+            },
+            {
+                "code": "pallet_scans",
+                "name": "Escaneo de Pallets",
+                "description": "Escaneo QR, lookup y reubicaciones",
+                "order": 14,
+            },
         ]
 
         modules_created = 0
@@ -141,6 +165,10 @@ class Command(BaseCommand):
                 "admin_users": ["view", "create", "change", "delete"],
                 "reports": ["view", "export"],
                 "settings": ["view", "change"],
+                "deposits_overview": ["view"],
+                "pallet_registry": ["view", "create", "change", "delete"],
+                "deposit_layout": ["view", "create", "change", "delete"],
+                "pallet_scans": ["view", "create", "change"],
             },
             UserProfile.Role.STOREKEEPER: {
                 "inventory_overview": ["view"],
@@ -150,6 +178,10 @@ class Command(BaseCommand):
                 "alarms": ["view"],
                 "counts": ["view", "create"],
                 "discrepancies": ["view"],
+                "deposits_overview": ["view"],
+                "pallet_registry": ["view", "create", "change", "delete"],
+                "deposit_layout": ["view", "create", "change", "delete"],
+                "pallet_scans": ["view", "create", "change"],
             },
             UserProfile.Role.SUPERVISOR: {
                 "inventory_overview": ["view"],
@@ -160,6 +192,10 @@ class Command(BaseCommand):
                 "counts": ["view", "create", "change"],
                 "discrepancies": ["view"],
                 "reports": ["view", "export"],
+                "deposits_overview": ["view"],
+                "pallet_registry": ["view"],
+                "deposit_layout": ["view"],
+                "pallet_scans": ["view", "create"],
             },
             UserProfile.Role.OPERATOR: {
                 "inventory_overview": ["view"],
@@ -167,6 +203,10 @@ class Command(BaseCommand):
                 "movements": ["view", "create"],
                 "checkouts": ["view", "create"],
                 "alarms": ["view"],
+                "deposits_overview": ["view"],
+                "pallet_registry": ["view"],
+                "deposit_layout": ["view"],
+                "pallet_scans": ["view", "create"],
             },
             UserProfile.Role.AUDITOR: {
                 "inventory_overview": ["view"],
@@ -177,6 +217,9 @@ class Command(BaseCommand):
                 "counts": ["view"],
                 "discrepancies": ["view"],
                 "reports": ["view", "export"],
+                "deposits_overview": ["view"],
+                "pallet_registry": ["view"],
+                "deposit_layout": ["view"],
             },
             UserProfile.Role.MAINTENANCE: {
                 "inventory_overview": ["view"],

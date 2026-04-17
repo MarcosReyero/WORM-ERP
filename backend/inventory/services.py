@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import unicodedata
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
@@ -17,6 +18,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_time
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
+from openpyxl.utils.datetime import from_excel
 
 from accounts.models import UserProfile
 from communications.services import (
@@ -49,6 +51,9 @@ from .models import (
     InventoryBatch,
     Location,
     MinimumStockDigestConfig,
+    Pallet,
+    PalletEvent,
+    PersonalDailyReport,
     Person,
     PhysicalCountSession,
     SafetyStockAlertRule,
@@ -1852,6 +1857,8 @@ def dispatch_full_stock_report(config_id, due_key):
 
 
 def build_dashboard(user=None):
+    from .deposits import resolve_deposit_permissions
+
     quantity_map, available_quantity_map, unit_total_map, unit_available_map = current_stock_maps()
     articles = Article.objects.select_related("sector_responsible").all()
     low_stock_count = 0
@@ -1872,27 +1879,49 @@ def build_dashboard(user=None):
     ).count()
     unread_messages = user_unread_message_count(user) if user else 0
     open_alarms = user_open_alarm_count(user) if user else 0
+    deposit_permissions = resolve_deposit_permissions(user) if user else {"can_view_module": False}
+    active_pallets = Pallet.objects.exclude(status=Pallet.PalletStatus.ARCHIVED).count()
+    deposit_events_today = PalletEvent.objects.filter(created_at__date=timezone.localdate()).count()
 
-    return {
-        "welcome": {
-            "title": "ERP modular",
-            "subtitle": "Inventario operativo para planta con foco en velocidad y control suficiente.",
+    modules = [
+        {
+            "slug": "inventario",
+            "name": "Inventario",
+            "description": "Stock, prestamos, conteos y diferencias",
+            "color": "#38a6ff",
+            "badge": str(low_stock_count or 0),
+            "status": "active",
         },
-        "modules": [
+    ]
+
+    if deposit_permissions["can_view_module"]:
+        modules.append(
             {
-                "slug": "inventario",
-                "name": "Inventario",
-                "description": "Stock, prestamos, conteos y diferencias",
-                "color": "#38a6ff",
-                "badge": str(low_stock_count or 0),
+                "slug": "depositos",
+                "name": "Depósitos",
+                "description": "Pallets, plano visual y escaneo QR",
+                "color": "#ff8b3d",
+                "badge": str(active_pallets or deposit_events_today or 0),
                 "status": "active",
-            },
+            }
+        )
+
+    modules.extend(
+        [
             {
                 "slug": "mensajes",
                 "name": "Mensajes",
                 "description": "Bandeja interna y alarmas",
                 "color": "#63a9ff",
                 "badge": str(unread_messages or open_alarms or 0),
+                "status": "active",
+            },
+            {
+                "slug": "personal",
+                "name": "Personal",
+                "description": "Informes y espacio personal del usuario",
+                "color": "#8b5cf6",
+                "badge": "0",
                 "status": "active",
             },
             {
@@ -1919,7 +1948,15 @@ def build_dashboard(user=None):
                 "badge": "20+",
                 "status": "planned",
             },
-        ],
+        ]
+    )
+
+    return {
+        "welcome": {
+            "title": "ERP modular",
+            "subtitle": "Inventario operativo para planta con foco en velocidad y control suficiente.",
+        },
+        "modules": modules,
         "kpis": [
             {"label": "Articulos activos", "value": articles.count()},
             {"label": "Bajo stock", "value": low_stock_count},
@@ -2466,8 +2503,8 @@ def _resolve_unit_article_movement(article, movement, payload, user):
     movement.source_location = source_location
 
 
-def create_movement(user, payload, allow_initial_load=False):
-    profile = require_role(user, MOVEMENT_ROLES)
+def create_movement(user, payload, allow_initial_load=False, bypass_role_check=False):
+    profile = get_profile(user) if bypass_role_check else require_role(user, MOVEMENT_ROLES)
 
     movement_type = payload.get("movement_type")
     article = resolve_instance(Article, payload.get("article_id"), "article")
@@ -3484,6 +3521,422 @@ def import_articles_from_excel(user, excel_file, mode="preview"):
         "created_count": len(created),
         "created": created,
         "errors": base_errors + errors,
+    }
+
+
+PERSONAL_REPORT_IMPORT_ALIASES = {
+    "fecha": "report_date",
+    "date": "report_date",
+    "report_date": "report_date",
+    "fecha_reporte": "report_date",
+    "dia": "day_label",
+    "day": "day_label",
+    "weekday": "day_label",
+    "dia_semana": "day_label",
+    "actividades": "activities",
+    "actividad": "activities",
+    "actividades_del_dia": "activities",
+    "actividades_dia": "activities",
+    "tareas": "activities",
+    "detalle": "activities",
+}
+
+SPANISH_WEEKDAY_LABELS = (
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo",
+)
+
+
+def _personal_report_weekday_label(report_date):
+    return SPANISH_WEEKDAY_LABELS[report_date.weekday()]
+
+
+def _parse_personal_report_date(value):
+    if value in (None, ""):
+        return None
+
+    if isinstance(value, datetime):
+        return value.date()
+
+    if isinstance(value, date):
+        return value
+
+    if isinstance(value, (int, float)):
+        try:
+            parsed = from_excel(value)
+            if isinstance(parsed, datetime):
+                return parsed.date()
+            if isinstance(parsed, date):
+                return parsed
+        except Exception:  # noqa: BLE001
+            return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+
+    raise InventoryApiError("Fecha invalida. Usa formato YYYY-MM-DD o DD/MM/AAAA.")
+
+
+def _map_personal_report_columns(headers):
+    column_map = {}
+    for index, header in enumerate(headers):
+        normalized = normalize_excel_header(header)
+        if not normalized:
+            continue
+
+        target = PERSONAL_REPORT_IMPORT_ALIASES.get(normalized)
+        if target and target not in column_map:
+            column_map[target] = index
+
+    required = {"report_date", "day_label", "activities"}
+    if required.issubset(set(column_map)):
+        return column_map
+    return None
+
+
+def serialize_personal_daily_report(report):
+    return {
+        "id": report.id,
+        "report_date": report.report_date.isoformat(),
+        "day_label": report.day_label,
+        "activities": report.activities,
+    }
+
+
+def list_personal_daily_reports(user, limit=120):
+    items = PersonalDailyReport.objects.filter(user=user).order_by("-report_date")[:limit]
+    return [serialize_personal_daily_report(item) for item in items]
+
+
+def _get_personal_daily_report(user, report_id):
+    report = PersonalDailyReport.objects.filter(id=report_id, user=user).first()
+    if not report:
+        raise InventoryApiError("Informe no encontrado.", status=404)
+    return report
+
+
+def create_personal_daily_report(user, payload):
+    report_date = _parse_personal_report_date(payload.get("report_date") or payload.get("fecha"))
+    if not report_date:
+        raise InventoryApiError("La fecha es requerida.")
+
+    if PersonalDailyReport.objects.filter(user=user, report_date=report_date).exists():
+        raise InventoryApiError("Ya existe un informe para esa fecha.")
+
+    day_label = clean_string(payload.get("day_label") or payload.get("dia") or "")
+    if not day_label:
+        day_label = _personal_report_weekday_label(report_date)
+
+    activities = clean_string(payload.get("activities") or payload.get("actividades") or "")
+    if not activities:
+        raise InventoryApiError("Las actividades del dia son requeridas.")
+
+    report = PersonalDailyReport(
+        user=user,
+        report_date=report_date,
+        day_label=day_label,
+        activities=activities,
+    )
+    update_audit(report, user, is_new=True)
+    save_validated(report)
+    return report
+
+
+def update_personal_daily_report(user, report_id, payload):
+    report = _get_personal_daily_report(user, report_id)
+
+    next_report_date = payload.get("report_date") or payload.get("fecha")
+    if next_report_date not in (None, ""):
+        parsed = _parse_personal_report_date(next_report_date)
+        if not parsed:
+            raise InventoryApiError("La fecha es requerida.")
+
+        if parsed != report.report_date and PersonalDailyReport.objects.filter(
+            user=user, report_date=parsed
+        ).exclude(id=report.id).exists():
+            raise InventoryApiError("Ya existe un informe para esa fecha.")
+
+        report.report_date = parsed
+
+    day_label = payload.get("day_label") or payload.get("dia")
+    if day_label is not None:
+        resolved = clean_string(day_label)
+        report.day_label = resolved or _personal_report_weekday_label(report.report_date)
+
+    activities = payload.get("activities") or payload.get("actividades")
+    if activities is not None:
+        resolved = clean_string(activities)
+        if not resolved:
+            raise InventoryApiError("Las actividades del dia son requeridas.")
+        report.activities = resolved
+
+    update_audit(report, user)
+    save_validated(report)
+    return report
+
+
+def delete_personal_daily_report(user, report_id):
+    report = _get_personal_daily_report(user, report_id)
+    report.delete()
+    return True
+
+
+def bulk_delete_personal_daily_reports(user, report_ids=None, delete_all=False):
+    queryset = PersonalDailyReport.objects.filter(user=user)
+
+    if delete_all:
+        deleted_count, _ = queryset.delete()
+        return {"deleted_count": deleted_count, "missing_count": 0}
+
+    if report_ids in (None, ""):
+        raise InventoryApiError("ids are required")
+
+    if not isinstance(report_ids, list):
+        raise InventoryApiError("ids must be a list")
+
+    if not report_ids:
+        raise InventoryApiError("ids are required")
+
+    try:
+        unique_ids = sorted({int(item) for item in report_ids})
+    except (TypeError, ValueError) as exc:
+        raise InventoryApiError("Invalid ids") from exc
+
+    matched_queryset = queryset.filter(id__in=unique_ids)
+    matched_count = matched_queryset.count()
+    deleted_count, _ = matched_queryset.delete()
+
+    return {
+        "deleted_count": deleted_count,
+        "missing_count": max(0, len(unique_ids) - matched_count),
+    }
+
+
+def import_personal_daily_reports_from_excel(user, excel_file):
+    if not excel_file:
+        raise InventoryApiError("Excel file is required")
+
+    try:
+        workbook = load_workbook(excel_file, data_only=True)
+    except Exception as exc:  # noqa: BLE001
+        raise InventoryApiError("Could not read the Excel file") from exc
+
+    sheet_matches = []
+
+    for sheet_index, sheet in enumerate(workbook.worksheets):
+        for row_number in range(1, min(sheet.max_row, 20) + 1):
+            headers = [cell.value for cell in sheet[row_number]]
+            mapped = _map_personal_report_columns(headers)
+            if not mapped:
+                continue
+
+            normalized_title = normalize_excel_header(sheet.title)
+            score = 0
+            if "informe" in normalized_title or "report" in normalized_title:
+                score = 10
+            elif "personal" in normalized_title:
+                score = 5
+
+            sheet_matches.append((score, sheet_index, sheet, row_number, mapped))
+            break
+
+    if not sheet_matches:
+        raise InventoryApiError(
+            "No se encontro una hoja con columnas: Fecha, Dia y Actividades del dia."
+        )
+
+    sheet_matches.sort(key=lambda item: (-item[0], item[1]))
+    _, _, resolved_sheet, header_row, column_map = sheet_matches[0]
+
+    candidates = []
+    created_count = 0
+    updated_count = 0
+
+    current_report = None
+    current_activities = []
+
+    def resolve_value(row_values, key):
+        index = column_map.get(key)
+        if index is None or index >= len(row_values):
+            return None
+        return row_values[index]
+
+    def finalize_current_report():
+        nonlocal current_report, current_activities
+
+        if not current_report:
+            return
+
+        candidate = {
+            "row": current_report["row"],
+            "sheet_name": current_report["sheet_name"],
+            "decision": "ready",
+            "detail": "",
+            "id": None,
+            "report_date": current_report["report_date"],
+            "day_label": current_report["day_label"],
+            "activities": "",
+        }
+
+        activities = "\n".join(line for line in current_activities if line)
+        if not activities.strip():
+            candidate["decision"] = "error"
+            candidate["detail"] = "Las actividades del dia son requeridas."
+        else:
+            candidate["activities"] = activities.strip()
+
+        candidates.append(candidate)
+        current_report = None
+        current_activities = []
+
+    for row_number in range(header_row + 1, resolved_sheet.max_row + 1):
+        row_values = [cell.value for cell in resolved_sheet[row_number]]
+
+        report_date_value = resolve_value(row_values, "report_date")
+        day_label_value = resolve_value(row_values, "day_label")
+        activities_value = resolve_value(row_values, "activities")
+
+        if all(_import_is_blank(value) for value in (report_date_value, day_label_value, activities_value)):
+            continue
+
+        has_date = not _import_is_blank(report_date_value)
+        has_activities = not _import_is_blank(activities_value)
+
+        if has_date:
+            finalize_current_report()
+
+            try:
+                report_date = _parse_personal_report_date(report_date_value)
+                if not report_date:
+                    raise InventoryApiError("La fecha es requerida.")
+
+                day_label = _import_text(day_label_value)
+                if not day_label:
+                    day_label = _personal_report_weekday_label(report_date)
+
+                current_report = {
+                    "row": row_number,
+                    "sheet_name": resolved_sheet.title,
+                    "report_date": report_date,
+                    "day_label": day_label,
+                }
+
+                if has_activities:
+                    current_activities.append(_import_text(activities_value))
+            except Exception as exc:  # noqa: BLE001
+                candidates.append(
+                    {
+                        "row": row_number,
+                        "sheet_name": resolved_sheet.title,
+                        "decision": "error",
+                        "detail": _import_error_detail(exc),
+                        "id": None,
+                        "report_date": None,
+                        "day_label": "",
+                        "activities": "",
+                    }
+                )
+                current_report = None
+                current_activities = []
+
+            continue
+
+        if has_activities:
+            if current_report:
+                current_activities.append(_import_text(activities_value))
+            else:
+                candidates.append(
+                    {
+                        "row": row_number,
+                        "sheet_name": resolved_sheet.title,
+                        "decision": "error",
+                        "detail": "Actividad sin fecha.",
+                        "id": None,
+                        "report_date": None,
+                        "day_label": "",
+                        "activities": _import_text(activities_value),
+                    }
+                )
+
+    finalize_current_report()
+
+    ready_candidates = [item for item in candidates if item["decision"] == "ready"]
+    if not ready_candidates:
+        raise InventoryApiError("No hay filas listas para importar en este Excel.")
+
+    with transaction.atomic():
+        for candidate in ready_candidates:
+            try:
+                report_date = candidate["report_date"]
+                report = PersonalDailyReport.objects.filter(
+                    user=user,
+                    report_date=report_date,
+                ).first()
+
+                if report:
+                    report.day_label = candidate["day_label"]
+                    report.activities = candidate["activities"]
+                    update_audit(report, user)
+                    save_validated(report)
+                    updated_count += 1
+                    candidate["decision"] = "updated"
+                else:
+                    report = PersonalDailyReport(
+                        user=user,
+                        report_date=report_date,
+                        day_label=candidate["day_label"],
+                        activities=candidate["activities"],
+                    )
+                    update_audit(report, user, is_new=True)
+                    save_validated(report)
+                    created_count += 1
+                    candidate["decision"] = "created"
+
+                candidate["id"] = report.id
+            except Exception as exc:  # noqa: BLE001
+                candidate["decision"] = "error"
+                candidate["detail"] = _import_error_detail(exc)
+
+    serialized_items = []
+    error_count = 0
+    for item in candidates:
+        report_date_value = item.get("report_date")
+        if isinstance(report_date_value, date):
+            report_date_value = report_date_value.isoformat()
+
+        serialized_items.append(
+            {
+                "row": item["row"],
+                "sheet_name": item["sheet_name"],
+                "id": item.get("id"),
+                "report_date": report_date_value,
+                "day_label": item.get("day_label") or "",
+                "activities": item.get("activities") or "",
+                "decision": item.get("decision"),
+                "detail": item.get("detail") or "",
+            }
+        )
+        if item.get("decision") == "error":
+            error_count += 1
+
+    return {
+        "filename": getattr(excel_file, "name", "") or "",
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "error_count": error_count,
+        "items": serialized_items,
     }
 
 

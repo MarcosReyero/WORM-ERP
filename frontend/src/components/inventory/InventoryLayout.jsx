@@ -87,7 +87,13 @@ export function InventoryLayout() {
   return (
     <ModuleWorkspaceLayout
       headerTitle=""
+      headerSubtitle=""
       moduleTitle={inventoryState.data?.header?.title || 'Inventario'}
+      moduleSubtitle={inventoryState.data?.header?.subtitle || 'Operacion de stock, movimientos y control'}
+      sidebarCollapsible
+      sidebarStorageKey="inventory-sidebar-collapsed"
+      variant="erp"
+      workspaceClassName="inventory-workspace erp-platform-workspace"
       sidebarActions={
         <button
           aria-label="Actualizar inventario"

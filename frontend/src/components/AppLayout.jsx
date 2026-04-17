@@ -27,6 +27,12 @@ function formatBadge(value) {
   return value > 99 ? '99+' : String(value)
 }
 
+const MODULE_ROUTES = {
+  inventario: { to: '/inventario', label: 'Inventario' },
+  depositos: { to: '/depositos', label: 'Depósitos' },
+  personal: { to: '/personal', label: 'Personal' },
+}
+
 export function AppLayout({
   dashboardData,
   onLogout,
@@ -42,6 +48,9 @@ export function AppLayout({
   const menuRef = useRef(null)
   const searchValue = searchByPath[location.pathname] || ''
   const unreadBadge = formatBadge(user?.unread_messages_count)
+  const visibleWorkspaceModules = (dashboardData?.modules || []).filter(
+    (module) => module.status === 'active' && MODULE_ROUTES[module.slug],
+  )
 
   useEffect(() => {
     function handlePointerDown(event) {
@@ -72,9 +81,11 @@ export function AppLayout({
             <NavLink className="nav-link" end to="/">
               Panel
             </NavLink>
-            <NavLink className="nav-link" to="/inventario">
-              Inventario
-            </NavLink>
+            {visibleWorkspaceModules.map((module) => (
+              <NavLink className="nav-link" key={module.slug} to={MODULE_ROUTES[module.slug].to}>
+                {MODULE_ROUTES[module.slug].label}
+              </NavLink>
+            ))}
           </div>
         </div>
 

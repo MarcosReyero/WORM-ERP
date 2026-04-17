@@ -190,6 +190,84 @@ class Location(AuditedModel):
         return f"{self.name} ({self.code})"
 
 
+class StorageZone(AuditedModel):
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.CASCADE,
+        related_name="storage_zones",
+    )
+    code = models.CharField(max_length=30)
+    name = models.CharField(max_length=120)
+    color = models.CharField(max_length=20, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["location__name", "sort_order", "code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["location", "code"],
+                name="unique_storage_zone_per_location",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.location.code} / {self.code}"
+
+
+class StoragePosition(AuditedModel):
+    class PositionStatus(models.TextChoices):
+        AVAILABLE = "available", "Disponible"
+        OCCUPIED = "occupied", "Ocupada"
+        BLOCKED = "blocked", "Bloqueada"
+
+    zone = models.ForeignKey(
+        StorageZone,
+        on_delete=models.CASCADE,
+        related_name="positions",
+    )
+    code = models.CharField(max_length=30)
+    capacity_pallets = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+    )
+    x = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    y = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    width = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=1,
+        validators=[MinValueValidator(0)],
+    )
+    height = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=1,
+        validators=[MinValueValidator(0)],
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=PositionStatus.choices,
+        default=PositionStatus.AVAILABLE,
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["zone__location__name", "zone__sort_order", "code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["zone", "code"],
+                name="unique_storage_position_per_zone",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.zone.code} / {self.code}"
+
+    @property
+    def location(self):
+        return self.zone.location
+
+
 class Article(AuditedModel):
     class ArticleType(models.TextChoices):
         CONSUMABLE = "consumable", "Consumible"
@@ -602,6 +680,124 @@ class InventoryBatch(AuditedModel):
             raise ValidationError(
                 {"expiry_date": "La fecha de vencimiento es obligatoria para este lote."}
             )
+
+
+class Pallet(AuditedModel):
+    class PalletStatus(models.TextChoices):
+        ACTIVE = "active", "Activo"
+        BLOCKED = "blocked", "Bloqueado"
+        MOVED = "moved", "Movido"
+        ARCHIVED = "archived", "Archivado"
+
+    pallet_code = models.CharField(max_length=40, unique=True)
+    qr_value = models.CharField(max_length=120, unique=True)
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.PROTECT,
+        related_name="pallets",
+    )
+    batch = models.ForeignKey(
+        InventoryBatch,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pallets",
+    )
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.PROTECT,
+        related_name="pallets",
+    )
+    position = models.ForeignKey(
+        StoragePosition,
+        on_delete=models.PROTECT,
+        related_name="pallets",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=PalletStatus.choices,
+        default=PalletStatus.ACTIVE,
+    )
+    notes = models.TextField(blank=True)
+    last_scanned_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+
+    def __str__(self):
+        return self.pallet_code
+
+    def clean(self):
+        if self.quantity <= 0:
+            raise ValidationError({"quantity": "La cantidad debe ser mayor a cero."})
+        if self.article.tracking_mode != Article.TrackingMode.QUANTITY:
+            raise ValidationError(
+                {"article": "Solo los articulos por cantidad pueden registrarse en pallets v1."}
+            )
+        if self.batch and self.batch.article_id != self.article_id:
+            raise ValidationError({"batch": "El lote no pertenece al articulo indicado."})
+        if self.position_id and self.location_id and self.position.zone.location_id != self.location_id:
+            raise ValidationError(
+                {"position": "La posicion fisica debe pertenecer al deposito seleccionado."}
+            )
+
+
+class PalletEvent(AuditedModel):
+    class EventType(models.TextChoices):
+        REGISTERED = "registered", "Registrado"
+        RELOCATED = "relocated", "Reubicado"
+        SCANNED_LOOKUP = "scanned_lookup", "Escaneo de consulta"
+
+    class InputMethod(models.TextChoices):
+        CAMERA = "camera", "Camara"
+        MANUAL = "manual", "Manual"
+
+    pallet = models.ForeignKey(
+        Pallet,
+        on_delete=models.CASCADE,
+        related_name="events",
+    )
+    event_type = models.CharField(max_length=24, choices=EventType.choices)
+    input_method = models.CharField(
+        max_length=16,
+        choices=InputMethod.choices,
+        default=InputMethod.MANUAL,
+    )
+    source_position = models.ForeignKey(
+        StoragePosition,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="outgoing_pallet_events",
+    )
+    target_position = models.ForeignKey(
+        StoragePosition,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="incoming_pallet_events",
+    )
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="pallet_events",
+    )
+    raw_qr = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} / {self.pallet.pallet_code}"
+
+    def clean(self):
+        if (
+            self.event_type == self.EventType.RELOCATED
+            and not self.target_position
+        ):
+            raise ValidationError({"target_position": "La reubicacion requiere destino."})
 
 
 class InventoryBalance(AuditedModel):
@@ -1149,3 +1345,26 @@ class InternalRequestLine(AuditedModel):
 
     def __str__(self):
         return f"{self.request.request_number} - {self.article.internal_code}"
+
+
+class PersonalDailyReport(AuditedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="personal_daily_reports",
+    )
+    report_date = models.DateField()
+    day_label = models.CharField(max_length=16)
+    activities = models.TextField()
+
+    class Meta:
+        ordering = ["-report_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "report_date"],
+                name="unique_personal_daily_report",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} - {self.report_date.isoformat()}"

@@ -2090,6 +2090,58 @@ a {
   align-items: center;
 }
 
+.module-sidebar-brand-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.module-sidebar-toggle {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: #d9e4ef;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.module-sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.module-mobile-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  min-width: 90px;
+  width: fit-content;
+  margin: 10px 10px 0;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--workspace-surface);
+  color: var(--workspace-heading);
+  border: 1px solid var(--workspace-border);
+}
+
+.module-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  background: rgba(9, 18, 27, 0.48);
+  z-index: 44;
+}
+
 .module-sidebar-eyebrow,
 .module-nav-group-title,
 .module-header-label,
@@ -2731,6 +2783,74 @@ a {
   color: var(--workspace-muted);
 }
 
+.personal-report-card {
+  display: grid;
+  gap: 10px;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.personal-report-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.personal-report-toggle {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.personal-report-toggle strong {
+  color: var(--workspace-heading);
+}
+
+.personal-report-toggle span {
+  color: var(--workspace-muted);
+  font-size: 0.84rem;
+}
+
+.personal-report-toggle:focus-visible {
+  outline: 2px solid rgba(56, 166, 255, 0.55);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.personal-report-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.personal-report-body {
+  padding-left: 26px;
+}
+
+.personal-report-body p {
+  margin: 0;
+  color: var(--workspace-muted);
+}
+
+.personal-report-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--workspace-muted-strong);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 .module-list-value {
   font-weight: 700;
   color: var(--workspace-heading);
@@ -3063,7 +3183,7 @@ a {
   color: var(--workspace-text-soft);
 }
 
-/* SearchSelect - Componente de select con búsqueda */
+/* SearchSelect - Componente de select con bÃºsqueda */
 .search-select-container {
   position: relative;
   width: 100%;
@@ -5218,6 +5338,1398 @@ a {
   }
 }
 
+.module-workspace.is-erp.deposits-workspace {
+  grid-template-columns: 228px minmax(0, 1fr);
+  border-radius: 0;
+  border: 1px solid var(--workspace-border);
+  box-shadow: none;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar {
+  gap: 8px;
+  padding: 8px;
+  background: #f3f5f8;
+  color: #223042;
+  border-right: 1px solid var(--workspace-border);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-main {
+  gap: 8px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand,
+.module-workspace.is-erp.deposits-workspace .module-nav-group,
+.module-workspace.is-erp.deposits-workspace .module-sidebar-footnote {
+  border-radius: 4px;
+  border: 1px solid var(--workspace-border);
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand {
+  padding: 10px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand h1,
+.module-workspace.is-erp.deposits-workspace .module-sidebar-footnote strong {
+  color: #162233;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand p,
+.module-workspace.is-erp.deposits-workspace .module-sidebar-footnote span,
+.module-workspace.is-erp.deposits-workspace .module-nav-group-title {
+  color: #5a677a;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-actions,
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand-tools {
+  gap: 6px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-icon-button,
+.module-workspace.is-erp.deposits-workspace .module-sidebar-toggle {
+  height: 30px;
+  min-height: 30px;
+  border-radius: 4px;
+  border: 1px solid var(--workspace-border);
+  background: #ffffff;
+  color: #2a3a4f;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-group {
+  gap: 4px;
+  padding: 4px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-group-items {
+  gap: 2px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-link {
+  border-radius: 4px;
+  border-color: transparent;
+  color: #2a3a4f;
+  padding: 6px;
+  transform: none;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-link:hover {
+  border-color: var(--workspace-border);
+  background: #eef2f7;
+  transform: none;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-link.active {
+  border-color: #8ea1ba;
+  background: #e7edf5;
+  box-shadow: inset 2px 0 0 #5f7998;
+  color: #162233;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: #2b3d53;
+  background: #eef2f7;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-copy strong {
+  font-size: 0.78rem;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-copy small {
+  color: #647589;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-badge {
+  border-radius: 4px;
+  min-width: 22px;
+  height: 20px;
+  background: #e7edf5;
+  color: #2d4058;
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed {
+  grid-template-columns: 70px minmax(0, 1fr);
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-sidebar-brand p,
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-sidebar-brand h1,
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-nav-group-title,
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-nav-copy,
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-nav-badge,
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-sidebar-footer {
+  display: none;
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-sidebar-brand {
+  padding: 8px 6px;
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-sidebar-brand-row {
+  justify-content: center;
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-sidebar-brand-tools {
+  flex-direction: column;
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-nav-link {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-canvas {
+  background: #f7f9fb;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-header {
+  padding: 10px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-content {
+  gap: 16px;
+  padding: 16px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-page-stack,
+.module-workspace.is-erp.deposits-workspace .module-main-stack,
+.module-workspace.is-erp.deposits-workspace .module-side-stack {
+  gap: 12px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-page-header {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-page-header h2 {
+  font-size: 1.08rem;
+  letter-spacing: 0;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface {
+  border-radius: 4px;
+  border: 1px solid var(--workspace-border);
+  box-shadow: none;
+  background: #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface-head {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--workspace-divider);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface-copy strong {
+  font-size: 0.92rem;
+  color: #172435;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface-copy p,
+.module-workspace.is-erp.deposits-workspace .module-empty-copy {
+  color: #5f6d7f;
+  font-size: 0.8rem;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface-body {
+  padding: 12px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table-section .module-surface-body {
+  padding: 0;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-toolbar {
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--workspace-divider);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table th {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 10px;
+  background: #f1f4f8;
+  color: #4b5a6d;
+  border-top: 1px solid var(--workspace-divider);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table td {
+  min-height: 40px;
+  height: 40px;
+  padding: 0 10px;
+  border-top: 1px solid var(--workspace-divider);
+  color: #1f2f43;
+  font-size: 0.83rem;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table tbody tr:hover td {
+  background: #f6f8fb;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table tbody tr.is-selected-row td {
+  background: #ebf1f8;
+}
+
+.deposits-erp-stack {
+  gap: 12px;
+}
+
+.deposits-table-surface .module-surface-body {
+  padding: 0;
+}
+
+.deposits-toolbar {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.deposits-toolbar--erp {
+  border-bottom: 1px solid var(--workspace-divider);
+}
+
+.deposits-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.deposits-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.deposits-form label,
+.deposits-toolbar label {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: #27374c;
+}
+
+.deposits-form label span,
+.deposits-toolbar label span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5a677a;
+}
+
+.deposits-form input,
+.deposits-form select,
+.deposits-form textarea,
+.deposits-toolbar select {
+  min-height: 36px;
+  height: 36px;
+  border-radius: 4px;
+  border: 1px solid var(--workspace-input-border);
+  background: #ffffff;
+  padding: 0 10px;
+  color: #1f2f43;
+  font-size: 0.84rem;
+}
+
+.deposits-form textarea {
+  min-height: 88px;
+  height: auto;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.deposits-form input:focus,
+.deposits-form select:focus,
+.deposits-form textarea:focus,
+.deposits-toolbar select:focus {
+  outline: none;
+  border-color: #6f8caf;
+  box-shadow: 0 0 0 1px #6f8caf;
+}
+
+.deposits-form-full {
+  grid-column: 1 / -1;
+}
+
+.deposits-form-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.deposits-form-actions .primary-button {
+  min-height: 36px;
+  border-radius: 4px;
+  min-width: 180px;
+}
+
+.deposits-form-actions .form-note {
+  margin: 0;
+  color: #5f6d7f;
+  font-size: 0.78rem;
+}
+
+.deposits-table-wrap {
+  border-top: 1px solid var(--workspace-divider);
+}
+
+.deposits-table-wrap--compact {
+  border-top: 0;
+  max-height: 240px;
+}
+
+.deposits-erp-table th,
+.deposits-erp-table td {
+  white-space: nowrap;
+}
+
+.deposits-erp-table--compact th,
+.deposits-erp-table--compact td {
+  height: 34px;
+  min-height: 34px;
+}
+
+.deposits-row-status {
+  border-radius: 4px;
+  min-height: 22px;
+  height: 22px;
+  padding: 0 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.deposits-table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--workspace-divider);
+  background: #f9fbfd;
+}
+
+.deposits-table-footer p {
+  margin: 0;
+  color: #5f6d7f;
+  font-size: 0.78rem;
+}
+
+.deposits-table-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deposits-table-controls label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #5f6d7f;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.deposits-table-controls select {
+  min-height: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid var(--workspace-input-border);
+  background: #ffffff;
+  color: #1f2f43;
+  padding: 0 8px;
+}
+
+.deposits-table-controls .secondary-button {
+  min-height: 30px;
+  border-radius: 4px;
+  padding: 0 10px;
+}
+
+.deposits-page-indicator {
+  min-width: 52px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #24364c;
+}
+
+.deposits-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 330px);
+  gap: 12px;
+}
+
+.deposits-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.deposits-context-grid div {
+  border: 1px solid var(--workspace-divider);
+  border-radius: 4px;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.deposits-context-grid dt {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #607287;
+}
+
+.deposits-context-grid dd {
+  margin: 4px 0 0;
+  color: #1f2f43;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.deposits-operations-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 12px;
+}
+
+.deposits-operation-surface .module-surface-body {
+  padding-top: 8px;
+}
+
+.deposits-scan-camera {
+  display: grid;
+  gap: 8px;
+}
+
+.deposits-camera-preview {
+  width: 100%;
+  min-height: 236px;
+  border-radius: 4px;
+  border: 1px solid var(--workspace-input-border);
+  background: #1d2735;
+  object-fit: cover;
+}
+
+.deposits-scan-button {
+  min-height: 36px;
+  border-radius: 4px;
+  width: fit-content;
+  min-width: 170px;
+}
+
+.deposits-result-card,
+.deposits-result-card--erp,
+.deposits-plan-card,
+.deposits-card {
+  border-radius: 4px;
+  border: 1px solid var(--workspace-divider);
+  background: #ffffff;
+  box-shadow: none;
+  padding: 10px;
+}
+
+.deposits-card-list {
+  display: grid;
+  gap: 8px;
+}
+
+.deposits-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.deposits-card-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.deposits-card-meta div {
+  border-radius: 4px;
+  border: 1px solid var(--workspace-divider);
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.deposits-card-meta dt {
+  color: #607287;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.deposits-card-meta dd {
+  margin: 4px 0 0;
+  color: #1f2f43;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.deposits-quick-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: #2d3e54;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 1200px) {
+  .deposits-summary-grid,
+  .deposits-operations-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 920px) {
+  .module-workspace.is-erp.deposits-workspace {
+    grid-template-columns: 176px minmax(0, 1fr);
+  }
+
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+
+  .module-workspace.is-erp.deposits-workspace .module-sidebar {
+    position: relative;
+    transform: none;
+    width: auto;
+    border-right: 1px solid var(--workspace-border);
+    grid-template-rows: auto 1fr auto;
+    gap: 8px;
+  }
+
+  .module-workspace.is-erp.deposits-workspace .module-sidebar-nav {
+    gap: 6px;
+  }
+
+  .module-workspace.is-erp.deposits-workspace .module-nav-group-items {
+    display: grid;
+    gap: 2px;
+    overflow: visible;
+  }
+
+  .module-workspace.is-erp.deposits-workspace .module-nav-link {
+    min-width: 0;
+    flex: none;
+  }
+
+  .module-workspace.is-erp.deposits-workspace .module-sidebar-backdrop,
+  .module-workspace.is-erp.deposits-workspace .module-mobile-nav-toggle {
+    display: none;
+  }
+
+  .deposits-toolbar-row {
+    width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-mobile {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-mobile .module-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(84vw, 280px);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 46;
+    border-right: 1px solid var(--workspace-border);
+  }
+
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-mobile.is-sidebar-open .module-sidebar {
+    transform: translateX(0);
+  }
+
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-mobile .module-mobile-nav-toggle {
+    display: inline-flex;
+  }
+
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-mobile .module-sidebar-backdrop {
+    display: block;
+  }
+
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-mobile .module-sidebar-toggle {
+    min-width: 68px;
+  }
+
+  .module-workspace.is-erp.deposits-workspace .module-content {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .deposits-form,
+  .deposits-toolbar-row {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .deposits-form-actions .primary-button,
+  .deposits-scan-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .deposits-table-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .deposits-table-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .deposits-context-grid,
+  .deposits-card-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .deposits-camera-preview {
+    min-height: 210px;
+  }
+}
+
+/* Deposits ERP structural pass (scoped) */
+.module-workspace.is-erp.deposits-workspace {
+  --deposits-erp-border: #8d9db2;
+  --deposits-erp-divider: #a5b4c7;
+  --deposits-erp-accent: #103864;
+  --deposits-erp-accent-soft: #d9e5f4;
+  --deposits-erp-sidebar-bg: #12365d;
+  --deposits-erp-canvas-bg: #f1f4f8;
+  --deposits-erp-head-bg: #12365d;
+  --deposits-erp-surface-bg: #ffffff;
+  --deposits-erp-muted: #2b4564;
+  --deposits-erp-text: #ffffff;
+  --deposits-erp-shadow-main:
+    0 0 0 1px color-mix(in srgb, var(--deposits-erp-border) 58%, transparent),
+    0 4px 10px rgba(7, 24, 42, 0.14);
+  --deposits-erp-shadow-soft:
+    0 0 0 1px color-mix(in srgb, var(--deposits-erp-border) 44%, transparent),
+    0 2px 6px rgba(7, 24, 42, 0.1);
+  grid-template-columns: 196px minmax(0, 1fr);
+  border-radius: 0;
+  border: 1px solid var(--deposits-erp-border);
+  box-shadow: none;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar {
+  padding: 6px;
+  gap: 6px;
+  border-right: 1px solid var(--deposits-erp-border);
+  background: var(--deposits-erp-sidebar-bg);
+  color: var(--deposits-erp-text);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-main {
+  gap: 4px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand,
+.module-workspace.is-erp.deposits-workspace .module-nav-group,
+.module-workspace.is-erp.deposits-workspace .module-sidebar-footnote {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand {
+  padding: 8px 6px 4px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand h1 {
+  margin: 0 0 2px;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-sidebar-brand p,
+.module-workspace.is-erp.deposits-workspace .module-nav-group-title {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-group {
+  gap: 4px;
+  padding: 0;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-group-title {
+  margin: 2px 0 4px;
+  padding: 0 6px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-group-items {
+  gap: 1px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-link {
+  border-radius: 2px;
+  padding: 6px 6px 6px 7px;
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-link:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+  transform: none;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-link.active {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: #0d2c49;
+  color: #ffffff;
+  box-shadow: inset 2px 0 0 #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-copy strong {
+  font-size: 0.77rem;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-copy small {
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-nav-badge {
+  min-width: 20px;
+  height: 18px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-icon-button,
+.module-workspace.is-erp.deposits-workspace .module-sidebar-toggle {
+  min-height: 28px;
+  height: 28px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed {
+  grid-template-columns: 62px minmax(0, 1fr);
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-sidebar-brand {
+  padding: 8px 4px;
+}
+
+.module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed .module-nav-link {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-canvas {
+  background: var(--deposits-erp-canvas-bg);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-content {
+  padding: 12px;
+  gap: 10px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface {
+  border-radius: 2px;
+  border: 1px solid var(--deposits-erp-border);
+  background: var(--deposits-erp-surface-bg);
+  box-shadow: var(--deposits-erp-shadow-main);
+}
+
+.module-workspace.is-erp.deposits-workspace .deposits-result-card,
+.module-workspace.is-erp.deposits-workspace .deposits-result-card--erp,
+.module-workspace.is-erp.deposits-workspace .deposits-card,
+.module-workspace.is-erp.deposits-workspace .deposits-plan-card,
+.module-workspace.is-erp.deposits-workspace .deposits-card-meta div,
+.module-workspace.is-erp.deposits-workspace .deposits-context-grid div {
+  box-shadow: var(--deposits-erp-shadow-soft);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface-head {
+  min-height: 36px;
+  padding: 6px 10px;
+  background: var(--deposits-erp-head-bg);
+  border-bottom: 1px solid var(--deposits-erp-divider);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface-copy strong {
+  font-size: 0.86rem;
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface-head .module-surface-copy p {
+  font-size: 0.75rem;
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-empty-copy {
+  font-size: 0.75rem;
+  color: var(--deposits-erp-muted);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-surface-body {
+  padding: 10px;
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table th {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 8px;
+  font-size: 0.69rem;
+  color: #ffffff;
+  background: var(--deposits-erp-head-bg);
+  border-top: 1px solid var(--deposits-erp-divider);
+  border-bottom: 1px solid var(--deposits-erp-divider);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table td {
+  height: 40px;
+  min-height: 40px;
+  padding: 0 8px;
+  font-size: 0.8rem;
+  color: var(--deposits-erp-text);
+  border-top: 1px solid var(--deposits-erp-divider);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--deposits-erp-accent-soft) 42%, var(--deposits-erp-surface-bg) 58%);
+}
+
+.module-workspace.is-erp.deposits-workspace .module-table tbody tr.is-selected-row td {
+  background: color-mix(in srgb, var(--deposits-erp-accent-soft) 58%, var(--deposits-erp-surface-bg) 42%);
+}
+
+.module-workspace.is-erp.deposits-workspace .deposits-form label span,
+.module-workspace.is-erp.deposits-workspace .deposits-toolbar label span {
+  color: var(--deposits-erp-accent);
+}
+
+.deposits-erp-stack.deposits-registry-screen {
+  gap: 10px;
+}
+
+.deposits-toolbar-surface .module-surface-body {
+  padding: 8px 10px;
+}
+
+.deposits-registry-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.deposits-registry-toolbar-fields {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(150px, 1fr) minmax(140px, 1fr);
+  gap: 8px;
+}
+
+.deposits-toolbar-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.deposits-toolbar-field span {
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--deposits-erp-accent);
+}
+
+.deposits-toolbar-field input,
+.deposits-toolbar-field select {
+  height: 36px;
+  min-height: 36px;
+  border-radius: 2px;
+  border: 1px solid var(--deposits-erp-border);
+  padding: 0 10px;
+  background: var(--deposits-erp-surface-bg);
+  color: var(--deposits-erp-text);
+  font-size: 0.82rem;
+}
+
+.deposits-toolbar-field input:focus,
+.deposits-toolbar-field select:focus {
+  outline: none;
+  border-color: var(--deposits-erp-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--deposits-erp-accent) 76%, transparent);
+}
+
+.deposits-registry-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deposits-registry-toolbar-actions .secondary-button {
+  min-height: 34px;
+  height: 34px;
+  border-radius: 2px;
+  padding: 0 12px;
+  border-color: var(--deposits-erp-border);
+  color: var(--deposits-erp-accent);
+  background: var(--deposits-erp-surface-bg);
+}
+
+.deposits-registry-table-panel .module-surface-head {
+  background: var(--deposits-erp-head-bg);
+}
+
+.deposits-table-kpis {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  color: #ffffff;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.deposits-table-kpis strong {
+  color: #ffffff;
+  font-size: 0.8rem;
+}
+
+.deposits-registry-table-wrap {
+  max-height: min(58vh, 620px);
+  overflow: auto;
+}
+
+.deposits-registry-table-wrap .module-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.deposits-row-action {
+  min-height: 26px;
+  border-radius: 2px;
+  padding: 0 8px;
+  border: 1px solid var(--deposits-erp-border);
+  color: var(--deposits-erp-accent);
+  background: var(--deposits-erp-surface-bg);
+}
+
+.deposits-summary-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 10px;
+}
+
+.deposits-secondary-panel .module-surface-head {
+  min-height: 34px;
+  background: var(--deposits-erp-head-bg);
+}
+
+.deposits-secondary-panel .module-surface-body {
+  padding: 8px 10px;
+}
+
+.deposits-secondary-panel .deposits-table-wrap--compact {
+  max-height: 210px;
+}
+
+.deposits-context-grid {
+  margin-bottom: 8px;
+  gap: 6px;
+}
+
+.deposits-context-grid div {
+  border-radius: 2px;
+  border: 1px solid var(--deposits-erp-border);
+  background: color-mix(in srgb, var(--deposits-erp-accent-soft) 26%, var(--deposits-erp-surface-bg) 74%);
+  padding: 6px;
+}
+
+.deposits-context-grid dt {
+  font-size: 0.66rem;
+  color: var(--deposits-erp-accent);
+}
+
+.deposits-context-grid dd {
+  font-size: 0.78rem;
+  color: var(--deposits-erp-text);
+}
+
+.workspace-shell[data-theme='dark'] .module-workspace.is-erp.deposits-workspace {
+  --deposits-erp-border: var(--workspace-border);
+  --deposits-erp-divider: var(--workspace-divider);
+  --deposits-erp-accent: #9fc2f6;
+  --deposits-erp-accent-soft: color-mix(in srgb, #6fa7ff 20%, var(--workspace-surface) 80%);
+  --deposits-erp-sidebar-bg: color-mix(in srgb, var(--workspace-surface-muted) 72%, #16314f 28%);
+  --deposits-erp-canvas-bg: var(--workspace-canvas);
+  --deposits-erp-head-bg: color-mix(in srgb, #6fa7ff 12%, var(--workspace-surface) 88%);
+  --deposits-erp-surface-bg: var(--workspace-surface);
+  --deposits-erp-muted: var(--workspace-muted);
+  --deposits-erp-text: var(--workspace-text);
+  --deposits-erp-shadow-main:
+    0 0 0 1px color-mix(in srgb, var(--deposits-erp-border) 78%, transparent),
+    0 8px 16px rgba(4, 10, 20, 0.46);
+  --deposits-erp-shadow-soft:
+    0 0 0 1px color-mix(in srgb, var(--deposits-erp-border) 64%, transparent),
+    0 4px 10px rgba(4, 10, 20, 0.34);
+}
+
+@media (max-width: 1200px) {
+  .deposits-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 920px) {
+  .module-workspace.is-erp.deposits-workspace {
+    grid-template-columns: 166px minmax(0, 1fr);
+  }
+
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-collapsed {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+
+  .deposits-registry-toolbar-fields {
+    grid-template-columns: minmax(180px, 1.6fr) minmax(130px, 1fr) minmax(120px, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-mobile {
+    grid-template-columns: 1fr;
+  }
+
+  .module-workspace.is-erp.deposits-workspace.is-sidebar-mobile .module-sidebar {
+    width: min(82vw, 260px);
+  }
+
+  .module-workspace.is-erp.deposits-workspace .module-content {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .deposits-registry-toolbar {
+    display: grid;
+    gap: 8px;
+  }
+
+  .deposits-registry-toolbar-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .deposits-registry-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .deposits-registry-table-wrap {
+    max-height: none;
+    overflow-x: auto;
+  }
+
+  .deposits-table-kpis {
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+/* ERP shared style (inventory/profile/personal) */
+.module-workspace.is-erp.erp-platform-workspace {
+  --erp-border: #8d9db2;
+  --erp-divider: #a5b4c7;
+  --erp-accent: #103864;
+  --erp-accent-soft: #d9e5f4;
+  --erp-sidebar-bg: #12365d;
+  --erp-canvas-bg: #f1f4f8;
+  --erp-head-bg: #12365d;
+  --erp-surface-bg: #ffffff;
+  --erp-muted: #2b4564;
+  --erp-text: #ffffff;
+  --erp-shadow-main:
+    0 0 0 1px color-mix(in srgb, var(--erp-border) 58%, transparent),
+    0 4px 10px rgba(7, 24, 42, 0.14);
+  grid-template-columns: 196px minmax(0, 1fr);
+  border-radius: 0;
+  border: 1px solid var(--erp-border);
+  box-shadow: none;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-sidebar {
+  padding: 6px;
+  gap: 6px;
+  border-right: 1px solid var(--erp-border);
+  background: var(--erp-sidebar-bg);
+  color: var(--erp-text);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-sidebar-main {
+  gap: 4px;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-sidebar-brand,
+.module-workspace.is-erp.erp-platform-workspace .module-nav-group,
+.module-workspace.is-erp.erp-platform-workspace .module-sidebar-footnote {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-sidebar-brand {
+  padding: 8px 6px 4px;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-sidebar-brand h1 {
+  margin: 0 0 2px;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-sidebar-brand p,
+.module-workspace.is-erp.erp-platform-workspace .module-nav-group-title {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-group {
+  gap: 4px;
+  padding: 0;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-group-title {
+  margin: 2px 0 4px;
+  padding: 0 6px;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-group-items {
+  gap: 1px;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-link {
+  border-radius: 2px;
+  padding: 6px 6px 6px 7px;
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-link:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+  transform: none;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-link.active {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: #0d2c49;
+  color: #ffffff;
+  box-shadow: inset 2px 0 0 #ffffff;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-copy strong {
+  font-size: 0.77rem;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-copy small {
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-nav-badge {
+  min-width: 20px;
+  height: 18px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-icon-button,
+.module-workspace.is-erp.erp-platform-workspace .module-sidebar-toggle {
+  min-height: 28px;
+  height: 28px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.erp-platform-workspace.is-sidebar-collapsed {
+  grid-template-columns: 62px minmax(0, 1fr);
+}
+
+.module-workspace.is-erp.erp-platform-workspace.is-sidebar-collapsed .module-sidebar-brand {
+  padding: 8px 4px;
+}
+
+.module-workspace.is-erp.erp-platform-workspace.is-sidebar-collapsed .module-nav-link {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-canvas {
+  background: var(--erp-canvas-bg);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-content {
+  padding: 12px;
+  gap: 10px;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-page-header h2,
+.module-workspace.is-erp.erp-platform-workspace .module-page-header strong {
+  color: var(--erp-accent);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-surface {
+  border-radius: 2px;
+  border: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg);
+  box-shadow: var(--erp-shadow-main);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-surface-head {
+  min-height: 36px;
+  padding: 6px 10px;
+  background: var(--erp-head-bg);
+  border-bottom: 1px solid var(--erp-divider);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-surface-copy strong {
+  font-size: 0.86rem;
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-surface-head .module-surface-copy p {
+  font-size: 0.75rem;
+  color: #ffffff;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-empty-copy {
+  font-size: 0.75rem;
+  color: var(--erp-muted);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-surface-body {
+  padding: 10px;
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-toolbar {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--erp-divider);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-table th {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 8px;
+  font-size: 0.69rem;
+  color: #ffffff;
+  background: var(--erp-head-bg);
+  border-top: 1px solid var(--erp-divider);
+  border-bottom: 1px solid var(--erp-divider);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-table td {
+  height: 40px;
+  min-height: 40px;
+  padding: 0 8px;
+  font-size: 0.8rem;
+  border-top: 1px solid var(--erp-divider);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--erp-accent-soft) 42%, var(--erp-surface-bg) 58%);
+}
+
+.module-workspace.is-erp.erp-platform-workspace .module-table tbody tr.is-selected-row td {
+  background: color-mix(in srgb, var(--erp-accent-soft) 58%, var(--erp-surface-bg) 42%);
+}
+
+.workspace-shell[data-theme='dark'] .module-workspace.is-erp.erp-platform-workspace {
+  --erp-border: var(--workspace-border);
+  --erp-divider: var(--workspace-divider);
+  --erp-accent: #9fc2f6;
+  --erp-accent-soft: color-mix(in srgb, #6fa7ff 20%, var(--workspace-surface) 80%);
+  --erp-sidebar-bg: color-mix(in srgb, var(--workspace-surface-muted) 72%, #16314f 28%);
+  --erp-canvas-bg: var(--workspace-canvas);
+  --erp-head-bg: color-mix(in srgb, #6fa7ff 12%, var(--workspace-surface) 88%);
+  --erp-surface-bg: var(--workspace-surface);
+  --erp-muted: var(--workspace-muted);
+  --erp-text: var(--workspace-text);
+  --erp-shadow-main:
+    0 0 0 1px color-mix(in srgb, var(--erp-border) 78%, transparent),
+    0 8px 16px rgba(4, 10, 20, 0.46);
+}
+
+@media (max-width: 920px) {
+  .module-workspace.is-erp.erp-platform-workspace {
+    grid-template-columns: 166px minmax(0, 1fr);
+  }
+
+  .module-workspace.is-erp.erp-platform-workspace.is-sidebar-collapsed {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .module-workspace.is-erp.erp-platform-workspace.is-sidebar-mobile {
+    grid-template-columns: 1fr;
+  }
+
+  .module-workspace.is-erp.erp-platform-workspace.is-sidebar-mobile .module-sidebar {
+    width: min(82vw, 260px);
+  }
+
+  .module-workspace.is-erp.erp-platform-workspace .module-content {
+    padding: 10px;
+    gap: 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-backdrop::before,
   .dashboard-backdrop::after,
@@ -5233,3 +6745,7 @@ a {
     transition: none;
   }
 }
+
+
+
+

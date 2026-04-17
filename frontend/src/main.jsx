@@ -9,6 +9,12 @@ import '@fontsource/outfit/700.css'
 import './index.css'
 import App from './App.jsx'
 
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => null)
+  })
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>

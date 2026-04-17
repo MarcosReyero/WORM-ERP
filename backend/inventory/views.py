@@ -22,6 +22,7 @@ from .services import (
     build_stock_export_excel,
     build_dashboard,
     build_inventory_overview,
+    create_personal_daily_report,
     create_article,
     get_article_detail,
     get_full_stock_report_config,
@@ -31,7 +32,11 @@ from .services import (
     create_movement,
     create_checkout,
     import_articles_from_excel,
+    import_personal_daily_reports_from_excel,
+    bulk_delete_personal_daily_reports,
+    delete_personal_daily_report,
     list_articles,
+    list_personal_daily_reports,
     list_safety_stock_alerts,
     parse_json,
     resolve_discrepancy,
@@ -47,7 +52,9 @@ from .services import (
     serialize_count_session,
     serialize_discrepancy,
     serialize_movement,
+    serialize_personal_daily_report,
     serialize_tracked_unit,
+    update_personal_daily_report,
     update_article,
 )
 
@@ -160,6 +167,79 @@ def article_export_excel(request):
         )
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["GET", "POST"])
+def personal_daily_reports(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    if request.method == "GET":
+        items = list_personal_daily_reports(request.user)
+        return JsonResponse({"items": items})
+
+    def handler():
+        report = create_personal_daily_report(request.user, _request_payload(request))
+        return JsonResponse(
+            {"detail": "Personal report created", "item": serialize_personal_daily_report(report)},
+            status=201,
+        )
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["POST"])
+def personal_daily_report_detail(request, report_id):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    def handler():
+        report = update_personal_daily_report(request.user, report_id, _request_payload(request))
+        return JsonResponse({"detail": "Personal report updated", "item": serialize_personal_daily_report(report)})
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["POST"])
+def personal_daily_report_delete(request, report_id):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    def handler():
+        delete_personal_daily_report(request.user, report_id)
+        return JsonResponse({"detail": "Personal report deleted"})
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["POST"])
+def personal_daily_report_bulk_delete(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    def handler():
+        payload = parse_json(request)
+        if not isinstance(payload, dict):
+            raise InventoryApiError("Invalid payload")
+
+        delete_all = bool(payload.get("all"))
+        ids = payload.get("ids") or payload.get("report_ids")
+        result = bulk_delete_personal_daily_reports(request.user, report_ids=ids, delete_all=delete_all)
+        return JsonResponse({"detail": "Personal reports deleted", "item": result})
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["POST"])
+def personal_daily_report_import_excel(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    def handler():
+        result = import_personal_daily_reports_from_excel(request.user, request.FILES.get("file"))
+        return JsonResponse({"detail": "Excel imported", "item": result}, status=201)
 
     return _handle_inventory_call(handler)
 

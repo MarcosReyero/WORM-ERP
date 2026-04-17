@@ -5,8 +5,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "inventary-dev-secret-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
-CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:5173", "http://localhost:5173"]
+ALLOWED_HOSTS = ["127.0.0.1","192.168.8.67", "localhost", "testserver"]
+CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:5173", "http://localhost:5173", "http://192.168.8.67:5173"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",

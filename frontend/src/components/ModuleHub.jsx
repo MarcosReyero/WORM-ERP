@@ -2,6 +2,13 @@ import { useDeferredValue, useEffect, useRef } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { ModuleIcon } from './Icons.jsx'
 
+const ACTIVE_MODULE_ROUTES = {
+  inventario: '/inventario',
+  depositos: '/depositos',
+  mensajes: '/mensajes',
+  personal: '/personal',
+}
+
 function matchesQuery(module, query) {
   if (!query) {
     return true
@@ -118,12 +125,14 @@ export function ModuleHub() {
               </>
             )
 
-            if (module.slug === 'inventario' || module.slug === 'mensajes') {
+            if (ACTIVE_MODULE_ROUTES[module.slug]) {
+              const destination = ACTIVE_MODULE_ROUTES[module.slug]
+
               return (
                 <Link
                   className="module-card"
                   key={module.slug}
-                  to={module.slug === 'inventario' ? '/inventario' : '/mensajes'}
+                  to={destination}
                 >
                   {card}
                 </Link>

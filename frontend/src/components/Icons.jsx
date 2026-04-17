@@ -135,6 +135,16 @@ export function ModuleIcon({ slug }) {
     )
   }
 
+  if (slug === 'depositos') {
+    return (
+      <BaseIcon>
+        <path d="M4 10.5 12 4l8 6.5V20H4v-9.5Z" />
+        <path d="M8 20v-5h8v5" />
+        <path d="M7.5 10.5h9" />
+      </BaseIcon>
+    )
+  }
+
   if (slug === 'ventas') {
     return (
       <BaseIcon>
@@ -183,6 +193,17 @@ export function ModuleIcon({ slug }) {
         <path d="M4.5 6.5h15v10h-9l-4 3v-3h-2z" />
         <path d="M8 10h8" />
         <path d="M8 13h5" />
+      </BaseIcon>
+    )
+  }
+
+  if (slug === 'personal') {
+    return (
+      <BaseIcon>
+        <path d="M7 20h10a2 2 0 0 0 2-2V7.5L15.5 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
+        <path d="M15 4v4h4" />
+        <circle cx="12" cy="12" r="2.2" />
+        <path d="M8.5 17a3.5 3.5 0 0 1 7 0" />
       </BaseIcon>
     )
   }

@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import close_old_connections
+from django.db.models import Sum
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from openpyxl.styles import Font, PatternFill
@@ -41,9 +42,14 @@ from inventory.models import (
     InventoryAutomationTaskState,
     Location,
     MinimumStockDigestConfig,
+    Pallet,
+    PalletEvent,
+    PersonalDailyReport,
     Person,
     SafetyStockAlertRule,
     Sector,
+    StoragePosition,
+    StorageZone,
     StockDiscrepancy,
     TrackedUnit,
     UnitOfMeasure,
@@ -286,6 +292,194 @@ class InventoryApiTests(TestCase):
             Article.objects.get(name="Rodamiento 6206").article_type,
             Article.ArticleType.SPARE_PART,
         )
+
+    def test_personal_report_excel_import_creates_and_updates_reports(self):
+        self.client.force_login(self.storekeeper)
+
+        first_workbook = Workbook()
+        sheet = first_workbook.active
+        sheet.title = "Informes"
+        sheet.append(["Fecha", "Dia", "Actividades del dia"])
+        sheet.append([datetime(2026, 4, 15, 10, 0, 0), "Martes", "Revision de stock y limpieza."])
+
+        response = self.client.post(
+            "/api/personal/reports/import-excel/",
+            data={
+                "file": self.build_excel_upload(first_workbook, name="informes.xlsx"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["item"]
+        self.assertEqual(payload["created_count"], 1)
+        self.assertEqual(payload["updated_count"], 0)
+        self.assertEqual(payload["error_count"], 0)
+        self.assertTrue(
+            PersonalDailyReport.objects.filter(
+                user=self.storekeeper,
+                report_date=datetime(2026, 4, 15).date(),
+            ).exists()
+        )
+
+        second_workbook = Workbook()
+        sheet = second_workbook.active
+        sheet.title = "Informes"
+        sheet.append(["Fecha", "Dia", "Actividades del dia"])
+        sheet.append([datetime(2026, 4, 15, 9, 0, 0), "", "Actualizacion de actividades importadas."])
+
+        update_response = self.client.post(
+            "/api/personal/reports/import-excel/",
+            data={
+                "file": self.build_excel_upload(second_workbook, name="informes.xlsx"),
+            },
+        )
+
+        self.assertEqual(update_response.status_code, 201)
+        update_payload = update_response.json()["item"]
+        self.assertEqual(update_payload["created_count"], 0)
+        self.assertEqual(update_payload["updated_count"], 1)
+        self.assertEqual(update_payload["error_count"], 0)
+
+        report = PersonalDailyReport.objects.get(
+            user=self.storekeeper,
+            report_date=datetime(2026, 4, 15).date(),
+        )
+        self.assertEqual(report.activities, "Actualizacion de actividades importadas.")
+        self.assertTrue(report.day_label)
+
+        list_response = self.client.get("/api/personal/reports/")
+        self.assertEqual(list_response.status_code, 200)
+        list_payload = list_response.json()
+        self.assertTrue(list_payload["items"])
+        self.assertEqual(list_payload["items"][0]["report_date"], "2026-04-15")
+
+    def test_personal_report_excel_import_requires_expected_columns(self):
+        self.client.force_login(self.storekeeper)
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Informes"
+        sheet.append(["Fecha", "Actividades del dia"])
+        sheet.append([datetime(2026, 4, 15, 10, 0, 0), "Actividades sin columna dia."])
+
+        response = self.client.post(
+            "/api/personal/reports/import-excel/",
+            data={
+                "file": self.build_excel_upload(workbook, name="informes.xlsx"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Fecha, Dia y Actividades", response.json()["detail"])
+
+    def test_personal_report_excel_import_supports_multiline_activities(self):
+        self.client.force_login(self.storekeeper)
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Informe"
+        sheet.append(["FECHA", "DIA", "ACTIVIDADES"])
+        sheet.append([datetime(2026, 4, 14, 0, 0, 0), "Martes", None])
+        sheet.append([None, None, ". Primera actividad"])
+        sheet.append([None, None, ". Segunda actividad"])
+        sheet.append([datetime(2026, 4, 15, 0, 0, 0), "", "Actividad en la misma fila"])
+        sheet.append([None, None, "Actividad extra"])
+
+        response = self.client.post(
+            "/api/personal/reports/import-excel/",
+            data={
+                "file": self.build_excel_upload(workbook, name="informes.xlsx"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["item"]
+        self.assertEqual(payload["created_count"], 2)
+        self.assertEqual(payload["updated_count"], 0)
+        self.assertEqual(payload["error_count"], 0)
+
+        first = PersonalDailyReport.objects.get(
+            user=self.storekeeper,
+            report_date=datetime(2026, 4, 14).date(),
+        )
+        self.assertEqual(first.day_label, "Martes")
+        self.assertEqual(first.activities, ". Primera actividad\n. Segunda actividad")
+
+        second = PersonalDailyReport.objects.get(
+            user=self.storekeeper,
+            report_date=datetime(2026, 4, 15).date(),
+        )
+        self.assertTrue(second.day_label)
+        self.assertEqual(second.activities, "Actividad en la misma fila\nActividad extra")
+
+    def test_personal_report_crud_allows_create_update_and_delete(self):
+        self.client.force_login(self.storekeeper)
+
+        create_response = self.client.post(
+            "/api/personal/reports/",
+            data=json.dumps(
+                {
+                    "report_date": "2026-04-16",
+                    "day_label": "",
+                    "activities": "Inicio de turno\nRevision de tableros",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        created_item = create_response.json()["item"]
+        self.assertEqual(created_item["report_date"], "2026-04-16")
+        self.assertTrue(created_item["day_label"])
+        self.assertIn("Revision de tableros", created_item["activities"])
+
+        update_response = self.client.post(
+            f"/api/personal/reports/{created_item['id']}/",
+            data=json.dumps(
+                {
+                    "day_label": "Jueves",
+                    "activities": "Actualizacion manual",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(update_response.status_code, 200)
+        updated_item = update_response.json()["item"]
+        self.assertEqual(updated_item["day_label"], "Jueves")
+        self.assertEqual(updated_item["activities"], "Actualizacion manual")
+
+        delete_response = self.client.post(f"/api/personal/reports/{created_item['id']}/delete/")
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertFalse(PersonalDailyReport.objects.filter(id=created_item["id"]).exists())
+
+    def test_personal_report_bulk_delete_removes_selected_reports(self):
+        self.client.force_login(self.storekeeper)
+
+        first = PersonalDailyReport.objects.create(
+            user=self.storekeeper,
+            report_date=datetime(2026, 4, 10).date(),
+            day_label="Viernes",
+            activities="Actividad 1",
+        )
+        second = PersonalDailyReport.objects.create(
+            user=self.storekeeper,
+            report_date=datetime(2026, 4, 11).date(),
+            day_label="Sabado",
+            activities="Actividad 2",
+        )
+
+        response = self.client.post(
+            "/api/personal/reports/bulk-delete/",
+            data=json.dumps({"ids": [first.id, second.id]}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["deleted_count"], 2)
+        self.assertFalse(PersonalDailyReport.objects.filter(id=first.id).exists())
+        self.assertFalse(PersonalDailyReport.objects.filter(id=second.id).exists())
 
     def test_stock_excel_export_requires_authentication(self):
         response = self.client.get("/api/articles/export-excel/")
@@ -1184,3 +1378,345 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertEqual(task_state.last_processed_count, 3)
         self.assertEqual(len(processed_ids), 3)
         self.assertTrue(any("reconcile_batch_progress" in line for line in captured_logs.output))
+
+
+class DepositsApiTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.storekeeper = user_model.objects.create_user(
+            username="dep-storekeeper",
+            password="StrongPass123",
+        )
+        self.storekeeper.profile.role = UserProfile.Role.STOREKEEPER
+        self.storekeeper.profile.save(update_fields=["role"])
+
+        self.operator = user_model.objects.create_user(
+            username="dep-operator",
+            password="StrongPass123",
+        )
+        self.operator.profile.role = UserProfile.Role.OPERATOR
+        self.operator.profile.save(update_fields=["role"])
+
+        self.auditor = user_model.objects.create_user(
+            username="dep-auditor",
+            password="StrongPass123",
+        )
+        self.auditor.profile.role = UserProfile.Role.AUDITOR
+        self.auditor.profile.save(update_fields=["role"])
+
+        self.location = Location.objects.get(code="DEP-PRINCIPAL")
+        unit = UnitOfMeasure.objects.get(code="UN")
+        sector = Sector.objects.get(code="DEP")
+        self.article = Article.objects.create(
+            internal_code="PAL-TEST-001",
+            name="Articulo palletizado",
+            article_type=Article.ArticleType.CONSUMABLE,
+            unit_of_measure=unit,
+            sector_responsible=sector,
+            tracking_mode=Article.TrackingMode.QUANTITY,
+            primary_location=self.location,
+            minimum_stock=Decimal("1"),
+        )
+        self.position_a, self.position_b = list(
+            StoragePosition.objects.filter(zone__location=self.location).order_by("code")[:2]
+        )
+
+        self.secondary_location = Location.objects.create(
+            code="DEP-SEC",
+            name="Deposio Secundario",
+            location_type=Location.LocationType.WAREHOUSE,
+            status="active",
+        )
+        self.secondary_zone = StorageZone.objects.create(
+            location=self.secondary_location,
+            code="ZS",
+            name="Zona Secundaria",
+            color="#5fc7ff",
+            sort_order=10,
+        )
+        self.secondary_position = StoragePosition.objects.create(
+            zone=self.secondary_zone,
+            code="S01",
+            capacity_pallets=1,
+            x=0,
+            y=0,
+            width=1.8,
+            height=1.2,
+        )
+        self.production_location = Location.objects.create(
+            code="PROD-01",
+            name="Produccion 1",
+            location_type=Location.LocationType.PRODUCTION,
+            status="active",
+        )
+        self.production_zone = StorageZone.objects.create(
+            location=self.production_location,
+            code="PZ",
+            name="Zona Produccion",
+            color="#9aa3af",
+            sort_order=10,
+        )
+        self.production_position = StoragePosition.objects.create(
+            zone=self.production_zone,
+            code="P01",
+            capacity_pallets=1,
+            x=0,
+            y=0,
+            width=1.8,
+            height=1.2,
+        )
+
+    def balance_total(self, location):
+        return (
+            InventoryBalance.objects.filter(article=self.article, location=location).aggregate(total=Sum("on_hand"))[
+                "total"
+            ]
+            or Decimal("0")
+        )
+
+    def register_pallet(self, quantity="5"):
+        self.client.force_login(self.storekeeper)
+        response = self.client.post(
+            "/api/pallets/",
+            data=json.dumps(
+                {
+                    "article_id": self.article.id,
+                    "quantity": quantity,
+                    "location_id": self.location.id,
+                    "position_id": self.position_a.id,
+                    "notes": "Alta de prueba",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        return response.json()["item"]
+
+    def test_deposit_endpoints_require_authentication(self):
+        self.assertEqual(self.client.get("/api/deposits/overview/").status_code, 401)
+        self.assertEqual(self.client.get("/api/pallets/").status_code, 401)
+        self.assertEqual(
+            self.client.post(
+                "/api/pallets/scan/",
+                data=json.dumps({"action": "lookup", "qr_value": "PAL-000001"}),
+                content_type="application/json",
+            ).status_code,
+            401,
+        )
+
+    def test_operator_can_scan_but_cannot_create_manual_pallet(self):
+        pallet = self.register_pallet()
+
+        self.client.force_login(self.operator)
+        lookup_response = self.client.post(
+            "/api/pallets/scan/",
+            data=json.dumps(
+                {
+                    "action": "lookup",
+                    "qr_value": pallet["pallet_code"],
+                    "input_method": "manual",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(lookup_response.status_code, 200)
+        self.assertEqual(lookup_response.json()["item"]["pallet_code"], pallet["pallet_code"])
+
+        manual_create = self.client.post(
+            "/api/pallets/",
+            data=json.dumps(
+                {
+                    "article_id": self.article.id,
+                    "quantity": "2",
+                    "location_id": self.location.id,
+                    "position_id": self.position_b.id,
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(manual_create.status_code, 403)
+
+    def test_auditor_can_list_and_view_but_cannot_scan_or_register(self):
+        pallet = self.register_pallet()
+
+        self.client.force_login(self.auditor)
+        list_response = self.client.get("/api/pallets/")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["items"][0]["pallet_code"], pallet["pallet_code"])
+
+        detail_response = self.client.get(f"/api/pallets/{pallet['id']}/")
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(detail_response.json()["item"]["id"], pallet["id"])
+
+        scan_response = self.client.post(
+            "/api/pallets/scan/",
+            data=json.dumps(
+                {
+                    "action": "lookup",
+                    "qr_value": pallet["pallet_code"],
+                    "input_method": "manual",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(scan_response.status_code, 403)
+
+        register_response = self.client.post(
+            "/api/pallets/",
+            data=json.dumps(
+                {
+                    "article_id": self.article.id,
+                    "quantity": "2",
+                    "location_id": self.location.id,
+                    "position_id": self.position_b.id,
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(register_response.status_code, 403)
+
+    def test_manual_pallet_registration_creates_event_and_stock_adjustment(self):
+        before_balance = self.balance_total(self.location)
+
+        pallet = self.register_pallet(quantity="7")
+
+        created = Pallet.objects.get(pk=pallet["id"])
+        self.assertEqual(created.status, Pallet.PalletStatus.ACTIVE)
+        self.assertEqual(created.location_id, self.location.id)
+        self.assertTrue(
+            PalletEvent.objects.filter(
+                pallet=created,
+                event_type=PalletEvent.EventType.REGISTERED,
+            ).exists()
+        )
+        self.assertTrue(
+            created.article.movements.filter(
+                movement_type="adjustment_in",
+                target_location=self.location,
+            ).exists()
+        )
+        self.assertEqual(self.balance_total(self.location), before_balance + Decimal("7"))
+
+    def test_internal_relocation_changes_position_without_moving_balance(self):
+        pallet = self.register_pallet(quantity="3")
+        before_balance = self.balance_total(self.location)
+
+        self.client.force_login(self.operator)
+        response = self.client.post(
+            "/api/pallets/scan/",
+            data=json.dumps(
+                {
+                    "action": "relocate",
+                    "qr_value": pallet["pallet_code"],
+                    "position_id": self.position_b.id,
+                    "input_method": "manual",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        moved = Pallet.objects.get(pk=pallet["id"])
+        self.assertEqual(moved.position_id, self.position_b.id)
+        self.assertEqual(moved.location_id, self.location.id)
+        self.assertEqual(self.balance_total(self.location), before_balance)
+        self.assertFalse(
+            moved.article.movements.filter(
+                movement_type="transfer",
+                reason_text__icontains=moved.pallet_code,
+            ).exists()
+        )
+
+    def test_cross_deposit_relocation_creates_transfer_and_updates_balances(self):
+        pallet = self.register_pallet(quantity="4")
+        self.assertEqual(self.balance_total(self.location), Decimal("4"))
+        self.assertEqual(self.balance_total(self.secondary_location), Decimal("0"))
+
+        self.client.force_login(self.operator)
+        response = self.client.post(
+            "/api/pallets/scan/",
+            data=json.dumps(
+                {
+                    "action": "relocate",
+                    "qr_value": pallet["pallet_code"],
+                    "position_id": self.secondary_position.id,
+                    "input_method": "manual",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        moved = Pallet.objects.get(pk=pallet["id"])
+        self.assertEqual(moved.location_id, self.secondary_location.id)
+        self.assertEqual(moved.position_id, self.secondary_position.id)
+        self.assertEqual(self.balance_total(self.location), Decimal("0"))
+        self.assertEqual(self.balance_total(self.secondary_location), Decimal("4"))
+        self.assertTrue(
+            moved.article.movements.filter(
+                movement_type="transfer",
+                source_location=self.location,
+                target_location=self.secondary_location,
+                reason_text__icontains=moved.pallet_code,
+            ).exists()
+        )
+        self.assertTrue(
+            PalletEvent.objects.filter(
+                pallet=moved,
+                event_type=PalletEvent.EventType.RELOCATED,
+                target_position=self.secondary_position,
+            ).exists()
+        )
+
+    def test_scan_register_generates_internal_pallet_code(self):
+        self.client.force_login(self.storekeeper)
+        response = self.client.post(
+            "/api/pallets/scan/",
+            data=json.dumps(
+                {
+                    "action": "register",
+                    "qr_value": "EXT-QR-999",
+                    "article_id": self.article.id,
+                    "quantity": "2",
+                    "location_id": self.location.id,
+                    "position_id": self.position_a.id,
+                    "input_method": "manual",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        item = response.json()["item"]
+        self.assertTrue(item["pallet_code"].startswith("PAL-"))
+        self.assertEqual(item["qr_value"], item["pallet_code"])
+        self.assertNotEqual(item["pallet_code"], "EXT-QR-999")
+
+        event = PalletEvent.objects.filter(pallet_id=item["id"]).order_by("-id").first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.raw_qr, "EXT-QR-999")
+
+    def test_manual_create_rejects_non_deposit_location(self):
+        self.client.force_login(self.storekeeper)
+        response = self.client.post(
+            "/api/pallets/",
+            data=json.dumps(
+                {
+                    "article_id": self.article.id,
+                    "quantity": "1",
+                    "location_id": self.production_location.id,
+                    "position_id": self.production_position.id,
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("not enabled as a deposit", response.json()["detail"])
+
+    def test_overview_only_includes_deposit_location_types(self):
+        self.client.force_login(self.storekeeper)
+        response = self.client.get("/api/deposits/overview/")
+        self.assertEqual(response.status_code, 200)
+        location_codes = {item["code"] for item in response.json()["locations"]}
+        self.assertIn(self.location.code, location_codes)
+        self.assertIn(self.secondary_location.code, location_codes)
+        self.assertNotIn(self.production_location.code, location_codes)
