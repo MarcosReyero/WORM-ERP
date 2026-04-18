@@ -97,8 +97,6 @@ export function DepositsLayout() {
       headerSubtitle=""
       moduleTitle={depositsState.data?.header?.title || 'Depositos'}
       moduleSubtitle={depositsState.data?.header?.subtitle || 'Operacion de pallets y movimientos'}
-      sidebarCollapsible
-      sidebarStorageKey="deposits-sidebar-collapsed"
       variant="erp"
       workspaceClassName="deposits-workspace"
       sidebarActions={

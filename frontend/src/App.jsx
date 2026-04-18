@@ -210,8 +210,8 @@ function App() {
     return (
       <div className="boot-screen">
         <div className="boot-card">
-          <span className="boot-logo">E</span>
-          <p className="boot-eyebrow">Inventary ERP</p>
+          <span className="boot-logo">N</span>
+          <p className="boot-eyebrow">Nodum ERP</p>
           <h1>Inicializando panel</h1>
           <p>Comprobando sesion, modulos y datos del inventario.</p>
         </div>

@@ -1,19 +1,33 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import { fetchPallets } from '../../lib/api.js'
-import {
-  ModuleEmptyState,
-  ModuleSurface,
-  ModuleTableSection,
-} from '../modules/ModuleWorkspace.jsx'
+import { ModuleEmptyState } from '../modules/ModuleWorkspace.jsx'
 import { eventMatchesQuery, formatDateTime, formatQuantity, palletMatchesQuery } from './utils.js'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50]
 const DEFAULT_PAGE_SIZE = 20
 
+function SummaryMetric({ label, value }) {
+  return (
+    <div className="deposits-summary-v2-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function EmptyTableRow({ colSpan, text }) {
+  return (
+    <tr className="deposits-summary-v2-empty-row">
+      <td colSpan={colSpan}>{text}</td>
+    </tr>
+  )
+}
+
 export function DepositsRegistryPage() {
   const { depositsOverview, refreshDepositsModule, searchValue } = useOutletContext()
   const deferredGlobalQuery = useDeferredValue((searchValue || '').trim().toLowerCase())
+  const [activeSection, setActiveSection] = useState('pallets')
   const [palletState, setPalletState] = useState({
     loading: true,
     error: '',
@@ -31,9 +45,8 @@ export function DepositsRegistryPage() {
   const mountedRef = useRef(true)
 
   const permissions = depositsOverview?.permissions
-  const catalogs = depositsOverview?.catalogs
   const locations = useMemo(() => depositsOverview?.locations || [], [depositsOverview?.locations])
-  const statuses = useMemo(() => catalogs?.pallet_statuses || [], [catalogs?.pallet_statuses])
+  const statuses = useMemo(() => depositsOverview?.catalogs?.pallet_statuses || [], [depositsOverview?.catalogs?.pallet_statuses])
   const deferredLocalQuery = useDeferredValue(localQuery.trim().toLowerCase())
 
   useEffect(
@@ -92,16 +105,51 @@ export function DepositsRegistryPage() {
   const safeCurrentPage = Math.min(currentPage, pageCount)
   const pageStart = (safeCurrentPage - 1) * pageSize
   const paginatedItems = filteredItems.slice(pageStart, pageStart + pageSize)
-  const selectedPallet = filteredItems.find((item) => item.id === selectedPalletId) || null
+  const selectedLocation = useMemo(
+    () => locations.find((location) => String(location.id) === filters.locationId) || null,
+    [filters.locationId, locations],
+  )
+  const activePallets = filteredItems.filter((item) => item.status === 'active').length
+
+  const visibleLocationSummary = useMemo(() => {
+    if (selectedLocation) {
+      return {
+        active_pallet_count: selectedLocation.active_pallet_count,
+        occupied_position_count: selectedLocation.occupied_position_count,
+        position_count: selectedLocation.position_count,
+      }
+    }
+
+    return locations.reduce(
+      (accumulator, location) => ({
+        active_pallet_count: accumulator.active_pallet_count + (location.active_pallet_count || 0),
+        occupied_position_count:
+          accumulator.occupied_position_count + (location.occupied_position_count || 0),
+        position_count: accumulator.position_count + (location.position_count || 0),
+      }),
+      {
+        active_pallet_count: 0,
+        occupied_position_count: 0,
+        position_count: 0,
+      },
+    )
+  }, [locations, selectedLocation])
+
   const recentEvents = useMemo(
     () =>
       (depositsOverview?.events_recent || [])
+        .filter((event) =>
+          selectedLocation
+            ? [event.source_location, event.target_location]
+                .filter(Boolean)
+                .some((value) => value === selectedLocation.name)
+            : true,
+        )
         .filter((event) => eventMatchesQuery(event, deferredGlobalQuery))
         .filter((event) => eventMatchesQuery(event, deferredLocalQuery))
         .slice(0, 8),
-    [deferredGlobalQuery, deferredLocalQuery, depositsOverview?.events_recent],
+    [deferredGlobalQuery, deferredLocalQuery, depositsOverview?.events_recent, selectedLocation],
   )
-  const activePallets = filteredItems.filter((item) => item.status === 'active').length
 
   useEffect(() => {
     setCurrentPage(1)
@@ -114,15 +162,18 @@ export function DepositsRegistryPage() {
   }, [currentPage, pageCount])
 
   useEffect(() => {
-    if (!selectedPalletId) {
+    if (!paginatedItems.length) {
+      if (selectedPalletId !== null) {
+        setSelectedPalletId(null)
+      }
       return
     }
 
-    const stillVisible = filteredItems.some((item) => item.id === selectedPalletId)
+    const stillVisible = paginatedItems.some((item) => item.id === selectedPalletId)
     if (!stillVisible) {
-      setSelectedPalletId(null)
+      setSelectedPalletId(paginatedItems[0].id)
     }
-  }, [filteredItems, selectedPalletId])
+  }, [paginatedItems, selectedPalletId])
 
   async function handleRefresh() {
     setIsRefreshing(true)
@@ -159,152 +210,253 @@ export function DepositsRegistryPage() {
   }
 
   return (
-    <div className="module-page-stack deposits-erp-stack deposits-registry-screen">
-      <ModuleSurface className="deposits-toolbar-surface">
-        <div className="deposits-registry-toolbar">
-          <div className="deposits-registry-toolbar-fields">
-            <label className="deposits-toolbar-field deposits-toolbar-field--search">
-              <span>Busqueda</span>
-              <input
-                type="search"
-                value={localQuery}
-                onChange={(event) => setLocalQuery(event.target.value)}
-                placeholder="Pallet, articulo, zona o posicion"
-              />
-            </label>
+    <div className="deposits-summary-v2">
+      <header className="deposits-summary-v2-header">
+        <div className="deposits-summary-v2-header-copy">
+          <p className="deposits-summary-v2-breadcrumb">Depositos / Resumen</p>
+          <h2>Resumen operativo de pallets</h2>
+          <p>Consulta stock palletizado, movimiento reciente y contexto del deposito activo.</p>
+        </div>
+        <div className="deposits-summary-v2-metrics">
+          <SummaryMetric label="Pallets visibles" value={filteredItems.length} />
+          <SummaryMetric label="Activos" value={activePallets} />
+          <SummaryMetric label="Posiciones ocupadas" value={visibleLocationSummary.occupied_position_count} />
+          <SummaryMetric label="Vista" value={selectedLocation ? selectedLocation.code : 'Global'} />
+        </div>
+      </header>
 
-            <label className="deposits-toolbar-field">
-              <span>Deposito</span>
-              <select
-                value={filters.locationId}
-                onChange={(event) =>
-                  setFilters((current) => ({
-                    ...current,
-                    locationId: event.target.value,
-                  }))
-                }
-              >
-                <option value="">Todos</option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.code}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <section className="deposits-summary-v2-toolbar" aria-label="Filtros y acciones">
+        <div className="deposits-summary-v2-toolbar-filters">
+          <label className="deposits-summary-v2-field deposits-summary-v2-field--search">
+            <span>Busqueda</span>
+            <input
+              type="search"
+              value={localQuery}
+              onChange={(event) => setLocalQuery(event.target.value)}
+              placeholder="Buscar por pallet, articulo, lote, zona o posicion"
+            />
+          </label>
 
-            <label className="deposits-toolbar-field">
-              <span>Estado</span>
-              <select
-                value={filters.status}
-                onChange={(event) =>
-                  setFilters((current) => ({
-                    ...current,
-                    status: event.target.value,
-                  }))
-                }
-              >
-                <option value="all">Todos</option>
-                {statuses.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="deposits-summary-v2-field">
+            <span>Deposito</span>
+            <select
+              value={filters.locationId}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  locationId: event.target.value,
+                }))
+              }
+            >
+              <option value="">Todos</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.code} - {location.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          <div className="deposits-registry-toolbar-actions">
-            <button className="secondary-button" onClick={handleResetFilters} type="button">
-              Limpiar
-            </button>
+          <label className="deposits-summary-v2-field">
+            <span>Estado</span>
+            <select
+              value={filters.status}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  status: event.target.value,
+                }))
+              }
+            >
+              <option value="all">Todos</option>
+              {statuses.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="deposits-summary-v2-toolbar-actions">
+          <div
+            aria-label="Apartados del resumen"
+            className="deposits-summary-v2-view-switch"
+            role="tablist"
+          >
             <button
-              className="secondary-button"
-              disabled={palletState.loading || isRefreshing}
-              onClick={() => void handleRefresh()}
+              aria-selected={activeSection === 'pallets'}
+              className={activeSection === 'pallets' ? 'is-active' : ''}
+              onClick={() => setActiveSection('pallets')}
+              role="tab"
               type="button"
             >
-              {palletState.loading || isRefreshing ? 'Actualizando' : 'Actualizar'}
+              Resumen
+            </button>
+            <button
+              aria-selected={activeSection === 'events'}
+              className={activeSection === 'events' ? 'is-active' : ''}
+              onClick={() => setActiveSection('events')}
+              role="tab"
+              type="button"
+            >
+              Movimientos recientes
+              <span>{recentEvents.length}</span>
             </button>
           </div>
+
+          {(permissions?.can_scan || permissions?.can_manage_registry) ? (
+            <Link className="secondary-button" to="/depositos/registro">
+              Abrir registro
+            </Link>
+          ) : null}
+          <button className="secondary-button" onClick={handleResetFilters} type="button">
+            Limpiar
+          </button>
+          <button
+            className="secondary-button"
+            disabled={palletState.loading || isRefreshing}
+            onClick={() => void handleRefresh()}
+            type="button"
+          >
+            {palletState.loading || isRefreshing ? 'Actualizando' : 'Actualizar'}
+          </button>
         </div>
-      </ModuleSurface>
+      </section>
 
-      <ModuleTableSection
-        className="deposits-table-surface deposits-registry-table-panel"
-        title="Listado operativo de pallets"
-        description="Grilla central para control, lectura y seleccion de pallets."
-        actions={
-          <div className="deposits-table-kpis">
-            <span>
-              Total <strong>{filteredItems.length}</strong>
-            </span>
-            <span>
-              Activos <strong>{activePallets}</strong>
-            </span>
-          </div>
-        }
+      {palletState.error ? <div className="form-error">{palletState.error}</div> : null}
+
+      <section
+        className="deposits-summary-v2-main"
+        aria-label={activeSection === 'pallets' ? 'Listado operativo de pallets' : 'Movimientos recientes'}
       >
-        {palletState.error ? <div className="form-error">{palletState.error}</div> : null}
+        <div className="deposits-summary-v2-block-head">
+          <div>
+            {activeSection === 'pallets' ? (
+              <>
+                <strong>Listado de pallets</strong>
+                <span>
+                  {selectedLocation ? `${selectedLocation.code} - ${selectedLocation.name}` : 'Todos los depositos'}
+                </span>
+              </>
+            ) : (
+              <>
+                <strong>Movimientos recientes</strong>
+                <span>Registro, consulta y reubicacion reciente</span>
+              </>
+            )}
+          </div>
+          <div className="deposits-summary-v2-main-meta">
+            {activeSection === 'pallets' ? (
+              <>
+                <span>{filteredItems.length} registros</span>
+                <span>{visibleLocationSummary.position_count} posiciones</span>
+                <span>{pageCount} paginas</span>
+              </>
+            ) : (
+              <>
+                <span>{recentEvents.length} registros</span>
+                <span>{selectedLocation ? selectedLocation.code : 'Vista global'}</span>
+              </>
+            )}
+          </div>
+        </div>
 
-        {paginatedItems.length ? (
-          <>
-            <div className="module-table-wrap deposits-table-wrap deposits-registry-table-wrap">
-              <table className="module-table deposits-erp-table">
-                <thead>
-                  <tr>
-                    <th>Pallet</th>
-                    <th>Articulo</th>
-                    <th>Deposito</th>
-                    <th>Posicion</th>
-                    <th>Cantidad</th>
-                    <th>Estado</th>
-                    <th>Ultimo scan</th>
-                    <th>Accion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedItems.map((item) => (
+        <div className="deposits-summary-v2-table-wrap">
+          {activeSection === 'pallets' ? (
+            <table className="deposits-summary-v2-table">
+              <thead>
+                <tr>
+                  <th>Pallet</th>
+                  <th>Articulo</th>
+                  <th>Lote</th>
+                  <th>Deposito</th>
+                  <th>Zona</th>
+                  <th>Posicion</th>
+                  <th>Cantidad</th>
+                  <th>Estado</th>
+                  <th>Ultimo scan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedItems.length ? (
+                  paginatedItems.map((item) => (
                     <tr
-                      className={item.id === selectedPalletId ? 'is-selected-row' : ''}
+                      className={item.id === selectedPalletId ? 'is-selected' : ''}
                       key={item.id}
                       onClick={() => setSelectedPalletId(item.id)}
                     >
-                      <td>{item.pallet_code}</td>
+                      <td className="is-code">{item.pallet_code}</td>
                       <td>{item.article}</td>
+                      <td>{item.batch || '-'}</td>
                       <td>{item.location}</td>
-                      <td>
-                        {item.zone} / {item.position}
-                      </td>
+                      <td>{item.zone}</td>
+                      <td>{item.position}</td>
                       <td>{formatQuantity(item.quantity)}</td>
                       <td>
-                        <span className={`status-pill deposits-row-status ${item.status === 'active' ? 'is-ok' : ''}`}>
+                        <span className={`status-pill ${item.status === 'active' ? 'ok' : ''}`}>
                           {item.status_label}
                         </span>
                       </td>
                       <td>{formatDateTime(item.last_scanned_at)}</td>
-                      <td>
-                        <button className="inline-action deposits-row-action" onClick={() => setSelectedPalletId(item.id)} type="button">
-                          Ver
-                        </button>
-                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                ) : (
+                  <EmptyTableRow
+                    colSpan={9}
+                    text={palletState.loading ? 'Cargando pallets...' : 'No hay pallets para el filtro actual.'}
+                  />
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="deposits-summary-v2-table">
+              <thead>
+                <tr>
+                  <th>Pallet</th>
+                  <th>Evento</th>
+                  <th>Origen</th>
+                  <th>Destino</th>
+                  <th>Usuario</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentEvents.length ? (
+                  recentEvents.map((event) => (
+                    <tr key={event.id}>
+                      <td className="is-code">{event.pallet_code}</td>
+                      <td>{event.event_type_label}</td>
+                      <td>
+                        {event.source_location || '-'}
+                        {event.source_position ? ` / ${event.source_position}` : ''}
+                      </td>
+                      <td>
+                        {event.target_location || '-'}
+                        {event.target_position ? ` / ${event.target_position}` : ''}
+                      </td>
+                      <td>{event.recorded_by}</td>
+                      <td>{formatDateTime(event.created_at)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyTableRow colSpan={6} text="No hay movimientos para mostrar." />
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-            <div className="deposits-table-footer">
+        <div className="deposits-summary-v2-footer">
+          {activeSection === 'pallets' ? (
+            <>
               <p>
-                Mostrando {pageStart + 1}-{Math.min(pageStart + pageSize, filteredItems.length)} de {filteredItems.length}
+                Mostrando {paginatedItems.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, filteredItems.length)} de {filteredItems.length}
               </p>
-              <div className="deposits-table-controls">
+              <div className="deposits-summary-v2-pagination">
                 <label>
                   <span>Filas</span>
-                  <select
-                    value={pageSize}
-                    onChange={(event) => setPageSize(Number(event.target.value))}
-                  >
+                  <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
                     {PAGE_SIZE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
                         {option}
@@ -320,7 +472,7 @@ export function DepositsRegistryPage() {
                 >
                   Anterior
                 </button>
-                <span className="deposits-page-indicator">
+                <span className="deposits-summary-v2-page-indicator">
                   {safeCurrentPage}/{pageCount}
                 </span>
                 <button
@@ -332,99 +484,11 @@ export function DepositsRegistryPage() {
                   Siguiente
                 </button>
               </div>
-            </div>
-          </>
-        ) : (
-          <ModuleEmptyState
-            title={palletState.loading ? 'Cargando pallets' : 'Sin pallets'}
-            description="No encontramos pallets con el filtro actual."
-          />
-        )}
-      </ModuleTableSection>
-
-      <section className="deposits-summary-grid">
-        <ModuleSurface
-          className="deposits-secondary-panel"
-          title="Movimientos recientes"
-          description="Historial inmediato subordinado a la grilla principal."
-        >
-          {recentEvents.length ? (
-            <div className="module-table-wrap deposits-table-wrap deposits-table-wrap--compact">
-              <table className="module-table deposits-erp-table deposits-erp-table--compact">
-                <thead>
-                  <tr>
-                    <th>Pallet</th>
-                    <th>Evento</th>
-                    <th>Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentEvents.map((event) => (
-                    <tr key={event.id}>
-                      <td>{event.pallet_code}</td>
-                      <td>{event.event_type_label}</td>
-                      <td>{formatDateTime(event.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            </>
           ) : (
-            <p className="module-empty-copy">No hay movimientos para mostrar con el filtro actual.</p>
+            <p>Mostrando {recentEvents.length} movimientos recientes segun la vista actual.</p>
           )}
-        </ModuleSurface>
-
-        <ModuleSurface
-          className="deposits-secondary-panel"
-          title="Contexto de deposito"
-          description="Detalle de fila activa y disponibilidad por deposito."
-        >
-          {selectedPallet ? (
-            <dl className="deposits-context-grid">
-              <div>
-                <dt>Pallet seleccionado</dt>
-                <dd>{selectedPallet.pallet_code}</dd>
-              </div>
-              <div>
-                <dt>Articulo</dt>
-                <dd>{selectedPallet.article}</dd>
-              </div>
-              <div>
-                <dt>Deposito</dt>
-                <dd>{selectedPallet.location}</dd>
-              </div>
-              <div>
-                <dt>Posicion</dt>
-                <dd>
-                  {selectedPallet.zone} / {selectedPallet.position}
-                </dd>
-              </div>
-            </dl>
-          ) : (
-            <p className="module-empty-copy">Selecciona una fila para ver contexto rapido.</p>
-          )}
-
-          <div className="module-table-wrap deposits-table-wrap deposits-table-wrap--compact">
-            <table className="module-table deposits-erp-table deposits-erp-table--compact">
-              <thead>
-                <tr>
-                  <th>Deposito</th>
-                  <th>Activos</th>
-                  <th>Posiciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {locations.map((location) => (
-                  <tr key={location.id}>
-                    <td>{location.name}</td>
-                    <td>{location.active_pallet_count}</td>
-                    <td>{location.position_count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </ModuleSurface>
+        </div>
       </section>
     </div>
   )

@@ -1,7 +1,7 @@
 {
-  "name": "Inventary ERP",
-  "short_name": "Inventary",
-  "description": "ERP operativo con módulos de inventario, depósitos y trazabilidad mobile-first.",
+  "name": "Nodum ERP",
+  "short_name": "Nodum",
+  "description": "ERP operativo con modulos de inventario, depositos y trazabilidad mobile-first.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -10,8 +10,6 @@ export function PersonalLayout() {
       headerTitle=""
       headerSubtitle=""
       moduleSubtitle={user ? `Espacio personal de ${user.full_name}.` : 'Espacio personal del usuario.'}
-      sidebarCollapsible
-      sidebarStorageKey="personal-sidebar-collapsed"
       variant="erp"
       workspaceClassName="personal-workspace erp-platform-workspace"
       moduleTitle="Personal"

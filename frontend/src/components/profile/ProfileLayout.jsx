@@ -10,8 +10,6 @@ export function ProfileLayout() {
       headerTitle=""
       headerSubtitle=""
       moduleSubtitle="Gestion de cuenta y usuarios del sistema."
-      sidebarCollapsible
-      sidebarStorageKey="profile-sidebar-collapsed"
       variant="erp"
       workspaceClassName="profile-workspace erp-platform-workspace"
       moduleTitle="Perfil"

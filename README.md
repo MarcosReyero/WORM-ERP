@@ -1,4 +1,4 @@
-# Inventary ERP
+# Nodum ERP
 
 Base inicial de un ERP modular con:
 

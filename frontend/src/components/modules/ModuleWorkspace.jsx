@@ -1,12 +1,8 @@
-﻿import { useEffect, useMemo, useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { isValidElement, useEffect, useMemo } from 'react'
+import { usePlatformShell } from '../shell/PlatformShellContext.jsx'
 
 function classNames(...parts) {
   return parts.filter(Boolean).join(' ')
-}
-
-function supportsWindow() {
-  return typeof window !== 'undefined'
 }
 
 export function PanelMessage({ error, success }) {
@@ -34,225 +30,104 @@ export function ModuleWorkspaceLayout({
   navGroups,
   sidebarUtility,
   sidebarFooter,
-  sidebarCollapsible = false,
-  sidebarStorageKey = '',
   variant = 'default',
   workspaceClassName = '',
 }) {
+  const { clearSidebarConfig, setSidebarConfig } = usePlatformShell()
   const resolvedHeaderLabel = headerLabel ?? moduleLabel
   const resolvedHeaderTitle = headerTitle ?? moduleTitle
   const resolvedHeaderSubtitle = headerSubtitle ?? moduleSubtitle
   const hasHeaderCopy = resolvedHeaderLabel || resolvedHeaderTitle || resolvedHeaderSubtitle
   const hasHeader = hasHeaderCopy || actions
-  const resolvedSidebarStorageKey = useMemo(() => {
-    if (sidebarStorageKey) {
-      return sidebarStorageKey
-    }
-
-    const baseLabel = (moduleTitle || resolvedHeaderTitle || 'module')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-
-    return `module-sidebar-collapsed:${baseLabel || 'module'}`
-  }, [moduleTitle, resolvedHeaderTitle, sidebarStorageKey])
-
-  const [isMobileSidebar, setIsMobileSidebar] = useState(() => {
-    if (!supportsWindow()) {
-      return false
-    }
-    return window.matchMedia('(max-width: 720px)').matches
-  })
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (!sidebarCollapsible || !supportsWindow()) {
-      return false
-    }
-    return window.localStorage.getItem(resolvedSidebarStorageKey) === '1'
-  })
-  const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState(false)
-
-  useEffect(() => {
-    if (!sidebarCollapsible || !supportsWindow()) {
-      return undefined
-    }
-
-    const mediaQuery = window.matchMedia('(max-width: 720px)')
-    const syncMobileState = () => {
-      const mobile = mediaQuery.matches
-      setIsMobileSidebar(mobile)
-      if (mobile) {
-        setIsSidebarOpenMobile(false)
-      }
-    }
-
-    syncMobileState()
-
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', syncMobileState)
-      return () => mediaQuery.removeEventListener('change', syncMobileState)
-    }
-
-    mediaQuery.addListener(syncMobileState)
-    return () => mediaQuery.removeListener(syncMobileState)
-  }, [sidebarCollapsible])
-
-  useEffect(() => {
-    if (!sidebarCollapsible || !supportsWindow()) {
-      return
-    }
-    window.localStorage.setItem(resolvedSidebarStorageKey, isSidebarCollapsed ? '1' : '0')
-  }, [isSidebarCollapsed, resolvedSidebarStorageKey, sidebarCollapsible])
-
-  function handleSidebarToggle() {
-    if (!sidebarCollapsible) {
-      return
-    }
-
-    if (isMobileSidebar) {
-      setIsSidebarOpenMobile((current) => !current)
-      return
-    }
-
-    setIsSidebarCollapsed((current) => !current)
-  }
-
-  function handleMobileSidebarClose() {
-    if (isMobileSidebar) {
-      setIsSidebarOpenMobile(false)
-    }
-  }
-
-  const workspaceClasses = classNames(
-    'module-workspace',
-    variant === 'erp' && 'is-erp',
-    workspaceClassName,
-    sidebarCollapsible && 'is-sidebar-collapsible',
-    sidebarCollapsible && !isMobileSidebar && isSidebarCollapsed && 'is-sidebar-collapsed',
-    sidebarCollapsible && isMobileSidebar && 'is-sidebar-mobile',
-    sidebarCollapsible && isMobileSidebar && isSidebarOpenMobile && 'is-sidebar-open',
+  const navGroupsKey = JSON.stringify(
+    (navGroups || []).map((group) => ({
+      title: group.title,
+      items: (group.items || []).map((item) => ({
+        badge: item.badge,
+        end: item.end,
+        hint: item.hint,
+        label: item.label,
+        shortLabel: item.shortLabel,
+        to: item.to,
+      })),
+    })),
   )
-  const isSidebarCondensed = Boolean(sidebarCollapsible && !isMobileSidebar && isSidebarCollapsed)
-  const showMobileTrigger = Boolean(sidebarCollapsible && isMobileSidebar && !isSidebarOpenMobile)
-  const showSidebarBackdrop = Boolean(sidebarCollapsible && isMobileSidebar && isSidebarOpenMobile)
-  const sidebarToggleTitle = isMobileSidebar
-    ? isSidebarOpenMobile
-      ? 'Cerrar menu'
-      : 'Abrir menu'
-    : isSidebarCollapsed
-      ? 'Expandir menu'
-      : 'Colapsar menu'
+  const sidebarActionsKey = isValidElement(sidebarActions)
+    ? JSON.stringify({
+        disabled: Boolean(sidebarActions.props?.disabled),
+        title: sidebarActions.props?.title || '',
+      })
+    : String(Boolean(sidebarActions))
+  const sidebarFooterKey = isValidElement(sidebarFooter)
+    ? sidebarFooter.type?.name || sidebarFooter.type?.displayName || 'footer-node'
+    : String(Boolean(sidebarFooter))
+  const sidebarUtilityKey = isValidElement(sidebarUtility)
+    ? sidebarUtility.type?.name || sidebarUtility.type?.displayName || 'utility-node'
+    : String(Boolean(sidebarUtility))
+
+  const shellConfig = useMemo(
+    () => ({
+      signature: [
+        variant,
+        workspaceClassName,
+        moduleLabel,
+        moduleTitle,
+        moduleSubtitle,
+        navGroupsKey,
+        sidebarActionsKey,
+        sidebarFooterKey,
+        sidebarUtilityKey,
+      ].join('|'),
+      moduleLabel,
+      moduleSubtitle,
+      moduleTitle,
+      navGroups,
+      sidebarActions,
+      sidebarFooter,
+      sidebarUtility,
+      variant,
+      workspaceClassName,
+    }),
+    [
+      moduleLabel,
+      moduleSubtitle,
+      moduleTitle,
+      navGroups,
+      navGroupsKey,
+      sidebarActions,
+      sidebarActionsKey,
+      sidebarFooter,
+      sidebarFooterKey,
+      sidebarUtility,
+      sidebarUtilityKey,
+      variant,
+      workspaceClassName,
+    ],
+  )
+
+  useEffect(() => {
+    setSidebarConfig(shellConfig)
+  }, [setSidebarConfig, shellConfig])
+
+  useEffect(() => clearSidebarConfig, [clearSidebarConfig])
 
   return (
-    <div className={workspaceClasses}>
-      {showSidebarBackdrop ? (
-        <button
-          aria-label="Cerrar menu lateral"
-          className="module-sidebar-backdrop"
-          onClick={handleMobileSidebarClose}
-          type="button"
-        />
+    <div className={classNames('module-shell', variant === 'erp' && 'is-erp', workspaceClassName)}>
+      {hasHeader ? (
+        <header className={classNames('module-header', !hasHeaderCopy && 'is-actions-only')}>
+          {hasHeaderCopy ? (
+            <div className="module-header-copy">
+              {resolvedHeaderLabel ? <p className="module-header-label">{resolvedHeaderLabel}</p> : null}
+              {resolvedHeaderTitle ? <strong>{resolvedHeaderTitle}</strong> : null}
+              {resolvedHeaderSubtitle ? <span>{resolvedHeaderSubtitle}</span> : null}
+            </div>
+          ) : null}
+          {actions ? <div className="module-header-actions">{actions}</div> : null}
+        </header>
       ) : null}
 
-      <aside className="module-sidebar">
-        <div className="module-sidebar-main">
-          <div className="module-sidebar-brand">
-            <div className="module-sidebar-brand-row">
-              <div>
-                {moduleLabel ? <p className="module-sidebar-eyebrow">{moduleLabel}</p> : null}
-                {moduleTitle ? <h1>{moduleTitle}</h1> : null}
-              </div>
-              <div className="module-sidebar-brand-tools">
-                {sidebarActions ? <div className="module-sidebar-actions">{sidebarActions}</div> : null}
-                {sidebarCollapsible ? (
-                  <button
-                    aria-label={sidebarToggleTitle}
-                    className="module-sidebar-toggle"
-                    onClick={handleSidebarToggle}
-                    title={sidebarToggleTitle}
-                    type="button"
-                  >
-                    {isMobileSidebar ? 'Cerrar' : isSidebarCollapsed ? 'Expandir' : 'Colapsar'}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-            {moduleSubtitle ? <p>{moduleSubtitle}</p> : null}
-          </div>
-
-          <ModuleSidebarNav groups={navGroups} isCondensed={isSidebarCondensed} onNavigate={handleMobileSidebarClose} />
-        </div>
-
-        {sidebarUtility || sidebarFooter ? (
-          <div className="module-sidebar-footer">
-            {sidebarUtility ? <div className="module-sidebar-utility">{sidebarUtility}</div> : null}
-            {sidebarFooter}
-          </div>
-        ) : null}
-      </aside>
-
-      <div className="module-canvas">
-        {showMobileTrigger ? (
-          <button
-            aria-label="Abrir menu lateral"
-            className="module-mobile-nav-toggle"
-            onClick={handleSidebarToggle}
-            type="button"
-          >
-            Menu
-          </button>
-        ) : null}
-
-        {hasHeader ? (
-          <header className={classNames('module-header', !hasHeaderCopy && 'is-actions-only')}>
-            {hasHeaderCopy ? (
-              <div className="module-header-copy">
-                {resolvedHeaderLabel ? <p className="module-header-label">{resolvedHeaderLabel}</p> : null}
-                {resolvedHeaderTitle ? <strong>{resolvedHeaderTitle}</strong> : null}
-                {resolvedHeaderSubtitle ? <span>{resolvedHeaderSubtitle}</span> : null}
-              </div>
-            ) : null}
-            {actions ? <div className="module-header-actions">{actions}</div> : null}
-          </header>
-        ) : null}
-
-        <div className="module-content">{children}</div>
-      </div>
+      <div className="module-content">{children}</div>
     </div>
-  )
-}
-
-export function ModuleSidebarNav({ groups = [], isCondensed = false, onNavigate }) {
-  return (
-    <nav className="module-sidebar-nav" aria-label="Navegacion del modulo">
-      {groups.map((group) => (
-        <div className="module-nav-group" key={group.title}>
-          <p className="module-nav-group-title">{group.title}</p>
-          <div className="module-nav-group-items">
-            {group.items.map((item) => (
-              <NavLink
-                className={({ isActive }) =>
-                  classNames('module-nav-link', isActive && 'active')
-                }
-                end={item.end}
-                key={item.to}
-                onClick={onNavigate}
-                title={isCondensed ? item.label : undefined}
-                to={item.to}
-              >
-                <span className="module-nav-mark">{item.shortLabel || item.label.slice(0, 1)}</span>
-                <span className="module-nav-copy">
-                  <strong>{item.label}</strong>
-                  {item.hint ? <small>{item.hint}</small> : null}
-                </span>
-                {item.badge !== undefined ? (
-                  <span className="module-nav-badge">{item.badge}</span>
-                ) : null}
-              </NavLink>
-            ))}
-          </div>
-        </div>
-      ))}
-    </nav>
   )
 }
 
@@ -366,4 +241,3 @@ export function ModuleEmptyState({ description, title }) {
     </div>
   )
 }
-
