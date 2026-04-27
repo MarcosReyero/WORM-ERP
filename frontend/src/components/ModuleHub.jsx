@@ -5,8 +5,27 @@ import { ModuleIcon } from './Icons.jsx'
 const ACTIVE_MODULE_ROUTES = {
   inventario: '/inventario',
   depositos: '/depositos',
-  mensajes: '/mensajes',
   personal: '/personal',
+  tia: '/tia',
+}
+
+const TIA_MODULE = {
+  slug: 'tia',
+  name: 'TIA',
+  description: 'Integracion Siemens S7-300 y monitoreo industrial',
+  color: '#14b8a6',
+  badge: '0',
+  status: 'active',
+}
+
+function dashboardModulesForPanel(modules = []) {
+  const visibleModules = modules.filter((module) => module.slug !== 'mensajes')
+
+  if (visibleModules.some((module) => module.slug === TIA_MODULE.slug)) {
+    return visibleModules
+  }
+
+  return [...visibleModules, TIA_MODULE]
 }
 
 function matchesQuery(module, query) {
@@ -41,7 +60,7 @@ export function ModuleHub() {
     )
   }
 
-  const filteredModules = dashboardData.modules.filter((module) =>
+  const filteredModules = dashboardModulesForPanel(dashboardData.modules).filter((module) =>
     matchesQuery(module, deferredQuery),
   )
 

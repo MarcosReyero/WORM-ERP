@@ -25,8 +25,6 @@ from communications.services import (
     active_message_contacts,
     serialize_contact,
     list_inventory_alarms,
-    user_open_alarm_count,
-    user_unread_message_count,
 )
 
 from .automation import (
@@ -1877,8 +1875,6 @@ def build_dashboard(user=None):
     open_discrepancies = StockDiscrepancy.objects.filter(
         status=StockDiscrepancy.DiscrepancyStatus.OPEN
     ).count()
-    unread_messages = user_unread_message_count(user) if user else 0
-    open_alarms = user_open_alarm_count(user) if user else 0
     deposit_permissions = resolve_deposit_permissions(user) if user else {"can_view_module": False}
     active_pallets = Pallet.objects.exclude(status=Pallet.PalletStatus.ARCHIVED).count()
     deposit_events_today = PalletEvent.objects.filter(created_at__date=timezone.localdate()).count()
@@ -1909,11 +1905,11 @@ def build_dashboard(user=None):
     modules.extend(
         [
             {
-                "slug": "mensajes",
-                "name": "Mensajes",
-                "description": "Bandeja interna y alarmas",
-                "color": "#63a9ff",
-                "badge": str(unread_messages or open_alarms or 0),
+                "slug": "tia",
+                "name": "TIA",
+                "description": "Integracion Siemens S7-300 y monitoreo industrial",
+                "color": "#14b8a6",
+                "badge": "0",
                 "status": "active",
             },
             {
@@ -3541,6 +3537,12 @@ PERSONAL_REPORT_IMPORT_ALIASES = {
     "detalle": "activities",
 }
 
+PERSONAL_REPORT_EXPORT_COLUMNS = (
+    "Fecha",
+    "Dia",
+    "Actividades del dia",
+)
+
 SPANISH_WEEKDAY_LABELS = (
     "Lunes",
     "Martes",
@@ -3938,6 +3940,101 @@ def import_personal_daily_reports_from_excel(user, excel_file):
         "error_count": error_count,
         "items": serialized_items,
     }
+
+
+def _excel_safe_text(value):
+    text = "" if value in (None, "") else str(value)
+    if text and text[0] in ("=", "+", "-", "@"):
+        return f"'{text}"
+    return text
+
+
+def _parse_personal_report_export_ids(filters):
+    if not filters:
+        return None
+
+    raw_values = []
+
+    if hasattr(filters, "getlist"):
+        raw_values = filters.getlist("ids") or filters.getlist("report_ids") or []
+        if not raw_values:
+            maybe = filters.get("ids") or filters.get("report_ids") or ""
+            raw_values = [maybe] if maybe else []
+    elif isinstance(filters, dict):
+        raw_values = filters.get("ids") or filters.get("report_ids") or []
+        if isinstance(raw_values, str):
+            raw_values = [raw_values]
+    else:
+        return None
+
+    resolved = []
+    for raw in raw_values:
+        if raw in (None, ""):
+            continue
+        if isinstance(raw, int):
+            resolved.append(raw)
+            continue
+        if isinstance(raw, str) and "," in raw:
+            resolved.extend([chunk.strip() for chunk in raw.split(",") if chunk.strip()])
+            continue
+        resolved.append(raw)
+
+    if not resolved:
+        return None
+
+    try:
+        unique_ids = sorted({int(item) for item in resolved})
+    except (TypeError, ValueError) as exc:
+        raise InventoryApiError("Invalid ids") from exc
+
+    if not unique_ids:
+        return None
+
+    return unique_ids
+
+
+def build_personal_daily_reports_export_excel(user, filters=None):
+    report_ids = _parse_personal_report_export_ids(filters)
+
+    queryset = PersonalDailyReport.objects.filter(user=user)
+    if report_ids:
+        queryset = queryset.filter(id__in=report_ids)
+
+    reports = list(queryset.order_by("-report_date", "-id"))
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Informes personal"
+    sheet.append(PERSONAL_REPORT_EXPORT_COLUMNS)
+
+    for report in reports:
+        raw_lines = (report.activities or "").splitlines() or [""]
+        lines = [line.rstrip() for line in raw_lines]
+        first_line = lines[0] if lines else ""
+
+        sheet.append(
+            [
+                report.report_date,
+                _excel_safe_text(report.day_label or ""),
+                _excel_safe_text(first_line),
+            ]
+        )
+
+        for extra_line in lines[1:]:
+            sheet.append(["", "", _excel_safe_text(extra_line)])
+
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = f"A1:{get_column_letter(len(PERSONAL_REPORT_EXPORT_COLUMNS))}{sheet.max_row}"
+
+    column_widths = [14, 16, 80]
+    for index, width in enumerate(column_widths, start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+
+    output = BytesIO()
+    workbook.save(output)
+
+    suffix = "seleccion" if report_ids else "completo"
+    return f"informes-personal-{suffix}-{timezone.localdate().isoformat()}.xlsx", output.getvalue()
 
 
 def list_articles():

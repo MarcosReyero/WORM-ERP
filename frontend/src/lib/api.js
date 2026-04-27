@@ -89,6 +89,41 @@ export function fetchDepositsOverview() {
   return request('/api/deposits/overview/')
 }
 
+export function fetchTiaOverview() {
+  return request('/api/tia/overview/')
+}
+
+export function fetchTiaReports() {
+  return request('/api/tia/reports/')
+}
+
+export function fetchTiaMcpConfig() {
+  return request('/api/tia/mcp/config/')
+}
+
+export function saveTiaMcpConfig(payload) {
+  return request('/api/tia/mcp/config/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function testTiaMcpConnection() {
+  return request('/api/tia/mcp/test/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+  })
+}
+
+export function fetchTiaMcpLogs() {
+  return request('/api/tia/mcp/logs/')
+}
+
 export function fetchDepositsLayout(locationId) {
   return request(`/api/deposits/layout/${locationId}/`)
 }
@@ -281,6 +316,50 @@ export async function exportArticlesToExcel(filters = {}) {
   const filename = parseDownloadFilename(
     response.headers.get('content-disposition'),
     'stock.xlsx',
+  )
+  const downloadUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = downloadUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(downloadUrl)
+
+  return { filename }
+}
+
+export async function exportPersonalDailyReportsToExcel(options = {}) {
+  const search = new URLSearchParams()
+
+  const ids = options.ids || options.reportIds || []
+  if (Array.isArray(ids)) {
+    for (const id of ids) {
+      if (id !== null && id !== undefined && id !== '') {
+        search.append('ids', String(id))
+      }
+    }
+  }
+
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const response = await fetch(`/api/personal/reports/export-excel/${suffix}`, {
+    credentials: 'include',
+    method: 'GET',
+  })
+
+  if (!response.ok) {
+    const isJson = response.headers.get('content-type')?.includes('application/json')
+    const data = isJson ? await response.json() : null
+    const error = new Error(data?.detail || 'No se pudo exportar el Excel.')
+    error.status = response.status
+    throw error
+  }
+
+  const blob = await response.blob()
+  const filename = parseDownloadFilename(
+    response.headers.get('content-disposition'),
+    'informes-personal.xlsx',
   )
   const downloadUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')

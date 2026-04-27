@@ -1,0 +1,4 @@
+mcp
+python-snap7
+PyYAML
+python-dotenv

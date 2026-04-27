@@ -4,6 +4,7 @@ import {
   createPersonalDailyReport,
   deleteAllPersonalDailyReports,
   deletePersonalDailyReport,
+  exportPersonalDailyReportsToExcel,
   fetchPersonalDailyReports,
   importPersonalDailyReportsFromExcel,
   updatePersonalDailyReport,
@@ -360,11 +361,29 @@ export function PersonalReportsPage() {
     event.target.value = ''
   }
 
-  function handleExportExcel() {
-    setFeedback({
-      error: '',
-      success: 'Exportacion a Excel pendiente de integracion con el backend.',
-    })
+  async function handleExportExcel() {
+    if (!reportsState.items.length) {
+      setFeedback({ error: 'No hay informes para exportar.', success: '' })
+      return
+    }
+
+    const ids = selectedIds.size ? Array.from(selectedIds) : visibleReports.map((report) => report.id)
+    if (!ids.length) {
+      setFeedback({ error: 'No hay informes visibles para exportar.', success: '' })
+      return
+    }
+
+    setBusyAction('export')
+    setFeedback({ error: '', success: '' })
+
+    try {
+      await exportPersonalDailyReportsToExcel({ ids })
+      setFeedback({ error: '', success: 'Excel exportado.' })
+    } catch (error) {
+      setFeedback({ error: error.message || 'No se pudo exportar el Excel.', success: '' })
+    } finally {
+      setBusyAction('')
+    }
   }
 
   return (
@@ -387,7 +406,14 @@ export function PersonalReportsPage() {
             >
               {busyAction === 'import' ? 'Importando...' : 'Importar informe Excel'}
             </button>
-            <button className="primary-button" onClick={handleExportExcel} type="button">
+            <button
+              className="primary-button"
+              disabled={busyAction === 'export' || busyAction === 'import'}
+              onClick={() => {
+                void handleExportExcel()
+              }}
+              type="button"
+            >
               Exportar informe a Excel
             </button>
           </>
@@ -646,4 +672,3 @@ export function PersonalReportsPage() {
     </div>
   )
 }
-

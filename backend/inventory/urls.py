@@ -7,6 +7,7 @@ from .deposits_views import (
     pallet_scan,
     pallets,
 )
+from .tia_views import tia_ai_reports, tia_mcp_config, tia_mcp_logs, tia_mcp_test, tia_overview
 from .views import (
     article_detail,
     article_export_excel,
@@ -29,6 +30,7 @@ from .views import (
     inventory_alarms,
     movements,
     personal_daily_report_bulk_delete,
+    personal_daily_report_export_excel,
     personal_daily_report_import_excel,
     personal_daily_report_delete,
     personal_daily_report_detail,
@@ -44,6 +46,11 @@ urlpatterns = [
     path("articles/import-excel/", article_import_excel, name="article-import-excel"),
     path("articles/<int:article_id>/", article_detail, name="article-detail"),
     path("personal/reports/", personal_daily_reports, name="personal-daily-reports"),
+    path(
+        "personal/reports/export-excel/",
+        personal_daily_report_export_excel,
+        name="personal-daily-reports-export-excel",
+    ),
     path(
         "personal/reports/<int:report_id>/",
         personal_daily_report_detail,
@@ -79,6 +86,11 @@ urlpatterns = [
     path("inventory/minimum-stock-digest/", inventory_minimum_stock_digest, name="inventory-minimum-stock-digest"),
     path("inventory/full-stock-report/", inventory_full_stock_report, name="inventory-full-stock-report"),
     path("inventory/overview/", inventory_overview, name="inventory-overview"),
+    path("tia/overview/", tia_overview, name="tia-overview"),
+    path("tia/reports/", tia_ai_reports, name="tia-ai-reports"),
+    path("tia/mcp/config/", tia_mcp_config, name="tia-mcp-config"),
+    path("tia/mcp/test/", tia_mcp_test, name="tia-mcp-test"),
+    path("tia/mcp/logs/", tia_mcp_logs, name="tia-mcp-logs"),
     path("deposits/overview/", deposits_overview, name="deposits-overview"),
     path("deposits/layout/<int:location_id>/", deposits_layout, name="deposits-layout"),
     path("pallets/", pallets, name="pallets"),

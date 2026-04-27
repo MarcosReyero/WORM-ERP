@@ -1,0 +1,37 @@
+# Define PLC tag mappings here
+
+
+tags:
+  marcha_motor:
+    area: db
+    db: 1
+    byte: 0
+    bit: 0
+    type: bool
+    access: read_write
+    description: Estado de marcha del motor
+
+  fallo_motor:
+    area: db
+    db: 1
+    byte: 0
+    bit: 1
+    type: bool
+    access: read
+    description: Bandera de fallo
+
+  contador_piezas:
+    area: db
+    db: 1
+    byte: 2
+    type: int
+    access: read
+    description: Contador de piezas
+
+  temperatura:
+    area: db
+    db: 1
+    byte: 4
+    type: real
+    access: read
+    description: Temperatura de proceso

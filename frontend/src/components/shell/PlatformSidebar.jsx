@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
   BoxesIcon,
+  CpuIcon,
   InboxIcon as InboxLucideIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -68,6 +69,12 @@ const MODULE_META = {
     label: 'Personal',
     shortLabel: 'P',
     to: '/personal',
+  },
+  tia: {
+    icon: CpuIcon,
+    label: 'TIA',
+    shortLabel: 'T',
+    to: '/tia',
   },
 }
 

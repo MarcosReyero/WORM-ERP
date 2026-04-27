@@ -22,6 +22,7 @@ from .services import (
     build_stock_export_excel,
     build_dashboard,
     build_inventory_overview,
+    build_personal_daily_reports_export_excel,
     create_personal_daily_report,
     create_article,
     get_article_detail,
@@ -240,6 +241,23 @@ def personal_daily_report_import_excel(request):
     def handler():
         result = import_personal_daily_reports_from_excel(request.user, request.FILES.get("file"))
         return JsonResponse({"detail": "Excel imported", "item": result}, status=201)
+
+    return _handle_inventory_call(handler)
+
+
+@require_GET
+def personal_daily_report_export_excel(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    def handler():
+        filename, payload = build_personal_daily_reports_export_excel(request.user, request.GET)
+        response = HttpResponse(
+            payload,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
     return _handle_inventory_call(handler)
 

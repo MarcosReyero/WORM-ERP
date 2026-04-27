@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -119,6 +120,24 @@ INVENTORY_AUTOMATION_JOB_HEARTBEAT_SECONDS = int(
 INVENTORY_AUTOMATION_DIGEST_LEASE_SECONDS = int(
     os.getenv("INVENTORY_AUTOMATION_DIGEST_LEASE_SECONDS", "300")
 )
+
+TIA_MCP_ENABLED = os.getenv("TIA_MCP_ENABLED", "false").lower() == "true"
+TIA_MCP_TRANSPORT = os.getenv("TIA_MCP_TRANSPORT", "stdio")
+TIA_MCP_SERVER_NAME = os.getenv("TIA_MCP_SERVER_NAME", "mcp-s7-server")
+TIA_MCP_SERVER_PATH = Path(
+    os.getenv(
+        "TIA_MCP_SERVER_PATH",
+        str(BASE_DIR / "integrations" / "mcp-s7-server"),
+    )
+)
+TIA_MCP_COMMAND = os.getenv("TIA_MCP_COMMAND", f'"{sys.executable}" server.py')
+TIA_MCP_TIMEOUT_SECONDS = float(os.getenv("TIA_MCP_TIMEOUT_SECONDS", "4"))
+TIA_MCP_READ_ONLY = os.getenv("TIA_MCP_READ_ONLY", "true").lower() == "true"
+TIA_MCP_RUNTIME_DIR = Path(os.getenv("TIA_MCP_RUNTIME_DIR", str(BASE_DIR / "runtime" / "tia")))
+TIA_S7_PLC_HOST = os.getenv("TIA_S7_PLC_HOST", os.getenv("PLC_HOST", "127.0.0.1"))
+TIA_S7_PLC_RACK = int(os.getenv("TIA_S7_PLC_RACK", os.getenv("PLC_RACK", "0")))
+TIA_S7_PLC_SLOT = int(os.getenv("TIA_S7_PLC_SLOT", os.getenv("PLC_SLOT", "2")))
+TIA_S7_PLC_TCP_PORT = int(os.getenv("TIA_S7_PLC_TCP_PORT", os.getenv("PLC_TCP_PORT", "102")))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

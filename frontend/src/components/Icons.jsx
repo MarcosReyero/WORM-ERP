@@ -208,6 +208,20 @@ export function ModuleIcon({ slug }) {
     )
   }
 
+  if (slug === 'tia') {
+    return (
+      <BaseIcon>
+        <path d="M6 16.5V9a6 6 0 0 1 12 0v7.5" />
+        <path d="M8 16.5h8" />
+        <path d="M9 20h6" />
+        <path d="M12 3v3" />
+        <path d="M9.5 10.5h.01" />
+        <path d="M14.5 10.5h.01" />
+        <path d="M10 14h4" />
+      </BaseIcon>
+    )
+  }
+
   return (
     <BaseIcon>
       <path d="M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />

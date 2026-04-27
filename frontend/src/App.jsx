@@ -21,6 +21,9 @@ import { PersonalReportsPage } from './components/personal/PersonalReportsPage.j
 import { ProfileDetailsPage } from './components/profile/ProfileDetailsPage.jsx'
 import { ProfileLayout } from './components/profile/ProfileLayout.jsx'
 import { ProfileUsersPage } from './components/profile/ProfileUsersPage.jsx'
+import { TiaAiReportsPage } from './components/tia/TiaAiReportsPage.jsx'
+import { TiaLayout } from './components/tia/TiaLayout.jsx'
+import { TiaVariableDashboardPage } from './components/tia/TiaVariableDashboardPage.jsx'
 import {
   fetchCsrfCookie,
   fetchDashboard,
@@ -275,6 +278,11 @@ function App() {
         <Route path="personal" element={<PersonalLayout />}>
           <Route index element={<Navigate replace to="informes" />} />
           <Route path="informes" element={<PersonalReportsPage />} />
+        </Route>
+        <Route path="tia" element={<TiaLayout />}>
+          <Route index element={<Navigate replace to="enlace-s7" />} />
+          <Route path="enlace-s7" element={<TiaVariableDashboardPage />} />
+          <Route path="analisis-ia" element={<TiaAiReportsPage />} />
         </Route>
       </Route>
       <Route
