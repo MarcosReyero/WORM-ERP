@@ -92,7 +92,7 @@ export function TiaLayout() {
       headerTitle=""
       headerSubtitle=""
       moduleTitle={tiaState.data?.header?.title || 'TIA'}
-      moduleSubtitle={tiaState.data?.header?.subtitle || 'Integracion Siemens S7-300 y diagnostico operativo'}
+      moduleSubtitle=""
       variant="erp"
       workspaceClassName="tia-workspace erp-platform-workspace"
       sidebarActions={
@@ -147,7 +147,6 @@ export function TiaLayout() {
       {tiaState.loading && !tiaState.data ? (
         <div className="module-empty-state">
           <strong>Cargando TIA</strong>
-          <p>Preparando tags S7-300, diagnostico MCP y panel operativo.</p>
         </div>
       ) : (
         <Outlet

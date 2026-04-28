@@ -25,7 +25,6 @@ function ConnectionPanel({ connection }) {
     <ModuleSurface
       className="tia-connection-panel"
       title="Estado general de conexion"
-      description="Contrato MCP S7-300 preparado para lectura controlada."
     >
       <div className="tia-connection-grid">
         <div className="tia-connection-state">
@@ -64,7 +63,6 @@ function BooleanIndicators({ tags }) {
   return (
     <ModuleSurface
       title="Senales discretas"
-      description="Indicadores booleanos principales leidos desde DB."
     >
       <div className="tia-boolean-grid">
         {boolTags.map((tag) => (
@@ -83,7 +81,7 @@ function NumericPanel({ tags }) {
   const numericTags = tags.filter((tag) => tag.type !== 'bool')
 
   return (
-    <ModuleSurface title="Variables numericas" description="Valores visibles para operacion y diagnostico.">
+    <ModuleSurface title="Variables numericas">
       <div className="tia-numeric-grid">
         {numericTags.map((tag) => (
           <article className="tia-numeric-card" key={tag.name}>
@@ -99,7 +97,7 @@ function NumericPanel({ tags }) {
 
 function DiagnosticsPanel({ diagnostics }) {
   return (
-    <ModuleSurface title="Salud y diagnostico" description="Chequeos de configuracion y lectura.">
+    <ModuleSurface title="Salud y diagnostico">
       <div className="module-list tia-diagnostics-list">
         {diagnostics.map((item) => (
           <div className="module-list-item" key={`${item.title}-${item.detail}`}>
@@ -206,7 +204,6 @@ function ConnectionConfigPanel({ connection, onRefresh, onLogs }) {
   return (
     <ModuleSurface
       title="Conexion TCP/IP S7-300"
-      description="Configura el PLC y habilita lectura real via servidor MCP embebido."
     >
       <form className="tia-mcp-form" onSubmit={handleSave}>
         <label className="tia-mcp-toggle">
@@ -319,7 +316,6 @@ function LogConsole({ logs, onRefresh }) {
   return (
     <ModuleSurface
       title="Consola de logs"
-      description="Eventos recientes de configuracion, lectura y prueba de conexion."
       actions={
         <button className="inline-action" onClick={onRefresh} type="button">
           Recargar
@@ -404,7 +400,6 @@ export function TiaVariableDashboardPage() {
       <ModulePageHeader
         eyebrow="TIA / Centro de Enlace S7-300"
         title="Centro de Enlace S7-300"
-        description="Punto de entrada operativo para integracion MCP, diagnostico y monitoreo de variables Siemens."
         actions={
           <button className="secondary-button" disabled={isRefreshing} onClick={() => void handleRefresh()} type="button">
             {isRefreshing ? 'Actualizando' : 'Actualizar lectura'}
@@ -422,7 +417,6 @@ export function TiaVariableDashboardPage() {
 
           <ModuleTableSection
             title="Catalogo de tags"
-            description="Lectura preparada para tags controlados por whitelist."
             toolbar={
               <ModuleToolbar>
                 <div className="module-filter-group module-filter-group--stock">
@@ -511,14 +505,14 @@ export function TiaVariableDashboardPage() {
           />
           <LogConsole logs={logs} onRefresh={() => void refreshLogs()} />
           <DiagnosticsPanel diagnostics={tiaOverview.diagnostics || []} />
-          <ModuleSurface title="Historico" description="Preparado para persistir snapshots por turno.">
+          <ModuleSurface title="Historico">
             <div className="tia-history-placeholder">
               <span />
               <span />
               <span />
               <span />
               <span />
-              <p>Sin historico persistido todavia. La estructura ya separa tags, lectura y timestamps.</p>
+              <p>Sin historico persistido todavia.</p>
             </div>
           </ModuleSurface>
         </aside>

@@ -83,7 +83,6 @@ export function TiaAiReportsPage() {
     return (
       <ModuleEmptyState
         title="Cargando analisis IA"
-        description="Preparando listado de reportes periodicos."
       />
     )
   }
@@ -96,7 +95,6 @@ export function TiaAiReportsPage() {
     return (
       <ModuleEmptyState
         title="Reportes no disponibles"
-        description="No hay datos de analisis para mostrar."
       />
     )
   }
@@ -106,7 +104,6 @@ export function TiaAiReportsPage() {
       <ModulePageHeader
         eyebrow="TIA / Analisis IA"
         title="Analitica Periodica de Planta"
-        description="Seccion preparada para ejecutar analisis automaticos sobre variables, eventos y lecturas S7-300."
         actions={<span className="module-chip is-muted">{reportsState.data.schedule.cadence}</span>}
       />
 
@@ -124,7 +121,6 @@ export function TiaAiReportsPage() {
           <div className="tia-report-status-card">
             <span className="status-pill low">programado</span>
             <strong>{formatDateTime(reportsState.data.schedule.next_run_at)}</strong>
-            <p>El backend queda preparado para automatizar esta tarea.</p>
           </div>
         </ModuleSurface>
       </section>
@@ -133,7 +129,6 @@ export function TiaAiReportsPage() {
         <div className="module-main-stack">
           <ModuleSurface
             title="Listado de reportes"
-            description="Modelos conceptuales listos para conectar con ejecuciones reales de IA."
           >
             <div className="tia-report-list">
               {reports.map((report) => (
