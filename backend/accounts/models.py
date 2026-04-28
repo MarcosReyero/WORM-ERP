@@ -76,6 +76,8 @@ class PermissionModule(models.Model):
         COUNTS = "counts", "Conteos"
         DISCREPANCIES = "discrepancies", "Discrepancias"
         ADMIN_USERS = "admin_users", "Administración de Usuarios"
+        PERSONAL = "personal", "Personal"
+        TIA = "tia", "TIA"
         REPORTS = "reports", "Reportes"
         SETTINGS = "settings", "Configuración"
         DEPOSITS_OVERVIEW = "deposits_overview", "Panel de Depósitos"

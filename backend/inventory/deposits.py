@@ -77,22 +77,19 @@ def _can(user, module_code, action_code):
 
 
 def resolve_deposit_permissions(user):
-    profile = get_deposit_profile(user)
-    role = profile.role
-
-    can_view_registry = _can(user, DEPOSIT_MODULE_CODES["registry"], "view") or role in DEPOSIT_VIEW_ROLES
+    can_view_registry = _can(user, DEPOSIT_MODULE_CODES["registry"], "view")
     can_manage_registry = (
         _can(user, DEPOSIT_MODULE_CODES["registry"], "create")
         or _can(user, DEPOSIT_MODULE_CODES["registry"], "change")
-        or role in DEPOSIT_MANAGER_ROLES
+        or _can(user, DEPOSIT_MODULE_CODES["registry"], "delete")
     )
-    can_view_layout = _can(user, DEPOSIT_MODULE_CODES["layout"], "view") or role in DEPOSIT_VIEW_ROLES
+    can_view_layout = _can(user, DEPOSIT_MODULE_CODES["layout"], "view")
     can_manage_layout = (
         _can(user, DEPOSIT_MODULE_CODES["layout"], "create")
         or _can(user, DEPOSIT_MODULE_CODES["layout"], "change")
-        or role in DEPOSIT_MANAGER_ROLES
+        or _can(user, DEPOSIT_MODULE_CODES["layout"], "delete")
     )
-    can_scan = _can(user, DEPOSIT_MODULE_CODES["scans"], "create") or role in DEPOSIT_SCAN_ROLES
+    can_scan = _can(user, DEPOSIT_MODULE_CODES["scans"], "create")
     can_view_module = (
         _can(user, DEPOSIT_MODULE_CODES["overview"], "view")
         or can_view_registry

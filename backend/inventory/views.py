@@ -1,6 +1,9 @@
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET, require_http_methods
 
+from accounts.permissions import has_module_permission
+from accounts.services import ensure_permission_catalog
+
 from communications.services import (
     CommunicationsApiError,
     create_inventory_alarm,
@@ -64,6 +67,20 @@ def _unauthorized():
     return JsonResponse({"detail": "Authentication required"}, status=401)
 
 
+def _forbidden():
+    return JsonResponse(
+        {"detail": "No tienes permiso para acceder a esta sección", "code": "PERMISSION_DENIED"},
+        status=403,
+    )
+
+
+def _require_permission(request, module_code, action_code="view"):
+    ensure_permission_catalog()
+    if not has_module_permission(request.user, module_code, action_code):
+        return _forbidden()
+    return None
+
+
 def _handle_inventory_call(callback):
     try:
         return callback()
@@ -91,6 +108,9 @@ def dashboard(request):
 def inventory_overview(request):
     if not request.user.is_authenticated:
         return _unauthorized()
+    denied = _require_permission(request, "inventory_overview", "view")
+    if denied:
+        return denied
     return JsonResponse(build_inventory_overview(request.user))
 
 
@@ -98,6 +118,9 @@ def inventory_overview(request):
 def catalogs(request):
     if not request.user.is_authenticated:
         return _unauthorized()
+    denied = _require_permission(request, "inventory_overview", "view")
+    if denied:
+        return denied
     return JsonResponse(serialize_catalogs())
 
 
@@ -107,9 +130,15 @@ def articles(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "stock_management", "view")
+        if denied:
+            return denied
         return JsonResponse({"items": list_articles()})
 
     def handler():
+        denied = _require_permission(request, "stock_management", "create")
+        if denied:
+            return denied
         article = create_article(request.user, _request_payload(request), files=request.FILES)
         return JsonResponse(
             {"detail": "Article created", "id": article.id, "item": get_article_detail(article.id)["article"]},
@@ -125,9 +154,15 @@ def article_detail(request, article_id):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "stock_management", "view")
+        if denied:
+            return denied
         return JsonResponse(get_article_detail(article_id))
 
     def handler():
+        denied = _require_permission(request, "stock_management", "change")
+        if denied:
+            return denied
         article = update_article(
             request.user,
             article_id,
@@ -145,6 +180,9 @@ def article_import_excel(request):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "stock_management", "create")
+        if denied:
+            return denied
         payload = _request_payload(request)
         mode = payload.get("mode") or "preview"
         result = import_articles_from_excel(request.user, request.FILES.get("file"), mode=mode)
@@ -161,6 +199,9 @@ def article_export_excel(request):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "stock_management", "export")
+        if denied:
+            return denied
         filename, payload = build_stock_export_excel(request.GET)
         response = HttpResponse(
             payload,
@@ -178,10 +219,16 @@ def personal_daily_reports(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "personal", "view")
+        if denied:
+            return denied
         items = list_personal_daily_reports(request.user)
         return JsonResponse({"items": items})
 
     def handler():
+        denied = _require_permission(request, "personal", "create")
+        if denied:
+            return denied
         report = create_personal_daily_report(request.user, _request_payload(request))
         return JsonResponse(
             {"detail": "Personal report created", "item": serialize_personal_daily_report(report)},
@@ -197,6 +244,9 @@ def personal_daily_report_detail(request, report_id):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "personal", "change")
+        if denied:
+            return denied
         report = update_personal_daily_report(request.user, report_id, _request_payload(request))
         return JsonResponse({"detail": "Personal report updated", "item": serialize_personal_daily_report(report)})
 
@@ -209,6 +259,9 @@ def personal_daily_report_delete(request, report_id):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "personal", "delete")
+        if denied:
+            return denied
         delete_personal_daily_report(request.user, report_id)
         return JsonResponse({"detail": "Personal report deleted"})
 
@@ -221,6 +274,9 @@ def personal_daily_report_bulk_delete(request):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "personal", "delete")
+        if denied:
+            return denied
         payload = parse_json(request)
         if not isinstance(payload, dict):
             raise InventoryApiError("Invalid payload")
@@ -239,6 +295,9 @@ def personal_daily_report_import_excel(request):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "personal", "create")
+        if denied:
+            return denied
         result = import_personal_daily_reports_from_excel(request.user, request.FILES.get("file"))
         return JsonResponse({"detail": "Excel imported", "item": result}, status=201)
 
@@ -251,6 +310,9 @@ def personal_daily_report_export_excel(request):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "personal", "export")
+        if denied:
+            return denied
         filename, payload = build_personal_daily_reports_export_excel(request.user, request.GET)
         response = HttpResponse(
             payload,
@@ -266,6 +328,9 @@ def personal_daily_report_export_excel(request):
 def balances(request):
     if not request.user.is_authenticated:
         return _unauthorized()
+    denied = _require_permission(request, "stock_management", "view")
+    if denied:
+        return denied
     items = [
         serialize_balance(balance)
         for balance in InventoryBalance.objects.select_related("article", "location", "batch")
@@ -278,6 +343,9 @@ def balances(request):
 def batches(request):
     if not request.user.is_authenticated:
         return _unauthorized()
+    denied = _require_permission(request, "stock_management", "view")
+    if denied:
+        return denied
     items = [
         serialize_batch(batch)
         for batch in InventoryBatch.objects.select_related("article", "supplier")
@@ -290,6 +358,9 @@ def batches(request):
 def tracked_units(request):
     if not request.user.is_authenticated:
         return _unauthorized()
+    denied = _require_permission(request, "stock_management", "view")
+    if denied:
+        return denied
     items = [
         serialize_tracked_unit(unit)
         for unit in TrackedUnit.objects.select_related(
@@ -308,6 +379,9 @@ def movements(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "movements", "view")
+        if denied:
+            return denied
         items = [
             serialize_movement(movement)
             for movement in StockMovement.objects.select_related(
@@ -324,6 +398,9 @@ def movements(request):
         return JsonResponse({"items": items})
 
     def handler():
+        denied = _require_permission(request, "movements", "create")
+        if denied:
+            return denied
         movement = create_movement(request.user, parse_json(request))
         return JsonResponse(
             {"detail": "Movement registered", "item": serialize_movement(movement)},
@@ -339,6 +416,9 @@ def checkouts(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "checkouts", "view")
+        if denied:
+            return denied
         items = [
             serialize_checkout(checkout)
             for checkout in AssetCheckout.objects.select_related(
@@ -351,6 +431,9 @@ def checkouts(request):
         return JsonResponse({"items": items})
 
     def handler():
+        denied = _require_permission(request, "checkouts", "create")
+        if denied:
+            return denied
         checkout = create_checkout(request.user, parse_json(request))
         return JsonResponse(
             {"detail": "Checkout registered", "item": serialize_checkout(checkout)},
@@ -366,6 +449,9 @@ def checkout_return(request, checkout_id):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "checkouts", "change")
+        if denied:
+            return denied
         checkout = return_checkout(request.user, checkout_id, parse_json(request))
         return JsonResponse({"detail": "Checkout returned", "item": serialize_checkout(checkout)})
 
@@ -378,6 +464,9 @@ def count_sessions(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "counts", "view")
+        if denied:
+            return denied
         items = [
             serialize_count_session(session)
             for session in PhysicalCountSession.objects.prefetch_related("lines")
@@ -386,6 +475,9 @@ def count_sessions(request):
         return JsonResponse({"items": items})
 
     def handler():
+        denied = _require_permission(request, "counts", "create")
+        if denied:
+            return denied
         session = create_count_session(request.user, parse_json(request))
         return JsonResponse(
             {"detail": "Count session created", "item": serialize_count_session(session)},
@@ -401,6 +493,9 @@ def count_session_lines(request, session_id):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "counts", "create")
+        if denied:
+            return denied
         line = add_count_line(request.user, session_id, parse_json(request))
         return JsonResponse(
             {
@@ -423,6 +518,9 @@ def discrepancies(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "discrepancies", "view")
+        if denied:
+            return denied
         items = [
             serialize_discrepancy(discrepancy)
             for discrepancy in StockDiscrepancy.objects.select_related(
@@ -435,6 +533,9 @@ def discrepancies(request):
         return JsonResponse({"items": items})
 
     def handler():
+        denied = _require_permission(request, "discrepancies", "create")
+        if denied:
+            return denied
         discrepancy = create_discrepancy(request.user, parse_json(request))
         return JsonResponse(
             {"detail": "Discrepancy registered", "item": serialize_discrepancy(discrepancy)},
@@ -450,6 +551,9 @@ def discrepancy_resolve(request, discrepancy_id):
         return _unauthorized()
 
     def handler():
+        denied = _require_permission(request, "discrepancies", "approve")
+        if denied:
+            return denied
         discrepancy = resolve_discrepancy(request.user, discrepancy_id, parse_json(request))
         return JsonResponse(
             {"detail": "Discrepancy resolved", "item": serialize_discrepancy(discrepancy)}
@@ -464,11 +568,17 @@ def inventory_alarms(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "alarms", "view")
+        if denied:
+            return denied
         return _handle_inventory_call(
             lambda: JsonResponse({"items": list_inventory_alarms(request.user)})
         )
 
     def handler():
+        denied = _require_permission(request, "alarms", "create")
+        if denied:
+            return denied
         item = create_inventory_alarm(request.user, parse_json(request))
         return JsonResponse({"detail": "Alarm created", "item": item}, status=201)
 
@@ -481,11 +591,17 @@ def inventory_safety_alerts(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "alarms", "view")
+        if denied:
+            return denied
         return _handle_inventory_call(
             lambda: JsonResponse({"items": list_safety_stock_alerts(request.user)})
         )
 
     def handler():
+        denied = _require_permission(request, "alarms", "change")
+        if denied:
+            return denied
         item = save_safety_stock_alert_rule(request.user, parse_json(request))
         return JsonResponse({"detail": "Safety alert saved", "item": item}, status=201)
 
@@ -498,11 +614,17 @@ def inventory_minimum_stock_digest(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "alarms", "view")
+        if denied:
+            return denied
         return _handle_inventory_call(
             lambda: JsonResponse({"item": get_minimum_stock_digest_config(request.user)})
         )
 
     def handler():
+        denied = _require_permission(request, "alarms", "change")
+        if denied:
+            return denied
         item = save_minimum_stock_digest_config(request.user, parse_json(request))
         return JsonResponse({"detail": "Minimum stock digest saved", "item": item}, status=201)
 
@@ -515,11 +637,17 @@ def inventory_full_stock_report(request):
         return _unauthorized()
 
     if request.method == "GET":
+        denied = _require_permission(request, "reports", "view")
+        if denied:
+            return denied
         return _handle_inventory_call(
             lambda: JsonResponse({"item": get_full_stock_report_config(request.user)})
         )
 
     def handler():
+        denied = _require_permission(request, "reports", "change")
+        if denied:
+            return denied
         item = save_full_stock_report_config(request.user, parse_json(request))
         return JsonResponse({"detail": "Full stock report saved", "item": item}, status=201)
 

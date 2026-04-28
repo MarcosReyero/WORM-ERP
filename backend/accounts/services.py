@@ -17,6 +17,138 @@ from .models import (
     UserProfile,
 )
 
+DEFAULT_PERMISSION_MODULES = [
+    {
+        "code": PermissionModule.Module.INVENTORY_OVERVIEW,
+        "name": "Panel de Inventario",
+        "description": "Vista general del estado del inventario",
+        "order": 1,
+    },
+    {
+        "code": PermissionModule.Module.STOCK_MANAGEMENT,
+        "name": "GestiÃ³n de Stock",
+        "description": "AdministraciÃ³n de artÃ­culos y stock",
+        "order": 2,
+    },
+    {
+        "code": PermissionModule.Module.MOVEMENTS,
+        "name": "Movimientos",
+        "description": "Registro de entradas y salidas de inventario",
+        "order": 3,
+    },
+    {
+        "code": PermissionModule.Module.CHECKOUTS,
+        "name": "Retiros",
+        "description": "GestiÃ³n de retiros y entregas",
+        "order": 4,
+    },
+    {
+        "code": PermissionModule.Module.ALARMS,
+        "name": "Alarmas",
+        "description": "Sistema de alertas de stock bajo",
+        "order": 5,
+    },
+    {
+        "code": PermissionModule.Module.COUNTS,
+        "name": "Conteos",
+        "description": "GestiÃ³n de conteos y auditorÃ­as de stock",
+        "order": 6,
+    },
+    {
+        "code": PermissionModule.Module.DISCREPANCIES,
+        "name": "Discrepancias",
+        "description": "IdentificaciÃ³n y resoluciÃ³n de discrepancias",
+        "order": 7,
+    },
+    {
+        "code": PermissionModule.Module.ADMIN_USERS,
+        "name": "AdministraciÃ³n de Usuarios",
+        "description": "GestiÃ³n de usuarios y permisos",
+        "order": 8,
+    },
+    {
+        "code": PermissionModule.Module.PERSONAL,
+        "name": "Personal",
+        "description": "Informes personales e intercambio de Excel",
+        "order": 9,
+    },
+    {
+        "code": PermissionModule.Module.TIA,
+        "name": "TIA",
+        "description": "Integración Siemens S7-300 y monitoreo industrial",
+        "order": 10,
+    },
+    {
+        "code": PermissionModule.Module.REPORTS,
+        "name": "Reportes",
+        "description": "GeneraciÃ³n y visualizaciÃ³n de reportes",
+        "order": 9,
+    },
+    {
+        "code": PermissionModule.Module.SETTINGS,
+        "name": "ConfiguraciÃ³n",
+        "description": "ConfiguraciÃ³n del sistema",
+        "order": 10,
+    },
+    {
+        "code": PermissionModule.Module.DEPOSITS_OVERVIEW,
+        "name": "Panel de DepÃ³sitos",
+        "description": "Vista general del mÃ³dulo DepÃ³sitos",
+        "order": 11,
+    },
+    {
+        "code": PermissionModule.Module.PALLET_REGISTRY,
+        "name": "Registro de Pallets",
+        "description": "Alta, consulta y mantenimiento de pallets",
+        "order": 12,
+    },
+    {
+        "code": PermissionModule.Module.DEPOSIT_LAYOUT,
+        "name": "Plano de DepÃ³sitos",
+        "description": "VisualizaciÃ³n y gestiÃ³n del plano fÃ­sico",
+        "order": 13,
+    },
+    {
+        "code": PermissionModule.Module.PALLET_SCANS,
+        "name": "Escaneo de Pallets",
+        "description": "Escaneo QR, lookup y reubicaciones",
+        "order": 14,
+    },
+]
+
+DEFAULT_PERMISSION_ACTIONS = [
+    {
+        "code": PermissionAction.Action.VIEW,
+        "name": "Ver",
+        "description": "Permite visualizar",
+    },
+    {
+        "code": PermissionAction.Action.CREATE,
+        "name": "Crear",
+        "description": "Permite crear nuevos registros",
+    },
+    {
+        "code": PermissionAction.Action.CHANGE,
+        "name": "Editar",
+        "description": "Permite editar registros existentes",
+    },
+    {
+        "code": PermissionAction.Action.DELETE,
+        "name": "Eliminar",
+        "description": "Permite eliminar registros",
+    },
+    {
+        "code": PermissionAction.Action.EXPORT,
+        "name": "Exportar",
+        "description": "Permite exportar datos",
+    },
+    {
+        "code": PermissionAction.Action.APPROVE,
+        "name": "Aprobar",
+        "description": "Permite aprobar acciones",
+    },
+]
+
 
 class AccountsApiError(Exception):
     def __init__(self, detail, status=400):
@@ -33,8 +165,14 @@ def get_or_create_profile(user):
 
 
 def require_admin(user):
+    from .permissions import has_module_permission
+
     profile = get_or_create_profile(user)
-    if user.is_superuser or user.is_staff or profile.role == UserProfile.Role.ADMINISTRATOR:
+    if user.is_superuser or user.is_staff:
+        return profile
+
+    ensure_permission_catalog()
+    if has_module_permission(user, "admin_users", "view"):
         return profile
     raise AccountsApiError("You do not have permission for this action", status=403)
 
@@ -59,7 +197,10 @@ def clean_string(value):
 
 
 def serialize_user_profile(user):
+    from .permissions import has_module_permission
+
     profile = get_or_create_profile(user)
+    ensure_permission_catalog()
     return {
         "id": user.id,
         "username": user.username,
@@ -79,7 +220,7 @@ def serialize_user_profile(user):
         "preferred_theme": profile.preferred_theme,
         "unread_messages_count": user_unread_message_count(user),
         "open_alarm_count": user_open_alarm_count(user),
-        "is_admin": user.is_superuser or user.is_staff or profile.role == UserProfile.Role.ADMINISTRATOR,
+        "is_admin": user.is_superuser or user.is_staff or has_module_permission(user, "admin_users", "view"),
     }
 
 
@@ -223,6 +364,134 @@ def reset_profile_password_for_admin(user, profile_user_id, payload):
     return {"id": target_user.id, "username": target_user.username}
 
 
+def ensure_permission_catalog():
+    for action_data in DEFAULT_PERMISSION_ACTIONS:
+        PermissionAction.objects.get_or_create(
+            code=action_data["code"],
+            defaults={
+                "name": action_data["name"],
+                "description": action_data["description"],
+            },
+        )
+
+    for module_data in DEFAULT_PERMISSION_MODULES:
+        PermissionModule.objects.get_or_create(
+            code=module_data["code"],
+            defaults={
+                "name": module_data["name"],
+                "description": module_data["description"],
+                "order": module_data["order"],
+            },
+        )
+
+    if not RolePermission.objects.exists():
+        _seed_default_role_permissions()
+
+
+def _seed_default_role_permissions():
+    role_permissions_config = {
+        UserProfile.Role.ADMINISTRATOR: {
+            "inventory_overview": ["view"],
+            "stock_management": ["view", "create", "change", "delete", "export"],
+            "movements": ["view", "create", "change", "delete", "approve"],
+            "checkouts": ["view", "create", "change", "delete"],
+            "alarms": ["view", "create", "change"],
+            "counts": ["view", "create", "change", "delete"],
+            "discrepancies": ["view", "create", "change", "delete", "approve"],
+            "admin_users": ["view", "create", "change", "delete"],
+            "personal": ["view", "create", "change", "delete", "export"],
+            "tia": ["view", "change"],
+            "reports": ["view", "export"],
+            "settings": ["view", "change"],
+            "deposits_overview": ["view"],
+            "pallet_registry": ["view", "create", "change", "delete"],
+            "deposit_layout": ["view", "create", "change", "delete"],
+            "pallet_scans": ["view", "create", "change"],
+        },
+        UserProfile.Role.STOREKEEPER: {
+            "inventory_overview": ["view"],
+            "stock_management": ["view", "change"],
+            "movements": ["view", "create"],
+            "checkouts": ["view", "create"],
+            "alarms": ["view"],
+            "counts": ["view", "create"],
+            "discrepancies": ["view"],
+            "personal": ["view", "export"],
+            "tia": ["view"],
+            "deposits_overview": ["view"],
+            "pallet_registry": ["view", "create", "change", "delete"],
+            "deposit_layout": ["view", "create", "change", "delete"],
+            "pallet_scans": ["view", "create", "change"],
+        },
+        UserProfile.Role.SUPERVISOR: {
+            "inventory_overview": ["view"],
+            "stock_management": ["view", "change"],
+            "movements": ["view"],
+            "checkouts": ["view"],
+            "alarms": ["view"],
+            "counts": ["view", "create", "change"],
+            "discrepancies": ["view"],
+            "reports": ["view", "export"],
+            "personal": ["view", "export"],
+            "tia": ["view"],
+            "deposits_overview": ["view"],
+            "pallet_registry": ["view"],
+            "deposit_layout": ["view"],
+            "pallet_scans": ["view", "create"],
+        },
+        UserProfile.Role.OPERATOR: {
+            "inventory_overview": ["view"],
+            "stock_management": ["view"],
+            "movements": ["view", "create"],
+            "checkouts": ["view", "create"],
+            "alarms": ["view"],
+            "personal": ["view", "export"],
+            "deposits_overview": ["view"],
+            "pallet_registry": ["view"],
+            "deposit_layout": ["view"],
+            "pallet_scans": ["view", "create"],
+        },
+        UserProfile.Role.AUDITOR: {
+            "inventory_overview": ["view"],
+            "stock_management": ["view"],
+            "movements": ["view"],
+            "checkouts": ["view"],
+            "alarms": ["view"],
+            "counts": ["view"],
+            "discrepancies": ["view"],
+            "reports": ["view", "export"],
+            "personal": ["view", "export"],
+            "deposits_overview": ["view"],
+            "pallet_registry": ["view"],
+            "deposit_layout": ["view"],
+        },
+        UserProfile.Role.MAINTENANCE: {
+            "inventory_overview": ["view"],
+            "movements": ["view", "create"],
+            "personal": ["view", "export"],
+            "tia": ["view"],
+        },
+        UserProfile.Role.PURCHASING: {
+            "inventory_overview": ["view"],
+            "stock_management": ["view"],
+            "movements": ["view", "create"],
+            "reports": ["view", "export"],
+            "personal": ["view", "export"],
+        },
+    }
+
+    actions = {action.code: action for action in PermissionAction.objects.all()}
+    modules = {module.code: module for module in PermissionModule.objects.all()}
+
+    for role, modules_config in role_permissions_config.items():
+        for module_code, action_codes in modules_config.items():
+            module = modules.get(module_code)
+            if not module:
+                continue
+            role_perm, _ = RolePermission.objects.get_or_create(role=role, module=module)
+            role_perm.actions.set([actions[action_code] for action_code in action_codes if action_code in actions])
+
+
 def _serialize_permission_module(module):
     return {
         "code": module.code,
@@ -240,6 +509,7 @@ def _serialize_permission_action(action):
 
 def permissions_meta_for_admin(user):
     require_admin(user)
+    ensure_permission_catalog()
     modules = list(PermissionModule.objects.order_by("order", "name"))
     actions = list(PermissionAction.objects.order_by("code"))
 
@@ -257,6 +527,7 @@ def permissions_meta_for_admin(user):
 
 def role_permissions_for_admin(user, role):
     require_admin(user)
+    ensure_permission_catalog()
     if role not in {value for value, _ in UserProfile.Role.choices}:
         raise AccountsApiError("Unknown role")
 
@@ -280,6 +551,7 @@ def role_permissions_for_admin(user, role):
 
 def save_role_permissions_for_admin(user, role, payload):
     require_admin(user)
+    ensure_permission_catalog()
     if role not in {value for value, _ in UserProfile.Role.choices}:
         raise AccountsApiError("Unknown role")
 
@@ -328,6 +600,7 @@ def save_role_permissions_for_admin(user, role, payload):
 
 def user_permissions_for_admin(user, profile_user_id):
     require_admin(user)
+    ensure_permission_catalog()
     user_model = get_user_model()
     target_user = get_object_or_404(user_model.objects.select_related("profile", "permissions"), pk=profile_user_id)
     user_permission, _ = UserPermission.objects.get_or_create(
@@ -373,6 +646,7 @@ def user_permissions_for_admin(user, profile_user_id):
 
 def save_user_permissions_for_admin(user, profile_user_id, payload):
     require_admin(user)
+    ensure_permission_catalog()
     user_model = get_user_model()
     target_user = get_object_or_404(user_model.objects.select_related("permissions"), pk=profile_user_id)
     user_permission, _ = UserPermission.objects.get_or_create(

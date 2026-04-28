@@ -16,6 +16,47 @@ import {
   PanelMessage,
 } from '../modules/ModuleWorkspace.jsx'
 
+const HUB_PERMISSION_GROUPS = [
+  {
+    key: 'inventario',
+    title: 'Inventario',
+    moduleCodes: [
+      'inventory_overview',
+      'stock_management',
+      'movements',
+      'checkouts',
+      'counts',
+      'discrepancies',
+      'alarms',
+    ],
+  },
+  {
+    key: 'depositos',
+    title: 'Depositos',
+    moduleCodes: [
+      'deposits_overview',
+      'pallet_registry',
+      'deposit_layout',
+      'pallet_scans',
+    ],
+  },
+  {
+    key: 'personal',
+    title: 'Personal',
+    moduleCodes: ['personal', 'reports'],
+  },
+  {
+    key: 'tia',
+    title: 'TIA',
+    moduleCodes: ['tia'],
+  },
+  {
+    key: 'administracion',
+    title: 'Administracion',
+    moduleCodes: ['admin_users', 'settings'],
+  },
+]
+
 function normalizeSet(values = []) {
   return new Set((values || []).map(String))
 }
@@ -132,6 +173,7 @@ export function AdminPermissionsPage() {
 
   const modules = useMemo(() => metaState.data?.modules || [], [metaState.data])
   const actions = useMemo(() => metaState.data?.actions || [], [metaState.data])
+  const modulesByCode = useMemo(() => new Map(modules.map((item) => [item.code, item])), [modules])
 
   const roleMatrix = useMemo(
     () => buildRoleMatrix(modules, actions, roleState.items),
@@ -189,6 +231,10 @@ export function AdminPermissionsPage() {
       next[moduleCode] = set
       return next
     })
+  }
+
+  function allowedCountForGroup(group) {
+    return group.moduleCodes.reduce((acc, moduleCode) => acc + (roleDraft[moduleCode]?.size || 0), 0)
   }
 
   function ensureUserOverride(moduleCode) {
@@ -349,33 +395,54 @@ export function AdminPermissionsPage() {
             {roleState.loading ? (
               <p className="module-empty-copy">Cargando rol...</p>
             ) : (
-              <div className="module-table-wrap">
-                <table className="module-table">
-                  <thead>
-                    <tr>
-                      <th>Modulo</th>
-                      {actions.map((action) => (
-                        <th key={action.code}>{action.name}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modules.map((module) => (
-                      <tr key={module.code}>
-                        <td>{module.name}</td>
-                        {actions.map((action) => (
-                          <td key={`${module.code}-${action.code}`}>
-                            <input
-                              checked={(roleDraft[module.code] || new Set()).has(action.code)}
-                              onChange={() => toggleRoleAction(module.code, action.code)}
-                              type="checkbox"
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="permissions-accordion-stack">
+                {HUB_PERMISSION_GROUPS.map((group) => (
+                  <details className="permissions-accordion" key={group.key} open>
+                    <summary className="permissions-accordion-summary">
+                      <span className="permissions-accordion-title">{group.title}</span>
+                      <span className="module-chip is-muted">{allowedCountForGroup(group)} permisos</span>
+                    </summary>
+
+                    <div className="permissions-accordion-body">
+                      {group.moduleCodes.map((moduleCode) => {
+                        const module = modulesByCode.get(moduleCode)
+                        if (!module) {
+                          return (
+                            <div className="permissions-module-row is-missing" key={moduleCode}>
+                              <div className="permissions-module-head">
+                                <strong>{moduleCode}</strong>
+                                <span className="module-empty-copy">No existe en catÃ¡logo</span>
+                              </div>
+                            </div>
+                          )
+                        }
+
+                        const allowedSet = roleDraft[module.code] || new Set()
+
+                        return (
+                          <div className="permissions-module-row" key={module.code}>
+                            <div className="permissions-module-head">
+                              <strong>{module.name}</strong>
+                              <span className="permissions-module-code">{module.code}</span>
+                            </div>
+                            <div className="permissions-actions">
+                              {actions.map((action) => (
+                                <label className="permissions-action" key={`${module.code}-${action.code}`}>
+                                  <input
+                                    checked={allowedSet.has(action.code)}
+                                    onChange={() => toggleRoleAction(module.code, action.code)}
+                                    type="checkbox"
+                                  />
+                                  <span>{action.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </details>
+                ))}
               </div>
             )}
           </ModuleTableSection>

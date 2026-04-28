@@ -1,6 +1,8 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_http_methods
 
+from accounts.services import ensure_permission_catalog
+
 from .deposits import (
     build_deposit_layout,
     build_deposits_overview,
@@ -35,6 +37,7 @@ def _handle_deposits_call(callback):
 def deposits_overview(request):
     if not request.user.is_authenticated:
         return _unauthorized()
+    ensure_permission_catalog()
     return _handle_deposits_call(lambda: JsonResponse(build_deposits_overview(request.user)))
 
 
@@ -42,6 +45,7 @@ def deposits_overview(request):
 def deposits_layout(request, location_id):
     if not request.user.is_authenticated:
         return _unauthorized()
+    ensure_permission_catalog()
     return _handle_deposits_call(lambda: JsonResponse(build_deposit_layout(request.user, location_id)))
 
 
@@ -49,6 +53,7 @@ def deposits_layout(request, location_id):
 def pallets(request):
     if not request.user.is_authenticated:
         return _unauthorized()
+    ensure_permission_catalog()
 
     if request.method == "GET":
         return _handle_deposits_call(
@@ -73,6 +78,7 @@ def pallets(request):
 def pallet_detail(request, pallet_id):
     if not request.user.is_authenticated:
         return _unauthorized()
+    ensure_permission_catalog()
 
     if request.method == "GET":
         return _handle_deposits_call(lambda: JsonResponse(get_pallet_detail(request.user, pallet_id)))
@@ -94,6 +100,7 @@ def pallet_detail(request, pallet_id):
 def pallet_scan(request):
     if not request.user.is_authenticated:
         return _unauthorized()
+    ensure_permission_catalog()
     return _handle_deposits_call(
         lambda: JsonResponse(scan_pallet(request.user, _request_payload(request)))
     )

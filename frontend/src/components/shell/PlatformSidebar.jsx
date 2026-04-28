@@ -199,10 +199,11 @@ export function PlatformSidebar({
     },
   ]
 
-  const activeModuleItems = (dashboardData?.modules || [])
-    .filter((module) => module.status === 'active' && MODULE_META[module.slug])
+  const moduleItems = (dashboardData?.modules || [])
+    .filter((module) => (module.status === 'active' || module.status === 'restricted') && MODULE_META[module.slug])
     .map((module) => ({
       slug: module.slug,
+      disabled: module.status !== 'active',
       ...MODULE_META[module.slug],
       hint: module.description,
       badge: module.slug === 'inventario'
@@ -244,21 +245,22 @@ export function PlatformSidebar({
           <SidebarNavGroup group={group} key={group.title} />
         ))}
 
-        {activeModuleItems.length ? (
+        {moduleItems.length ? (
           <SidebarGroup>
             <SidebarGroupLabel>Modulos</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {activeModuleItems.map((item) => {
-                  const isActive = routeIsActive(location.pathname, item)
+                {moduleItems.map((item) => {
+                  const isActive = !item.disabled && routeIsActive(location.pathname, item)
                   const badgeLabel = formatSidebarBadge(item.badge)
                   const Icon = item.icon
-                  const tooltip = item.hint ? `${item.label} - ${item.hint}` : item.label
+                  const tooltipBase = item.hint ? `${item.label} - ${item.hint}` : item.label
+                  const tooltip = item.disabled ? `${tooltipBase} (Sin permisos)` : tooltipBase
 
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-                        <Link to={item.to}>
+                      {item.disabled ? (
+                        <SidebarMenuButton disabled tooltip={tooltip}>
                           {Icon ? (
                             <Icon className="platform-sidebar-item-icon" />
                           ) : (
@@ -267,8 +269,21 @@ export function PlatformSidebar({
                             </span>
                           )}
                           <span>{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
+                        </SidebarMenuButton>
+                      ) : (
+                        <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
+                          <Link to={item.to}>
+                            {Icon ? (
+                              <Icon className="platform-sidebar-item-icon" />
+                            ) : (
+                              <span className="platform-sidebar-item-mark">
+                                {item.shortLabel || item.label.slice(0, 1)}
+                              </span>
+                            )}
+                            <span>{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      )}
                       {badgeLabel ? <SidebarMenuBadge>{badgeLabel}</SidebarMenuBadge> : null}
                       {isActive ? <SidebarContextualNav groups={contextualGroups} /> : null}
                     </SidebarMenuItem>

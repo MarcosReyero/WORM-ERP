@@ -1856,6 +1856,8 @@ def dispatch_full_stock_report(config_id, due_key):
 
 def build_dashboard(user=None):
     from .deposits import resolve_deposit_permissions
+    from accounts.permissions import has_module_permission
+    from accounts.services import ensure_permission_catalog
 
     quantity_map, available_quantity_map, unit_total_map, unit_available_map = current_stock_maps()
     articles = Article.objects.select_related("sector_responsible").all()
@@ -1875,9 +1877,16 @@ def build_dashboard(user=None):
     open_discrepancies = StockDiscrepancy.objects.filter(
         status=StockDiscrepancy.DiscrepancyStatus.OPEN
     ).count()
+    if user:
+        ensure_permission_catalog()
     deposit_permissions = resolve_deposit_permissions(user) if user else {"can_view_module": False}
     active_pallets = Pallet.objects.exclude(status=Pallet.PalletStatus.ARCHIVED).count()
     deposit_events_today = PalletEvent.objects.filter(created_at__date=timezone.localdate()).count()
+
+    def module_status(module_code):
+        if not user:
+            return "restricted"
+        return "active" if has_module_permission(user, module_code, "view") else "restricted"
 
     modules = [
         {
@@ -1886,21 +1895,17 @@ def build_dashboard(user=None):
             "description": "Stock, prestamos, conteos y diferencias",
             "color": "#38a6ff",
             "badge": str(low_stock_count or 0),
-            "status": "active",
+            "status": module_status("inventory_overview"),
+        },
+        {
+            "slug": "depositos",
+            "name": "Depósitos",
+            "description": "Pallets, plano visual y escaneo QR",
+            "color": "#ff8b3d",
+            "badge": str(active_pallets or deposit_events_today or 0),
+            "status": "active" if deposit_permissions["can_view_module"] else "restricted",
         },
     ]
-
-    if deposit_permissions["can_view_module"]:
-        modules.append(
-            {
-                "slug": "depositos",
-                "name": "Depósitos",
-                "description": "Pallets, plano visual y escaneo QR",
-                "color": "#ff8b3d",
-                "badge": str(active_pallets or deposit_events_today or 0),
-                "status": "active",
-            }
-        )
 
     modules.extend(
         [
@@ -1910,7 +1915,7 @@ def build_dashboard(user=None):
                 "description": "Integracion Siemens S7-300 y monitoreo industrial",
                 "color": "#14b8a6",
                 "badge": "0",
-                "status": "active",
+                "status": module_status("tia"),
             },
             {
                 "slug": "personal",
@@ -1918,7 +1923,7 @@ def build_dashboard(user=None):
                 "description": "Informes y espacio personal del usuario",
                 "color": "#8b5cf6",
                 "badge": "0",
-                "status": "active",
+                "status": module_status("personal"),
             },
             *(
                 [
@@ -1928,14 +1933,10 @@ def build_dashboard(user=None):
                         "description": "Usuarios y permisos",
                         "color": "#35596f",
                         "badge": "0",
-                        "status": "active",
+                        "status": module_status("admin_users"),
                     }
                 ]
                 if user
-                and (
-                    user.is_superuser
-                    or get_profile(user).role == UserProfile.Role.ADMINISTRATOR
-                )
                 else []
             ),
             {
@@ -1982,7 +1983,26 @@ def build_dashboard(user=None):
 
 def build_inventory_overview(user):
     profile = get_profile(user)
-    can_manage_alarms = profile.role in ALARM_ROLES or user.is_superuser
+    from accounts.permissions import has_module_permission
+    from accounts.services import ensure_permission_catalog
+
+    ensure_permission_catalog()
+
+    can_manage_master = (
+        user.is_superuser
+        or has_module_permission(user, "stock_management", "create")
+        or has_module_permission(user, "stock_management", "change")
+        or has_module_permission(user, "stock_management", "delete")
+    )
+    can_record_movement = user.is_superuser or has_module_permission(user, "movements", "create")
+    can_checkout = user.is_superuser or has_module_permission(user, "checkouts", "create")
+    can_count = user.is_superuser or has_module_permission(user, "counts", "create")
+    can_approve = user.is_superuser or has_module_permission(user, "movements", "approve")
+    can_manage_alarms = (
+        user.is_superuser
+        or has_module_permission(user, "alarms", "create")
+        or has_module_permission(user, "alarms", "change")
+    )
     quantity_map, available_quantity_map, unit_total_map, unit_available_map = current_stock_maps()
     articles = Article.objects.select_related(
         "unit_of_measure",
@@ -2029,11 +2049,11 @@ def build_inventory_overview(user):
             },
         ],
         "permissions": {
-            "can_manage_master": profile.role in MASTER_ROLES or user.is_superuser,
-            "can_record_movement": profile.role in MOVEMENT_ROLES or user.is_superuser,
-            "can_checkout": profile.role in CHECKOUT_ROLES or user.is_superuser,
-            "can_count": profile.role in COUNT_ROLES or user.is_superuser,
-            "can_approve": profile.role in APPROVER_ROLES or user.is_superuser,
+            "can_manage_master": can_manage_master,
+            "can_record_movement": can_record_movement,
+            "can_checkout": can_checkout,
+            "can_count": can_count,
+            "can_approve": can_approve,
             "can_manage_alarms": can_manage_alarms,
         },
         "catalogs": {

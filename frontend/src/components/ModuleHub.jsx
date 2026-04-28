@@ -16,7 +16,7 @@ const TIA_MODULE = {
   description: 'Integracion Siemens S7-300 y monitoreo industrial',
   color: '#14b8a6',
   badge: '0',
-  status: 'active',
+  status: 'restricted',
 }
 
 function dashboardModulesForPanel(modules = []) {
@@ -130,6 +130,8 @@ export function ModuleHub() {
         <section className="module-grid dashboard-module-grid">
           {filteredModules.map((module) => {
             const isDisabled = module.status !== 'active'
+            const isRestricted = module.status === 'restricted'
+            const disabledLabel = isRestricted ? 'Sin permisos' : 'Modulo deshabilitado'
             const card = (
               <>
                 <span
@@ -145,7 +147,7 @@ export function ModuleHub() {
               </>
             )
 
-            if (ACTIVE_MODULE_ROUTES[module.slug]) {
+            if (!isDisabled && ACTIVE_MODULE_ROUTES[module.slug]) {
               const destination = ACTIVE_MODULE_ROUTES[module.slug]
 
               return (
@@ -162,9 +164,9 @@ export function ModuleHub() {
             return (
               <div
                 className="module-card is-disabled"
-                data-disabled-label="Modulo deshabilitado"
+                data-disabled-label={disabledLabel}
                 key={module.slug}
-                title="Modulo deshabilitado"
+                title={disabledLabel}
               >
                 {card}
               </div>
