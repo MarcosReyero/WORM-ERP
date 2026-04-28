@@ -130,12 +130,10 @@ export function DepositsPlanPage() {
       <ModulePageHeader
         eyebrow="Depositos / Plano"
         title="Plano consultivo"
-        description="Mapa responsive por zonas, ocupacion por posicion y pallet vigente."
       />
 
       <ModuleSurface
         title="Deposito"
-        description="Selecciona ubicacion para inspeccionar zonas y ocupacion."
       >
         <ModuleToolbar className="deposits-toolbar">
           <label>
@@ -165,7 +163,6 @@ export function DepositsPlanPage() {
       {layoutState.loading ? (
         <ModuleEmptyState
           title="Cargando plano"
-          description="Preparando zonas, posiciones y ocupacion actual."
         />
       ) : (
         <section className="deposits-plan-stack">
@@ -176,7 +173,6 @@ export function DepositsPlanPage() {
                 <ModuleSurface
                   key={zone.id}
                   title={`${zone.code} · ${zone.name}`}
-                  description="Vista 2D resumida con posiciones fisicas y pallet actual."
                 >
                   <div className="deposits-zone-meter" role="img" aria-label={`Ocupacion ${occupancyPercent}%`}>
                     <div className="deposits-zone-meter-bar" style={{ width: `${occupancyPercent}%` }} />

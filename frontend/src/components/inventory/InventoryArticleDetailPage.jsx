@@ -217,7 +217,6 @@ export function InventoryArticleDetailPage() {
     return (
       <div className="module-page-stack stock-titled-page">
         <ModuleEmptyState
-          description="Cargando informacion del articulo, stock y trazabilidad reciente."
           title="Cargando ficha"
         />
       </div>
@@ -251,7 +250,6 @@ export function InventoryArticleDetailPage() {
             </Link>
           </>
         }
-        description="Ficha editable con imagen, stock, movimientos y unidades asociadas."
         eyebrow="Inventario / Stock"
         title={article.name}
       />
@@ -259,7 +257,6 @@ export function InventoryArticleDetailPage() {
       <section className="module-page-grid">
         <div className="module-main-stack">
           <ModuleSurface
-            description="Vista completa del producto dentro del maestro operativo."
             title="Ficha del producto"
           >
             <div className="record-summary">
@@ -353,7 +350,6 @@ export function InventoryArticleDetailPage() {
           </ModuleSurface>
 
           <ModuleTableSection
-            description="Saldos por ubicacion y lote cuando aplica."
             title="Stock por ubicacion"
           >
             {balances.length ? (
@@ -390,7 +386,6 @@ export function InventoryArticleDetailPage() {
           </ModuleTableSection>
 
           <ModuleTableSection
-            description="Ultimas operaciones que afectaron este articulo."
             title="Movimientos recientes"
           >
             {movements.length ? (
@@ -430,7 +425,6 @@ export function InventoryArticleDetailPage() {
 
           {trackedUnits.length ? (
             <ModuleTableSection
-              description="Unidades trazadas asociadas a este articulo."
               title="Unidades individuales"
             >
               <div className="module-table-wrap">
@@ -463,12 +457,7 @@ export function InventoryArticleDetailPage() {
           ) : null}
         </div>
 
-        <ModuleActionPanel
-          description="Edita la ficha sin salir del modulo. La auditoria queda automatica."
-          isOpen={showEditPanel}
-          onToggle={() => setShowEditPanel((current) => !current)}
-          title="Editar producto"
-        >
+        <ModuleActionPanel isOpen={showEditPanel} onToggle={() => setShowEditPanel((current) => !current)} title="Editar producto">
           <form className="ops-form article-detail-form" onSubmit={handleSubmit}>
             <div className="field-grid">
               <label className="field-span-2">

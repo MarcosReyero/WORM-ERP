@@ -36,27 +36,27 @@ function getWorkspaceHeading(pathname, sidebarConfig) {
   if (sidebarConfig?.moduleTitle) {
     return {
       title: sidebarConfig.moduleTitle,
-      subtitle: sidebarConfig.moduleSubtitle || 'Operacion del modulo actual',
+      subtitle: sidebarConfig.moduleSubtitle || '',
     }
   }
 
   if (pathname.startsWith('/mensajes')) {
     return {
       title: 'Mensajes',
-      subtitle: 'Conversaciones internas y alarmas',
+      subtitle: '',
     }
   }
 
   if (pathname.startsWith('/perfil')) {
     return {
       title: 'Perfil',
-      subtitle: 'Cuenta, usuarios y preferencias',
+      subtitle: '',
     }
   }
 
   return {
     title: 'Panel principal',
-    subtitle: 'Vista general de la plataforma',
+    subtitle: '',
   }
 }
 
@@ -143,7 +143,7 @@ export function AppLayout({
               <SidebarTrigger className="topbar-sidebar-trigger" />
               <div className="topbar-section-copy">
                 <strong>{workspaceHeading.title}</strong>
-                <span>{workspaceHeading.subtitle}</span>
+                {workspaceHeading.subtitle ? <span>{workspaceHeading.subtitle}</span> : null}
               </div>
             </div>
 

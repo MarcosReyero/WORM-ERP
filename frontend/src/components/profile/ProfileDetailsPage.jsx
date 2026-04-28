@@ -122,7 +122,6 @@ export function ProfileDetailsPage() {
     return (
       <div className="module-empty-state">
         <strong>Cargando perfil</strong>
-        <p>Preparando datos personales y preferencias.</p>
       </div>
     )
   }
@@ -130,7 +129,6 @@ export function ProfileDetailsPage() {
   return (
     <div className="module-page-stack">
       <ModulePageHeader
-        description="Datos personales, avatar y preferencias persistidas para esta cuenta."
         eyebrow="Perfil"
         title="Mi perfil"
       />
@@ -140,7 +138,6 @@ export function ProfileDetailsPage() {
       <section className="profile-page-grid">
         <ModuleSurface
           className="profile-main-surface"
-          description="Actualiza la ficha visible en el sistema interno."
           title="Datos personales"
         >
           <form className="ops-form profile-form" onSubmit={handleSubmit}>
@@ -225,7 +222,6 @@ export function ProfileDetailsPage() {
 
         <aside className="profile-side-stack">
           <ModuleSurface
-            description="Imagen de perfil usada en la mensajeria y en el navbar."
             title="Avatar"
           >
             <div className="profile-avatar-card">
@@ -270,7 +266,6 @@ export function ProfileDetailsPage() {
           </ModuleSurface>
 
           <ModuleSurface
-            description="Informacion operativa visible para otros perfiles."
             title="Cuenta"
           >
             <div className="record-meta-grid">
@@ -294,7 +289,6 @@ export function ProfileDetailsPage() {
           </ModuleSurface>
 
           <ModuleSurface
-            description="Actividad basica asociada a esta sesion."
             title="Actividad reciente"
           >
             <div className="record-meta-grid">

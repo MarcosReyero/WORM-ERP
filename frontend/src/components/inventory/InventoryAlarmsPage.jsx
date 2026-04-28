@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+﻿import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   createInventoryAlarmRequest,
@@ -411,7 +411,6 @@ export function InventoryAlarmsPage() {
   return (
     <div className="module-page-stack">
       <ModulePageHeader
-        description="Configura destinatarios y envia correos automaticos cuando un articulo llegue a stock minimo. Tambien puedes seguir disparando alarmas internas manuales."
         eyebrow="Inventario / Alarmas"
         title="Alarmas operativas"
       />
@@ -420,7 +419,6 @@ export function InventoryAlarmsPage() {
         <div className="module-main-stack">
           <ModuleTableSection
             actions={<span className="module-chip">{triggeredCount} activas</span>}
-            description="Reglas automaticas por articulo. El mail se envia cuando el stock llega al minimo configurado y no se repite hasta que el articulo salga y vuelva a entrar en estado critico."
             title="Stock minimo"
           >
             {safetyAlerts.length ? (
@@ -516,7 +514,6 @@ export function InventoryAlarmsPage() {
                 {minimumStockDigest?.low_stock_count || 0} articulos hoy
               </span>
             }
-            description="Resumen general para enviar periodicamente el estado de todos los articulos en o por debajo del stock minimo."
             title="Resumen periodico"
           >
             {minimumStockDigest?.id ? (
@@ -617,7 +614,6 @@ export function InventoryAlarmsPage() {
 
           <ModuleTableSection
             actions={<span className="module-chip">{fullStockReport?.article_count || 0} articulos</span>}
-            description="Reporte (Excel) con el stock completo, enviado automaticamente segun la programacion."
             title="Reporte de stock completo"
           >
             {fullStockReport?.id ? (
@@ -713,7 +709,6 @@ export function InventoryAlarmsPage() {
 
           <ModuleTableSection
             actions={<span className="module-chip">{manualAlarms.length} visibles</span>}
-            description="Historial de avisos internos enviados a la casilla de mensajes."
             title="Alarmas internas manuales"
           >
             {manualAlarms.length ? (
@@ -759,7 +754,6 @@ export function InventoryAlarmsPage() {
 
         <aside className="module-side-stack">
           <ModuleActionPanel
-            description="Elige si quieres una alerta por articulo individual o un resumen periodico de todos los articulos en stock minimo."
             title="Configurar alerta automatica"
           >
             <div className="alarm-mode-tabs">
@@ -795,7 +789,7 @@ export function InventoryAlarmsPage() {
                     }))}
                     value={safetyForm.article_id}
                     onChange={(id) => handleSelectSafetyArticle(id)}
-                    placeholder="Buscar artículo..."
+                    placeholder="Buscar artÃ­culo..."
                   />
                 </label>
 
@@ -1066,25 +1060,25 @@ export function InventoryAlarmsPage() {
                           key: 'scheduler',
                           label: 'Runner',
                           state: automationStatus?.scheduler,
-                          description: 'Proceso ejecutor central de la automatización. Verifica cada 60s si hay tareas pendientes (reconciliación, envío de digests).'
+                          description: 'Proceso ejecutor central de la automatizaciÃ³n. Verifica cada 60s si hay tareas pendientes (reconciliaciÃ³n, envÃ­o de digests).'
                         },
                         {
                           key: 'minimum_stock_reconcile',
                           label: 'Reconciliacion',
                           state: automationStatus?.minimum_stock_reconcile,
-                          description: 'Evalúa todos los artículos y actualiza su estado de alerta según el stock actual. Se ejecuta cada 10 minutos.'
+                          description: 'EvalÃºa todos los artÃ­culos y actualiza su estado de alerta segÃºn el stock actual. Se ejecuta cada 10 minutos.'
                         },
                         {
                           key: 'minimum_stock_digest',
                           label: 'Digest',
                           state: automationStatus?.minimum_stock_digest,
-                          description: 'Envía resumen periódico de artículos en stock mínimo. Se ejecuta según la configuración (diario/semanal a la hora especificada).'
+                          description: 'EnvÃ­a resumen periÃ³dico de artÃ­culos en stock mÃ­nimo. Se ejecuta segÃºn la configuraciÃ³n (diario/semanal a la hora especificada).'
                         },
                         {
                           key: 'full_stock_report',
                           label: 'Reporte stock',
                           state: automationStatus?.full_stock_report,
-                          description: 'Envía el reporte periódico del stock completo en Excel. Se ejecuta según la configuración (diario/semanal a la hora especificada).'
+                          description: 'EnvÃ­a el reporte periÃ³dico del stock completo en Excel. Se ejecuta segÃºn la configuraciÃ³n (diario/semanal a la hora especificada).'
                         },
                       ].map((item) => (
                         <div className="alarm-automation-item" key={item.key}>
@@ -1095,7 +1089,7 @@ export function InventoryAlarmsPage() {
                                 type="button"
                                 className="info-button"
                                 onClick={() => setExpandedTooltip(expandedTooltip === item.key ? null : item.key)}
-                                title="Ver explicación"
+                                title="Ver explicaciÃ³n"
                               >
                                 ?
                               </button>
@@ -1135,11 +1129,7 @@ export function InventoryAlarmsPage() {
               </>
             )}
           </ModuleActionPanel>
-
-          <ModuleActionPanel
-            description="Envía automaticamente un Excel con el stock completo (todos los articulos) segun la programacion."
-            title="Reporte de stock completo"
-          >
+          <ModuleActionPanel title="Reporte de stock completo">
             <PanelMessage error={fullStockFeedback.error} success={fullStockFeedback.success} />
 
             <form className="ops-form" onSubmit={handleFullStockReportSubmit}>
@@ -1150,7 +1140,6 @@ export function InventoryAlarmsPage() {
                     {fullStockForm.is_enabled ? 'Activo' : 'Deshabilitado'}
                   </span>
                 </div>
-                <p>El reporte adjuntara un Excel con el stock completo al momento del envio.</p>
                 <div className="alarm-digest-meta">
                   <span>
                     Proximo envio <strong>{formatDateTime(fullStockReport?.next_run_at)}</strong>
@@ -1300,10 +1289,7 @@ export function InventoryAlarmsPage() {
             </form>
           </ModuleActionPanel>
 
-          <ModuleActionPanel
-            description="Si necesitas avisar algo puntual, puedes seguir enviando una alarma manual a la casilla interna."
-            title="Nueva alarma interna"
-          >
+          <ModuleActionPanel title="Nueva alarma interna">
             <PanelMessage error={manualFeedback.error} success={manualFeedback.success} />
 
             <form className="ops-form" onSubmit={handleManualSubmit}>
@@ -1403,3 +1389,4 @@ export function InventoryAlarmsPage() {
     </div>
   )
 }
+

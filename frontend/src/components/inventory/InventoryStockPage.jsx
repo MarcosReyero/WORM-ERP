@@ -1,9 +1,9 @@
-import { useDeferredValue, useState } from 'react'
+﻿import { useDeferredValue, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { useEffect } from 'react'
 import { createArticle, exportArticlesToExcel, importArticlesFromExcel } from '../../lib/api.js'
 import { CloseIcon, SearchIcon } from '../Icons.jsx'
 import {
-  ModuleActionPanel,
   ModuleEmptyState,
   ModulePageHeader,
   ModuleTableSection,
@@ -61,8 +61,8 @@ export function InventoryStockPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [alertFilter, setAlertFilter] = useState('all')
-  const [showCreateForm, setShowCreateForm] = useState(true)
-  const [showImportForm, setShowImportForm] = useState(true)
+  const [utilityMode, setUtilityMode] = useState('table')
+  const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, articleId: null })
   const [busyAction, setBusyAction] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [articleFeedback, setArticleFeedback] = useState({ error: '', success: '' })
@@ -90,6 +90,92 @@ export function InventoryStockPage() {
     loanable: false,
   })
 
+  function resetStockView() {
+    setStockSearch('')
+    setTypeFilter('all')
+    setStatusFilter('all')
+    setAlertFilter('all')
+  }
+
+  function toggleUtility(nextMode) {
+    closeContextMenu()
+    setUtilityMode((current) => (current === nextMode ? 'table' : nextMode))
+  }
+
+  function closeContextMenu() {
+    setContextMenu((current) => (current.isOpen ? { ...current, isOpen: false } : current))
+  }
+
+  function openContextMenu(event, articleId) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const menuWidth = 208
+    const menuHeight = 76
+    const padding = 8
+
+    const x = Math.min(event.clientX, window.innerWidth - menuWidth - padding)
+    const y = Math.min(event.clientY, window.innerHeight - menuHeight - padding)
+
+    setContextMenu({
+      isOpen: true,
+      x: Math.max(padding, x),
+      y: Math.max(padding, y),
+      articleId: articleId ?? null,
+    })
+  }
+
+  function goToMovement(mode) {
+    if (!contextMenu.articleId) {
+      return
+    }
+
+    closeContextMenu()
+    navigate('/inventario/movimientos', {
+      state: {
+        preset: {
+          mode,
+          articleId: contextMenu.articleId,
+        },
+      },
+    })
+  }
+
+  useEffect(() => {
+    if (!contextMenu.isOpen) {
+      return
+    }
+
+    function handlePointerDown(event) {
+      if (event.target?.closest?.('.module-context-menu')) {
+        return
+      }
+      closeContextMenu()
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        closeContextMenu()
+      }
+    }
+
+    function handleWindowChange() {
+      closeContextMenu()
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', handleWindowChange)
+    window.addEventListener('scroll', handleWindowChange, true)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', handleWindowChange)
+      window.removeEventListener('scroll', handleWindowChange, true)
+    }
+  }, [contextMenu.isOpen])
+
   if (!inventoryOverview) {
     return null
   }
@@ -112,13 +198,6 @@ export function InventoryStockPage() {
     importSummary?.errors?.length
       ? importSummary.errors
       : importSummary?.items?.filter((item) => item.decision === 'error') ?? []
-
-  function resetStockView() {
-    setStockSearch('')
-    setTypeFilter('all')
-    setStatusFilter('all')
-    setAlertFilter('all')
-  }
 
   async function handleExportArticles() {
     setExportFeedback({ error: '', success: '' })
@@ -257,594 +336,637 @@ export function InventoryStockPage() {
               : `${articles.length} articulos visibles`}
           </span>
         }
-        description="Maestro y existencias en una vista de trabajo compacta, filtrable y pensada para consulta rapida."
         eyebrow="Inventario / Stock"
         title="Stock"
       />
 
-      <section className="module-page-grid">
+      <section className="module-page-grid module-page-grid--single">
         <div className="module-main-stack">
           <ModuleTableSection
-            description="Busca por nombre, codigo interno o categoria y combina la busqueda con filtros operativos sin perder contexto."
-            title="Existencias"
-            toolbar={
-              <ModuleToolbar className="module-toolbar--stock-table">
-                <div className="module-filter-group module-filter-group--stock">
-                  <label className="module-search-field">
-                    Buscar articulo
-                    <div className="module-search-input">
-                      <SearchIcon />
-                      <input
-                        onChange={(event) => setStockSearch(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Escape' && stockSearch) {
-                            setStockSearch('')
-                          }
-                        }}
-                        placeholder="Buscar por nombre, código o categoría"
-                        type="search"
-                        value={stockSearch}
-                      />
-                      {stockSearch ? (
-                        <button
-                          aria-label="Limpiar búsqueda"
-                          className="module-search-clear"
-                          onClick={() => setStockSearch('')}
-                          type="button"
-                        >
-                          <CloseIcon />
-                        </button>
-                      ) : null}
-                    </div>
-                  </label>
-                  <label>
-                    Tipo
-                    <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                      <option value="all">Todos</option>
-                      {catalogs.article_types.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Estado
-                    <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                      <option value="all">Todos</option>
-                      <option value="active">Activo</option>
-                      <option value="inactive">Inactivo</option>
-                      <option value="discontinued">Descontinuado</option>
-                    </select>
-                  </label>
-                  <label>
-                    Alerta
-                    <select value={alertFilter} onChange={(event) => setAlertFilter(event.target.value)}>
-                      <option value="all">Todas</option>
-                      <option value="low">Bajo minimo</option>
-                      <option value="out">Sin stock</option>
-                      <option value="healthy">En nivel</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="module-toolbar-meta">
-                  {hasActiveSearch && deferredGlobalQuery ? (
-                    <span className="module-chip is-muted">Busqueda global activa</span>
-                  ) : null}
+            title={
+              <span className="module-title-row">
+                <span className="module-title-tools" role="toolbar" aria-label="Utilidades">
                   <button
-                    className="inline-action"
-                    disabled={busyAction === 'export'}
-                    onClick={() => {
-                      void handleExportArticles()
-                    }}
+                    className={`module-utility-button ${utilityMode === 'table' ? 'is-active' : ''}`}
+                    onClick={() => toggleUtility('table')}
                     type="button"
                   >
-                    {busyAction === 'export' ? 'Exportando...' : 'Exportar Excel'}
+                    Existencias
                   </button>
-                  {isFilteredView ? (
-                    <button className="inline-action" onClick={resetStockView} type="button">
-                      Limpiar vista
-                    </button>
-                  ) : null}
-                </div>
-              </ModuleToolbar>
+                  <button
+                    className={`module-utility-button ${utilityMode === 'create' ? 'is-active' : ''}`}
+                    onClick={() => toggleUtility('create')}
+                    type="button"
+                  >
+                    Alta rapida
+                  </button>
+                  <button
+                    className={`module-utility-button ${utilityMode === 'import' ? 'is-active' : ''}`}
+                    onClick={() => toggleUtility('import')}
+                    type="button"
+                  >
+                    Importar Excel
+                  </button>
+                </span>
+              </span>
             }
-          >
-            <PanelMessage error={exportFeedback.error} success={exportFeedback.success} />
-            {filteredArticles.length ? (
-              <div className="module-table-wrap">
-                <table className="module-table module-table--stock">
-                  <thead>
-                    <tr>
-                      <th>Articulo</th>
-                      <th>Tipo</th>
-                      <th>Stock</th>
-                      <th>Disponible</th>
-                      <th>Minimo</th>
-                      <th>Ubicacion</th>
-                      <th>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredArticles.map((article) => {
-                      const articleDetailPath = `/inventario/stock/${article.id}`
-
-                      return (
-                        <tr
-                          className="module-table-row-link"
-                          key={article.id}
-                          onClick={() => navigate(articleDetailPath)}
+            toolbar={
+              utilityMode === 'table' ? (
+                <ModuleToolbar className="module-toolbar--stock-table">
+                  <div className="module-filter-group module-filter-group--stock">
+                    <label className="module-search-field">
+                      Buscar articulo
+                      <div className="module-search-input">
+                        <SearchIcon />
+                        <input
+                          onChange={(event) => setStockSearch(event.target.value)}
                           onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              navigate(articleDetailPath)
+                            if (event.key === 'Escape' && stockSearch) {
+                              setStockSearch('')
                             }
                           }}
-                          role="link"
-                          tabIndex={0}
-                          title={`Abrir ficha de ${article.name}`}
-                        >
-                          <td>
-                            <div className="module-table-item">
-                              <Link className="module-table-link" to={articleDetailPath}>
-                                {article.name}
-                              </Link>
-                              <span>{article.internal_code}</span>
-                            </div>
-                          </td>
-                          <td>{article.article_type_label}</td>
-                          <td>{formatQuantity(article.current_stock)}</td>
-                          <td>{formatQuantity(article.available_stock)}</td>
-                          <td>{formatQuantity(article.minimum_stock)}</td>
-                          <td>{article.primary_location || '-'}</td>
-                          <td>
-                            <span className={`status-pill ${getArticleStockTone(article)}`}>
-                              {getArticleStockLabel(article)}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <ModuleEmptyState
-                description={
-                  hasActiveSearch
-                    ? 'No encontramos articulos para esa busqueda. Prueba con nombre, codigo o categoria, o limpia la busqueda.'
-                    : hasActiveFilters
-                      ? 'No hay articulos para los filtros actuales. Ajusta Tipo, Estado o Alerta para volver a ver stock.'
-                      : 'Todavia no hay articulos cargados en stock.'
-                }
-                title="Sin stock visible"
-              />
-            )}
-          </ModuleTableSection>
-        </div>
-
-        <div className="module-side-stack">
-          <ModuleActionPanel
-            description="Alta corta y operativa. El codigo se genera solo y se valida contra duplicados."
-            isOpen={showCreateForm}
-            onToggle={() => setShowCreateForm((current) => !current)}
-            title="Alta rapida"
+                          placeholder="Buscar por nombre, cÃ³digo o categorÃ­a"
+                          type="search"
+                          value={stockSearch}
+                        />
+                        {stockSearch ? (
+                          <button
+                            aria-label="Limpiar bÃºsqueda"
+                            className="module-search-clear"
+                            onClick={() => setStockSearch('')}
+                            type="button"
+                          >
+                            <CloseIcon />
+                          </button>
+                        ) : null}
+                      </div>
+                    </label>
+                    <label>
+                      Tipo
+                      <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                        <option value="all">Todos</option>
+                        {catalogs.article_types.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Estado
+                      <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                        <option value="all">Todos</option>
+                        <option value="active">Activo</option>
+                        <option value="inactive">Inactivo</option>
+                        <option value="discontinued">Descontinuado</option>
+                      </select>
+                    </label>
+                    <label>
+                      Alerta
+                      <select value={alertFilter} onChange={(event) => setAlertFilter(event.target.value)}>
+                        <option value="all">Todas</option>
+                        <option value="low">Bajo minimo</option>
+                        <option value="out">Sin stock</option>
+                        <option value="healthy">En nivel</option>
+                      </select>
+                    </label>
+                    <label>
+                      Exportar
+                      <button
+                        className="inline-action"
+                        disabled={busyAction === 'export'}
+                        onClick={() => {
+                          void handleExportArticles()
+                        }}
+                        type="button"
+                      >
+                        {busyAction === 'export' ? 'Exportando...' : 'Exportar Excel'}
+                      </button>
+                    </label>
+                  </div>
+                  <div className="module-toolbar-meta">
+                    {hasActiveSearch && deferredGlobalQuery ? (
+                      <span className="module-chip is-muted">Busqueda global activa</span>
+                    ) : null}
+                    {isFilteredView ? (
+                      <button className="inline-action" onClick={resetStockView} type="button">
+                        Limpiar vista
+                      </button>
+                    ) : null}
+                  </div>
+                </ModuleToolbar>
+              ) : null
+            }
           >
-            <form className="ops-form" onSubmit={handleArticleSubmit}>
-              <div className="field-grid">
-                <label className="field-span-2">
-                  Nombre
-                  <input
-                    onChange={(event) =>
-                      setArticleForm((current) => ({ ...current, name: event.target.value }))
-                    }
-                    value={articleForm.name}
-                  />
-                </label>
-                <label>
-                  Tipo
-                  <select
-                    onChange={(event) =>
-                      setArticleForm((current) => {
-                        const nextTracking = pickDefaultTracking(event.target.value)
-                        return {
-                          ...current,
-                          article_type: event.target.value,
-                          tracking_mode: nextTracking,
-                          loanable:
-                            event.target.value === 'tool'
-                              ? true
-                              : nextTracking === 'unit'
-                                ? current.loanable
-                                : false,
+            {utilityMode === 'create' ? (
+              <>
+                <p className="module-empty-copy">
+                  Alta corta y operativa. El codigo se genera solo y se valida contra duplicados.
+                </p>
+                <form className="ops-form" onSubmit={handleArticleSubmit}>
+                  <div className="field-grid">
+                    <label className="field-span-2">
+                      Nombre
+                      <input
+                        onChange={(event) =>
+                          setArticleForm((current) => ({ ...current, name: event.target.value }))
                         }
-                      })
-                    }
-                    value={articleForm.article_type}
-                  >
-                    {catalogs.article_types.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Unidad
-                  <select
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        unit_of_measure_id: event.target.value,
-                      }))
-                    }
-                    value={articleForm.unit_of_measure_id}
-                  >
-                    <option value="">Seleccionar</option>
-                    {catalogs.units.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Sector responsable
-                  <select
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        sector_responsible_id: event.target.value,
-                      }))
-                    }
-                    value={articleForm.sector_responsible_id}
-                  >
-                    <option value="">Seleccionar</option>
-                    {catalogs.sectors.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Ubicacion base
-                  <select
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        primary_location_id: event.target.value,
-                      }))
-                    }
-                    value={articleForm.primary_location_id}
-                  >
-                    <option value="">Sin definir</option>
-                    {catalogs.locations.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Categoria
-                  <select
-                    onChange={(event) =>
-                      setArticleForm((current) => ({ ...current, category_id: event.target.value }))
-                    }
-                    value={articleForm.category_id}
-                  >
-                    <option value="">Sin categoria</option>
-                    {catalogs.categories.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Tracking
-                  <select
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        tracking_mode: event.target.value,
-                        loanable: event.target.value === 'unit' ? current.loanable : false,
-                      }))
-                    }
-                    value={articleForm.tracking_mode}
-                  >
-                    {catalogs.tracking_modes.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Stock inicial
-                  <input
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        initial_quantity: event.target.value,
-                      }))
-                    }
-                    step="0.001"
-                    type="number"
-                    value={articleForm.initial_quantity}
-                  />
-                </label>
-                <label>
-                  Stock minimo
-                  <input
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        minimum_stock: event.target.value,
-                      }))
-                    }
-                    placeholder={
-                      shouldRequireMinimumStock(articleForm.article_type, articleForm.is_critical)
-                        ? 'Obligatorio'
-                        : 'Opcional'
-                    }
-                    step="0.001"
-                    type="number"
-                    value={articleForm.minimum_stock}
-                  />
-                </label>
-              </div>
-
-              <div className="checkbox-row">
-                <label>
-                  <input
-                    checked={articleForm.is_critical}
-                    onChange={(event) =>
-                      setArticleForm((current) => ({ ...current, is_critical: event.target.checked }))
-                    }
-                    type="checkbox"
-                  />
-                  Critico
-                </label>
-                <label>
-                  <input
-                    checked={articleForm.loanable}
-                    onChange={(event) =>
-                      setArticleForm((current) => ({ ...current, loanable: event.target.checked }))
-                    }
-                    type="checkbox"
-                  />
-                  Prestable
-                </label>
-                <label>
-                  <input
-                    checked={articleForm.requires_lot}
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        requires_lot: event.target.checked,
-                        requires_expiry: event.target.checked ? current.requires_expiry : false,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  Lote
-                </label>
-                <label>
-                  <input
-                    checked={articleForm.requires_expiry}
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        requires_expiry: event.target.checked,
-                        requires_lot: event.target.checked ? true : current.requires_lot,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  Vencimiento
-                </label>
-                <label>
-                  <input
-                    checked={articleForm.requires_assignee}
-                    onChange={(event) =>
-                      setArticleForm((current) => ({
-                        ...current,
-                        requires_assignee: event.target.checked,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  Asignacion
-                </label>
-              </div>
-
-              <PanelMessage error={articleFeedback.error} success={articleFeedback.success} />
-              <button
-                className="primary-button"
-                disabled={!permissions.can_manage_master || busyAction === 'article'}
-                type="submit"
-              >
-                {busyAction === 'article' ? 'Guardando...' : 'Crear articulo'}
-              </button>
-            </form>
-          </ModuleActionPanel>
-
-          <ModuleActionPanel
-            description="Analiza primero el archivo y confirma despues. Soporta tablas estructuradas y listas simples de pañol."
-            isOpen={showImportForm}
-            onToggle={() => setShowImportForm((current) => !current)}
-            title="Importar desde Excel"
-          >
-            <form className="ops-form" onSubmit={handleImportSubmit}>
-              <label>
-                Archivo Excel
-                <input
-                  accept=".xlsx,.xlsm"
-                  onChange={(event) => {
-                    setImportFile(event.target.files?.[0] || null)
-                    setImportFeedback({ error: '', success: '', summary: null })
-                  }}
-                  type="file"
-                />
-              </label>
-
-              <p className="module-empty-copy">
-                Si el Excel viene armado como tabla, usa <strong>nombre</strong>, <strong>tipo</strong>,{' '}
-                <strong>unidad</strong> y <strong>sector</strong>. Tambien puede leer listas simples como la
-                de pañol, con la primera columna <strong>nombre</strong> y categorias por bloque.
-              </p>
-
-              <PanelMessage error={importFeedback.error} success={importFeedback.success} />
-
-              {importSummary ? (
-                <div className="import-summary">
-                  <div className="record-meta-grid">
-                    <article className="record-meta-card">
-                      <span>
-                        {importSummary.mode === 'confirm' ? 'Productos agregados' : 'Listos para agregar'}
-                      </span>
-                      <strong>
-                        {importSummary.mode === 'confirm'
-                          ? importSummary.created_count
-                          : importSummary.ready_count}
-                      </strong>
-                    </article>
-                    <article className="record-meta-card">
-                      <span>Omitidos</span>
-                      <strong>{importSummary.skip_count}</strong>
-                    </article>
-                    <article className="record-meta-card">
-                      <span>Con error</span>
-                      <strong>{importSummary.error_count}</strong>
-                    </article>
+                        value={articleForm.name}
+                      />
+                    </label>
+                    <label>
+                      Tipo
+                      <select
+                        onChange={(event) =>
+                          setArticleForm((current) => {
+                            const nextTracking = pickDefaultTracking(event.target.value)
+                            return {
+                              ...current,
+                              article_type: event.target.value,
+                              tracking_mode: nextTracking,
+                              loanable:
+                                event.target.value === 'tool'
+                                  ? true
+                                  : nextTracking === 'unit'
+                                    ? current.loanable
+                                    : false,
+                            }
+                          })
+                        }
+                        value={articleForm.article_type}
+                      >
+                        {catalogs.article_types.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Unidad
+                      <select
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            unit_of_measure_id: event.target.value,
+                          }))
+                        }
+                        value={articleForm.unit_of_measure_id}
+                      >
+                        <option value="">Seleccionar</option>
+                        {catalogs.units.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Sector responsable
+                      <select
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            sector_responsible_id: event.target.value,
+                          }))
+                        }
+                        value={articleForm.sector_responsible_id}
+                      >
+                        <option value="">Seleccionar</option>
+                        {catalogs.sectors.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Ubicacion base
+                      <select
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            primary_location_id: event.target.value,
+                          }))
+                        }
+                        value={articleForm.primary_location_id}
+                      >
+                        <option value="">Sin definir</option>
+                        {catalogs.locations.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Categoria
+                      <select
+                        onChange={(event) =>
+                          setArticleForm((current) => ({ ...current, category_id: event.target.value }))
+                        }
+                        value={articleForm.category_id}
+                      >
+                        <option value="">Sin categoria</option>
+                        {catalogs.categories.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Tracking
+                      <select
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            tracking_mode: event.target.value,
+                            loanable: event.target.value === 'unit' ? current.loanable : false,
+                          }))
+                        }
+                        value={articleForm.tracking_mode}
+                      >
+                        {catalogs.tracking_modes.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Stock inicial
+                      <input
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            initial_quantity: event.target.value,
+                          }))
+                        }
+                        step="0.001"
+                        type="number"
+                        value={articleForm.initial_quantity}
+                      />
+                    </label>
+                    <label>
+                      Stock minimo
+                      <input
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            minimum_stock: event.target.value,
+                          }))
+                        }
+                        placeholder={
+                          shouldRequireMinimumStock(articleForm.article_type, articleForm.is_critical)
+                            ? 'Obligatorio'
+                            : 'Opcional'
+                        }
+                        step="0.001"
+                        type="number"
+                        value={articleForm.minimum_stock}
+                      />
+                    </label>
                   </div>
 
-                  {previewReadyItems.length ? (
-                    <div className="import-preview-block">
-                      <div className="import-preview-heading">
-                        <strong>
-                          {importSummary.mode === 'confirm'
-                            ? 'Productos detectados en la importacion'
-                            : 'Productos listos para agregar'}
-                        </strong>
-                        <span>{previewReadyItems.length} filas</span>
-                      </div>
-                      <div className="module-list import-preview-list">
-                        {previewReadyItems.slice(0, 12).map((item) => {
-                          const meta = getImportDecisionMeta(item.decision)
+                  <div className="checkbox-row">
+                    <label>
+                      <input
+                        checked={articleForm.is_critical}
+                        onChange={(event) =>
+                          setArticleForm((current) => ({ ...current, is_critical: event.target.checked }))
+                        }
+                        type="checkbox"
+                      />
+                      Critico
+                    </label>
+                    <label>
+                      <input
+                        checked={articleForm.loanable}
+                        onChange={(event) =>
+                          setArticleForm((current) => ({ ...current, loanable: event.target.checked }))
+                        }
+                        type="checkbox"
+                      />
+                      Prestable
+                    </label>
+                    <label>
+                      <input
+                        checked={articleForm.requires_lot}
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            requires_lot: event.target.checked,
+                            requires_expiry: event.target.checked ? current.requires_expiry : false,
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      Lote
+                    </label>
+                    <label>
+                      <input
+                        checked={articleForm.requires_expiry}
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            requires_expiry: event.target.checked,
+                            requires_lot: event.target.checked ? true : current.requires_lot,
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      Vencimiento
+                    </label>
+                    <label>
+                      <input
+                        checked={articleForm.requires_assignee}
+                        onChange={(event) =>
+                          setArticleForm((current) => ({
+                            ...current,
+                            requires_assignee: event.target.checked,
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      Asignacion
+                    </label>
+                  </div>
 
-                          return (
-                            <div className="module-list-item import-preview-item" key={`${item.sheet_name}-${item.row}`}>
-                              <div>
-                                <strong>{item.name}</strong>
-                                <p>
-                                  {item.article_type_label} · {item.unit_name} · {item.sector_name}
-                                  {item.category_name ? ` · ${item.category_name}` : ''}
-                                </p>
-                              </div>
-                              <span className={`status-pill ${meta.tone}`}>{meta.label}</span>
-                            </div>
-                          )
-                        })}
+                  <PanelMessage error={articleFeedback.error} success={articleFeedback.success} />
+                  <button
+                    className="primary-button"
+                    disabled={!permissions.can_manage_master || busyAction === 'article'}
+                    type="submit"
+                  >
+                    {busyAction === 'article' ? 'Guardando...' : 'Crear articulo'}
+                  </button>
+                </form>
+              </>
+            ) : utilityMode === 'import' ? (
+              <>
+                <p className="module-empty-copy">
+                  Analiza primero el archivo y confirma despues. Soporta tablas estructuradas y listas simples de paÃ±ol.
+                </p>
+                <form className="ops-form" onSubmit={handleImportSubmit}>
+                  <label>
+                    Archivo Excel
+                    <input
+                      accept=".xlsx,.xlsm"
+                      onChange={(event) => {
+                        setImportFile(event.target.files?.[0] || null)
+                        setImportFeedback({ error: '', success: '', summary: null })
+                      }}
+                      type="file"
+                    />
+                  </label>
+
+                  <p className="module-empty-copy">
+                    Si el Excel viene armado como tabla, usa <strong>nombre</strong>, <strong>tipo</strong>,{' '}
+                    <strong>unidad</strong> y <strong>sector</strong>. Tambien puede leer listas simples como la
+                    de paÃ±ol, con la primera columna <strong>nombre</strong> y categorias por bloque.
+                  </p>
+
+                  <PanelMessage error={importFeedback.error} success={importFeedback.success} />
+
+                  {importSummary ? (
+                    <div className="import-summary">
+                      <div className="record-meta-grid">
+                        <article className="record-meta-card">
+                          <span>
+                            {importSummary.mode === 'confirm' ? 'Productos agregados' : 'Listos para agregar'}
+                          </span>
+                          <strong>
+                            {importSummary.mode === 'confirm'
+                              ? importSummary.created_count
+                              : importSummary.ready_count}
+                          </strong>
+                        </article>
+                        <article className="record-meta-card">
+                          <span>Omitidos</span>
+                          <strong>{importSummary.skip_count}</strong>
+                        </article>
+                        <article className="record-meta-card">
+                          <span>Con error</span>
+                          <strong>{importSummary.error_count}</strong>
+                        </article>
                       </div>
-                      {previewReadyItems.length > 12 ? (
-                        <p className="module-empty-copy">
-                          Y {previewReadyItems.length - 12} productos mas listos para agregar.
-                        </p>
+
+                      {previewReadyItems.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>
+                              {importSummary.mode === 'confirm'
+                                ? 'Productos detectados en la importacion'
+                                : 'Productos listos para agregar'}
+                            </strong>
+                            <span>{previewReadyItems.length} filas</span>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {previewReadyItems.slice(0, 12).map((item) => {
+                              const meta = getImportDecisionMeta(item.decision)
+
+                              return (
+                                <div className="module-list-item import-preview-item" key={`${item.sheet_name}-${item.row}`}>
+                                  <div>
+                                    <strong>{item.name}</strong>
+                                    <p>
+                                      {item.article_type_label} Â· {item.unit_name} Â· {item.sector_name}
+                                      {item.category_name ? ` Â· ${item.category_name}` : ''}
+                                    </p>
+                                  </div>
+                                  <span className={`status-pill ${meta.tone}`}>{meta.label}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          {previewReadyItems.length > 12 ? (
+                            <p className="module-empty-copy">
+                              Y {previewReadyItems.length - 12} productos mas listos para agregar.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {previewSkippedItems.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>Productos omitidos</strong>
+                            <span>{previewSkippedItems.length} filas</span>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {previewSkippedItems.slice(0, 6).map((item) => (
+                              <div className="module-list-item import-preview-item" key={`${item.sheet_name}-${item.row}`}>
+                                <div>
+                                  <strong>{item.name || `Fila ${item.row}`}</strong>
+                                  <p>{item.detail}</p>
+                                </div>
+                                <span className="status-pill low">Omitido</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {previewErrorItems.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>Filas con problema</strong>
+                            <span>{previewErrorItems.length} filas</span>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {previewErrorItems.slice(0, 6).map((item) => (
+                              <div
+                                className="module-list-item import-preview-item"
+                                key={`${item.sheet_name}-${item.row}-${item.detail}`}
+                              >
+                                <div>
+                                  <strong>{item.name || `Fila ${item.row}`}</strong>
+                                  <p>{item.detail}</p>
+                                </div>
+                                <span className="status-pill out">Error</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {importSummary.sheet_summaries?.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>Hojas detectadas</strong>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {importSummary.sheet_summaries.map((sheet) => (
+                              <div className="module-list-item import-preview-item" key={sheet.sheet_name}>
+                                <div>
+                                  <strong>{sheet.sheet_name}</strong>
+                                  <p>
+                                    {sheet.mode === 'simple_list' ? 'Lista simple' : 'Tabla estructurada'} Â·{' '}
+                                    {sheet.candidate_count} filas utiles
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       ) : null}
                     </div>
                   ) : null}
 
-                  {previewSkippedItems.length ? (
-                    <div className="import-preview-block">
-                      <div className="import-preview-heading">
-                        <strong>Productos omitidos</strong>
-                        <span>{previewSkippedItems.length} filas</span>
-                      </div>
-                      <div className="module-list import-preview-list">
-                        {previewSkippedItems.slice(0, 6).map((item) => (
-                          <div className="module-list-item import-preview-item" key={`${item.sheet_name}-${item.row}`}>
-                            <div>
-                              <strong>{item.name || `Fila ${item.row}`}</strong>
-                              <p>{item.detail}</p>
-                            </div>
-                            <span className="status-pill low">Omitido</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+                  <div className="import-actions">
+                    <button
+                      className="primary-button"
+                      disabled={!permissions.can_manage_master || busyAction === 'import' || busyAction === 'import-confirm'}
+                      type="submit"
+                    >
+                      {busyAction === 'import' ? 'Analizando...' : 'Analizar Excel'}
+                    </button>
 
-                  {previewErrorItems.length ? (
-                    <div className="import-preview-block">
-                      <div className="import-preview-heading">
-                        <strong>Filas con problema</strong>
-                        <span>{previewErrorItems.length} filas</span>
-                      </div>
-                      <div className="module-list import-preview-list">
-                        {previewErrorItems.slice(0, 6).map((item) => (
-                          <div
-                            className="module-list-item import-preview-item"
-                            key={`${item.sheet_name}-${item.row}-${item.detail}`}
-                          >
-                            <div>
-                              <strong>{item.name || `Fila ${item.row}`}</strong>
-                              <p>{item.detail}</p>
-                            </div>
-                            <span className="status-pill out">Error</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+                    {importSummary?.mode === 'preview' && importSummary.ready_count > 0 ? (
+                      <button
+                        className="secondary-button"
+                        disabled={!permissions.can_manage_master || busyAction === 'import-confirm'}
+                        onClick={handleImportConfirm}
+                        type="button"
+                      >
+                        {busyAction === 'import-confirm' ? 'Confirmando...' : 'Confirmar alta'}
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <PanelMessage error={exportFeedback.error} success={exportFeedback.success} />
+                {filteredArticles.length ? (
+                  <div className="module-table-wrap">
+                    <table className="module-table module-table--stock">
+                      <thead>
+                        <tr>
+                          <th>Articulo</th>
+                          <th>Tipo</th>
+                          <th>Stock</th>
+                          <th>Disponible</th>
+                          <th>Minimo</th>
+                          <th>Ubicacion</th>
+                          <th>Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredArticles.map((article) => {
+                          const articleDetailPath = `/inventario/stock/${article.id}`
 
-                  {importSummary.sheet_summaries?.length ? (
-                    <div className="import-preview-block">
-                      <div className="import-preview-heading">
-                        <strong>Hojas detectadas</strong>
-                      </div>
-                      <div className="module-list import-preview-list">
-                        {importSummary.sheet_summaries.map((sheet) => (
-                          <div className="module-list-item import-preview-item" key={sheet.sheet_name}>
-                            <div>
-                              <strong>{sheet.sheet_name}</strong>
-                              <p>
-                                {sheet.mode === 'simple_list' ? 'Lista simple' : 'Tabla estructurada'} ·{' '}
-                                {sheet.candidate_count} filas utiles
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
+                          return (
+                            <tr
+                              className="module-table-row-link"
+                              key={article.id}
+                              onClick={() => navigate(articleDetailPath)}
+                              onContextMenu={(event) => openContextMenu(event, article.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  navigate(articleDetailPath)
+                                }
+                              }}
+                              role="link"
+                              tabIndex={0}
+                              title={`Abrir ficha de ${article.name}`}
+                            >
+                              <td>
+                                <div className="module-table-item">
+                                  <Link className="module-table-link" to={articleDetailPath}>
+                                    {article.name}
+                                  </Link>
+                                  <span>{article.internal_code}</span>
+                                </div>
+                              </td>
+                              <td>{article.article_type_label}</td>
+                              <td>{formatQuantity(article.current_stock)}</td>
+                              <td>{formatQuantity(article.available_stock)}</td>
+                              <td>{formatQuantity(article.minimum_stock)}</td>
+                              <td>{article.primary_location || '-'}</td>
+                              <td>
+                                <span className={`status-pill ${getArticleStockTone(article)}`}>
+                                  {getArticleStockLabel(article)}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <ModuleEmptyState
+                    description={
+                      hasActiveSearch
+                        ? 'No encontramos articulos para esa busqueda. Prueba con nombre, codigo o categoria, o limpia la busqueda.'
+                        : hasActiveFilters
+                          ? 'No hay articulos para los filtros actuales. Ajusta Tipo, Estado o Alerta para volver a ver stock.'
+                          : 'Todavia no hay articulos cargados en stock.'
+                    }
+                    title="Sin stock visible"
+                  />
+                )}
+              </>
+            )}
+          </ModuleTableSection>
 
-              <div className="import-actions">
-                <button
-                  className="primary-button"
-                  disabled={!permissions.can_manage_master || busyAction === 'import' || busyAction === 'import-confirm'}
-                  type="submit"
-                >
-                  {busyAction === 'import' ? 'Analizando...' : 'Analizar Excel'}
-                </button>
-
-                {importSummary?.mode === 'preview' && importSummary.ready_count > 0 ? (
-                  <button
-                    className="secondary-button"
-                    disabled={!permissions.can_manage_master || busyAction === 'import-confirm'}
-                    onClick={handleImportConfirm}
-                    type="button"
-                  >
-                    {busyAction === 'import-confirm' ? 'Confirmando...' : 'Confirmar alta'}
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          </ModuleActionPanel>
+          {contextMenu.isOpen ? (
+            <div
+              className="module-context-menu"
+              role="menu"
+              style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+            >
+              <button className="module-context-menu-item" onClick={() => goToMovement('egress')} type="button">
+                Retiro (egreso)
+              </button>
+              <button className="module-context-menu-item" onClick={() => goToMovement('ingress')} type="button">
+                Ingreso
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>

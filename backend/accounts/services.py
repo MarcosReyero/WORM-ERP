@@ -7,7 +7,15 @@ from communications.services import (
     user_unread_message_count,
 )
 
-from .models import UserProfile
+from .models import (
+    PermissionAction,
+    PermissionModule,
+    RolePermission,
+    SectorPermission,
+    UserModulePermission,
+    UserPermission,
+    UserProfile,
+)
 
 
 class AccountsApiError(Exception):
@@ -26,7 +34,7 @@ def get_or_create_profile(user):
 
 def require_admin(user):
     profile = get_or_create_profile(user)
-    if user.is_superuser or profile.role == UserProfile.Role.ADMINISTRATOR:
+    if user.is_superuser or user.is_staff or profile.role == UserProfile.Role.ADMINISTRATOR:
         return profile
     raise AccountsApiError("You do not have permission for this action", status=403)
 
@@ -71,7 +79,7 @@ def serialize_user_profile(user):
         "preferred_theme": profile.preferred_theme,
         "unread_messages_count": user_unread_message_count(user),
         "open_alarm_count": user_open_alarm_count(user),
-        "is_admin": user.is_superuser or profile.role == UserProfile.Role.ADMINISTRATOR,
+        "is_admin": user.is_superuser or user.is_staff or profile.role == UserProfile.Role.ADMINISTRATOR,
     }
 
 
@@ -213,3 +221,270 @@ def reset_profile_password_for_admin(user, profile_user_id, payload):
     target_user.set_password(new_password)
     target_user.save(update_fields=["password"])
     return {"id": target_user.id, "username": target_user.username}
+
+
+def _serialize_permission_module(module):
+    return {
+        "code": module.code,
+        "name": module.name,
+        "order": module.order,
+    }
+
+
+def _serialize_permission_action(action):
+    return {
+        "code": action.code,
+        "name": action.name,
+    }
+
+
+def permissions_meta_for_admin(user):
+    require_admin(user)
+    modules = list(PermissionModule.objects.order_by("order", "name"))
+    actions = list(PermissionAction.objects.order_by("code"))
+
+    from inventory.models import Sector
+
+    sectors = list(Sector.objects.order_by("name"))
+
+    return {
+        "modules": [_serialize_permission_module(module) for module in modules],
+        "actions": [_serialize_permission_action(action) for action in actions],
+        "roles": [{"value": value, "label": label} for value, label in UserProfile.Role.choices],
+        "sectors": [{"id": sector.id, "name": sector.name, "code": sector.code} for sector in sectors],
+    }
+
+
+def role_permissions_for_admin(user, role):
+    require_admin(user)
+    if role not in {value for value, _ in UserProfile.Role.choices}:
+        raise AccountsApiError("Unknown role")
+
+    perms = (
+        RolePermission.objects.filter(role=role)
+        .select_related("module")
+        .prefetch_related("actions")
+        .order_by("module__order", "module__name")
+    )
+    return {
+        "role": role,
+        "items": [
+            {
+                "module": perm.module.code,
+                "actions": [action.code for action in perm.actions.all()],
+            }
+            for perm in perms
+        ],
+    }
+
+
+def save_role_permissions_for_admin(user, role, payload):
+    require_admin(user)
+    if role not in {value for value, _ in UserProfile.Role.choices}:
+        raise AccountsApiError("Unknown role")
+
+    items = payload.get("items") if hasattr(payload, "get") else None
+    if not isinstance(items, list):
+        raise AccountsApiError("items must be a list")
+
+    modules = {module.code: module for module in PermissionModule.objects.all()}
+    actions = {action.code: action for action in PermissionAction.objects.all()}
+
+    requested = {}
+    for entry in items:
+        if not isinstance(entry, dict):
+            continue
+        module_code = clean_string(entry.get("module"))
+        if not module_code:
+            continue
+        if module_code not in modules:
+            raise AccountsApiError(f"Unknown module {module_code}")
+        action_codes = entry.get("actions") or []
+        if not isinstance(action_codes, list):
+            raise AccountsApiError("actions must be a list")
+        normalized_actions = []
+        for action_code in action_codes:
+            action_code = clean_string(action_code)
+            if not action_code:
+                continue
+            if action_code not in actions:
+                raise AccountsApiError(f"Unknown action {action_code}")
+            normalized_actions.append(action_code)
+        requested[module_code] = list(dict.fromkeys(normalized_actions))
+
+    for module_code, module in modules.items():
+        desired_actions = requested.get(module_code, [])
+        existing = RolePermission.objects.filter(role=role, module=module).first()
+        if not desired_actions:
+            if existing:
+                existing.delete()
+            continue
+        if not existing:
+            existing = RolePermission.objects.create(role=role, module=module)
+        existing.actions.set([actions[code] for code in desired_actions])
+
+    return role_permissions_for_admin(user, role)
+
+
+def user_permissions_for_admin(user, profile_user_id):
+    require_admin(user)
+    user_model = get_user_model()
+    target_user = get_object_or_404(user_model.objects.select_related("profile", "permissions"), pk=profile_user_id)
+    user_permission, _ = UserPermission.objects.get_or_create(
+        user=target_user,
+        defaults={"inherit_role_permissions": True},
+    )
+
+    module_perms = (
+        UserModulePermission.objects.filter(user_permission=user_permission)
+        .select_related("module")
+        .prefetch_related("actions")
+        .order_by("module__order", "module__name")
+    )
+    sector_perms = (
+        SectorPermission.objects.filter(user=target_user)
+        .select_related("sector")
+        .order_by("sector__name")
+    )
+
+    return {
+        "user_id": target_user.id,
+        "inherit_role_permissions": user_permission.inherit_role_permissions,
+        "module_permissions": [
+            {
+                "module": perm.module.code,
+                "allow": perm.allow,
+                "actions": [action.code for action in perm.actions.all()],
+            }
+            for perm in module_perms
+        ],
+        "sector_permissions": [
+            {
+                "sector_id": perm.sector_id,
+                "sector": perm.sector.name,
+                "can_view": perm.can_view,
+                "can_edit": perm.can_edit,
+                "can_delete": perm.can_delete,
+            }
+            for perm in sector_perms
+        ],
+    }
+
+
+def save_user_permissions_for_admin(user, profile_user_id, payload):
+    require_admin(user)
+    user_model = get_user_model()
+    target_user = get_object_or_404(user_model.objects.select_related("permissions"), pk=profile_user_id)
+    user_permission, _ = UserPermission.objects.get_or_create(
+        user=target_user,
+        defaults={"inherit_role_permissions": True},
+    )
+
+    inherit_role = payload.get("inherit_role_permissions") if hasattr(payload, "get") else None
+    if inherit_role is not None:
+        user_permission.inherit_role_permissions = parse_boolean(inherit_role)
+        _save_validated(user_permission)
+
+    modules = {module.code: module for module in PermissionModule.objects.all()}
+    actions = {action.code: action for action in PermissionAction.objects.all()}
+
+    module_items = payload.get("module_permissions") if hasattr(payload, "get") else None
+    if module_items is not None:
+        if not isinstance(module_items, list):
+            raise AccountsApiError("module_permissions must be a list")
+
+        desired = {}
+        for entry in module_items:
+            if not isinstance(entry, dict):
+                continue
+            module_code = clean_string(entry.get("module"))
+            if not module_code:
+                continue
+            if module_code not in modules:
+                raise AccountsApiError(f"Unknown module {module_code}")
+            allow = parse_boolean(entry.get("allow", True))
+            action_codes = entry.get("actions") or []
+            if not isinstance(action_codes, list):
+                raise AccountsApiError("actions must be a list")
+            normalized_actions = []
+            for action_code in action_codes:
+                action_code = clean_string(action_code)
+                if not action_code:
+                    continue
+                if action_code not in actions:
+                    raise AccountsApiError(f"Unknown action {action_code}")
+                normalized_actions.append(action_code)
+            desired[module_code] = {
+                "allow": allow,
+                "actions": list(dict.fromkeys(normalized_actions)),
+            }
+
+        existing = {
+            perm.module.code: perm
+            for perm in UserModulePermission.objects.filter(user_permission=user_permission).select_related("module")
+        }
+
+        for module_code, module in modules.items():
+            desired_entry = desired.get(module_code)
+            perm = existing.get(module_code)
+            if not desired_entry or not desired_entry["actions"]:
+                if perm:
+                    perm.delete()
+                continue
+            if not perm:
+                perm = UserModulePermission.objects.create(
+                    user_permission=user_permission,
+                    module=module,
+                    allow=desired_entry["allow"],
+                )
+            else:
+                perm.allow = desired_entry["allow"]
+                _save_validated(perm)
+            perm.actions.set([actions[code] for code in desired_entry["actions"]])
+
+    sector_items = payload.get("sector_permissions") if hasattr(payload, "get") else None
+    if sector_items is not None:
+        if not isinstance(sector_items, list):
+            raise AccountsApiError("sector_permissions must be a list")
+
+        from inventory.models import Sector
+
+        sectors = {str(sector.id): sector for sector in Sector.objects.all()}
+        desired_sectors = {}
+        for entry in sector_items:
+            if not isinstance(entry, dict):
+                continue
+            sector_id = clean_string(entry.get("sector_id"))
+            if not sector_id:
+                continue
+            if sector_id not in sectors:
+                raise AccountsApiError(f"Unknown sector {sector_id}")
+            desired_sectors[sector_id] = {
+                "can_view": parse_boolean(entry.get("can_view", False)),
+                "can_edit": parse_boolean(entry.get("can_edit", False)),
+                "can_delete": parse_boolean(entry.get("can_delete", False)),
+            }
+
+        existing_sector = {str(p.sector_id): p for p in SectorPermission.objects.filter(user=target_user)}
+
+        for sector_id, config in desired_sectors.items():
+            perm = existing_sector.get(sector_id)
+            if not perm:
+                perm = SectorPermission.objects.create(
+                    user=target_user,
+                    sector=sectors[sector_id],
+                    can_view=config["can_view"],
+                    can_edit=config["can_edit"],
+                    can_delete=config["can_delete"],
+                )
+            else:
+                perm.can_view = config["can_view"]
+                perm.can_edit = config["can_edit"]
+                perm.can_delete = config["can_delete"]
+                _save_validated(perm)
+
+        for sector_id, perm in existing_sector.items():
+            if sector_id not in desired_sectors:
+                perm.delete()
+
+    return user_permissions_for_admin(user, profile_user_id)

@@ -52,7 +52,6 @@ export function InventoryDiscrepanciesPage() {
     <div className="module-page-stack">
       <ModulePageHeader
         actions={<span className="module-chip">{visibleDiscrepancies.length} visibles</span>}
-        description="Cola operativa para revisar y cerrar diferencias sin frenar la carga diaria."
         eyebrow="Inventario / Diferencias"
         title="Diferencias"
       />
@@ -62,7 +61,7 @@ export function InventoryDiscrepanciesPage() {
       <section className="module-page-grid">
         <div className="module-main-stack">
           <ModuleTableSection
-            description="La causa puede estar vacia. El ajuste solo se cierra con rol aprobador."
+            description="El ajuste se cierra solo con rol aprobador."
             title="Cola de diferencias"
             toolbar={
               <ModuleToolbar>
@@ -144,7 +143,6 @@ export function InventoryDiscrepanciesPage() {
 
         <aside className="module-side-stack">
           <ModuleSurface
-            description="La operacion diaria sigue siendo liviana, pero el cierre queda auditado."
             title="Cierre controlado"
           >
             <div className="module-list">

@@ -64,7 +64,10 @@ function matchesProfile(profile, query) {
   return target.includes(query)
 }
 
-export function ProfileUsersPage() {
+export function ProfileUsersPage({
+  eyebrow = 'Perfil / Usuarios',
+  title = 'Administracion de perfiles',
+}) {
   const { refreshSession, searchValue, user } = useOutletContext()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -216,23 +219,20 @@ export function ProfileUsersPage() {
             Nuevo usuario
           </button>
         }
-        description="Alta, edicion, activacion y control basico de accesos para el equipo."
-        eyebrow="Perfil / Usuarios"
-        title="Administracion de perfiles"
+        eyebrow={eyebrow}
+        title={title}
       />
 
       <PanelMessage error={feedback.error} success={feedback.success} />
 
       {loading ? (
         <ModuleEmptyState
-          description="Cargando usuarios, roles y sectores."
           title="Preparando administracion"
         />
       ) : (
         <section className="module-page-grid profile-admin-grid">
           <div className="module-main-stack">
             <ModuleTableSection
-              description="Usuarios visibles para administracion interna."
               title="Perfiles"
             >
               {filteredProfiles.length ? (
@@ -448,7 +448,6 @@ export function ProfileUsersPage() {
 
             {panelMode === 'edit' && selectedProfileId ? (
               <ModuleActionPanel
-                description="Cambia la contrasena sin salir de esta vista."
                 title="Reset de contrasena"
               >
                 <div className="ops-form">

@@ -137,7 +137,7 @@ export function ModulePageHeader({ actions, description, eyebrow, title }) {
       <div className="module-page-header-copy">
         {eyebrow ? <p className="module-page-eyebrow">{eyebrow}</p> : null}
         <h2>{title}</h2>
-        <p>{description}</p>
+        {description ? <p>{description}</p> : null}
       </div>
       {actions ? <div className="module-page-actions">{actions}</div> : null}
     </div>
@@ -218,7 +218,7 @@ export function ModuleActionPanel({
       <div className="module-surface-head">
         <div className="module-surface-copy">
           <strong>{title}</strong>
-          <p>{description}</p>
+          {description ? <p>{description}</p> : null}
         </div>
         {onToggle ? (
           <button className="inline-action" onClick={onToggle} type="button">
@@ -237,7 +237,7 @@ export function ModuleEmptyState({ description, title }) {
   return (
     <div className="module-empty-state">
       <strong>{title}</strong>
-      <p>{description}</p>
+      {description ? <p>{description}</p> : null}
     </div>
   )
 }

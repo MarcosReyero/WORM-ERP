@@ -69,7 +69,6 @@ export function InventoryOverviewPage() {
             </Link>
           </>
         }
-        description="Entrada principal del modulo: stock actual, alertas y pendientes sin ruido visual."
         eyebrow="Inventario / Resumen"
         title="Resumen operativo"
       />
@@ -84,7 +83,6 @@ export function InventoryOverviewPage() {
                 Abrir stock completo
               </Link>
             }
-            description="Existencias ordenadas por prioridad operativa: bajo minimo primero y despues orden alfabetico."
             title="Stock actual"
           >
             {overviewArticles.length ? (
@@ -134,7 +132,6 @@ export function InventoryOverviewPage() {
 
         <aside className="module-side-stack">
           <ModuleSurface
-            description="Prioridades inmediatas de reposicion."
             title="Alertas de stock"
           >
             {lowStockArticles.length ? (
@@ -157,7 +154,6 @@ export function InventoryOverviewPage() {
           </ModuleSurface>
 
           <ModuleSurface
-            description="Herramientas y unidades fuera del deposito."
             title="Prestamos abiertos"
           >
             {openCheckouts.length ? (
@@ -178,7 +174,6 @@ export function InventoryOverviewPage() {
           </ModuleSurface>
 
           <ModuleSurface
-            description="Ultimos registros generados por el equipo."
             title="Actividad reciente"
           >
             {recentMovements.length ? (
@@ -199,7 +194,6 @@ export function InventoryOverviewPage() {
           </ModuleSurface>
 
           <ModuleSurface
-            description="Conteos y diferencias que todavia requieren revision."
             title="Control pendiente"
           >
             {openDiscrepancies.length || openCounts.length ? (

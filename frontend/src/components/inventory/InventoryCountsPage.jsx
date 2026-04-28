@@ -84,7 +84,6 @@ export function InventoryCountsPage() {
             </Link>
           </>
         }
-        description="Primero se cuenta. Si aparece diferencia, la revision queda pendiente y se resuelve despues."
         eyebrow="Inventario / Conteos"
         title="Conteos"
       />
@@ -93,7 +92,6 @@ export function InventoryCountsPage() {
         <div className="module-main-stack">
           <ModuleTableSection
             actions={<span className="module-chip">{visibleSessions.length} sesiones visibles</span>}
-            description="Cuando una linea no coincide, la sesion pasa a revision."
             title="Sesiones de conteo"
           >
             {visibleSessions.length ? (
@@ -138,7 +136,6 @@ export function InventoryCountsPage() {
 
         <div className="module-side-stack">
           <ModuleActionPanel
-            description="Alta corta de sesion con una primera linea para capturar el conteo real."
             isOpen={showCountForm}
             onToggle={() => setShowCountForm((current) => !current)}
             title="Conteo rapido"
@@ -261,25 +258,6 @@ export function InventoryCountsPage() {
           </form>
           </ModuleActionPanel>
 
-          <ModuleSurface
-            description="Contar no obliga a justificar en el momento."
-            title="Regla operativa"
-          >
-            <div className="module-list">
-              <div className="module-list-item">
-                <div>
-                  <strong>Conteo primero</strong>
-                  <p>Si hay diferencia, la sesion queda en revision automaticamente.</p>
-                </div>
-              </div>
-              <div className="module-list-item">
-                <div>
-                  <strong>Resolucion despues</strong>
-                  <p>El cierre de ajuste se hace desde la seccion de Diferencias.</p>
-                </div>
-              </div>
-            </div>
-          </ModuleSurface>
         </div>
       </section>
     </div>

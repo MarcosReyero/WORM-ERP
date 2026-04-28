@@ -85,7 +85,6 @@ export function InventoryCheckoutsPage() {
     <div className="module-page-stack">
       <ModulePageHeader
         actions={<span className="module-chip">{openCheckouts.length} prestamos abiertos</span>}
-        description="Control de herramientas y unidades asignables con devolucion directa."
         eyebrow="Inventario / Prestamos"
         title="Prestamos"
       />
@@ -95,7 +94,6 @@ export function InventoryCheckoutsPage() {
       <section className="module-page-grid">
         <div className="module-main-stack">
           <ModuleTableSection
-            description="Si la unidad vuelve, el retorno la deja otra vez disponible."
             title="Prestamos abiertos"
           >
             {openCheckouts.length ? (
@@ -152,7 +150,6 @@ export function InventoryCheckoutsPage() {
 
           <ModuleSurface
             actions={<span className="module-chip">{visibleUnits.length} unidades visibles</span>}
-            description="Herramientas y activos individuales dentro del modulo."
             title="Unidades trazadas"
           >
             {visibleUnits.length ? (
@@ -192,12 +189,7 @@ export function InventoryCheckoutsPage() {
           </ModuleSurface>
         </div>
 
-        <ModuleActionPanel
-          description="Selecciona una unidad disponible y el receptor. Nada mas para un prestamo normal."
-          isOpen={showCheckoutForm}
-          onToggle={() => setShowCheckoutForm((current) => !current)}
-          title="Prestamo rapido"
-        >
+        <ModuleActionPanel isOpen={showCheckoutForm} onToggle={() => setShowCheckoutForm((current) => !current)} title="Prestamo rapido">
           <form className="ops-form" onSubmit={handleCheckoutSubmit}>
             <div className="field-grid">
               <label className="field-span-2">

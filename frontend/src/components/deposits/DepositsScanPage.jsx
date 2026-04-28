@@ -342,14 +342,12 @@ export function DepositsScanPage() {
       <ModulePageHeader
         eyebrow="Depositos / Registro"
         title="Registro de pallets"
-        description="Operacion unificada de escaneo QR y alta manual."
       />
 
       {canUseScanTools ? (
         <section className="deposits-operations-grid">
           <ModuleSurface
             title="Captura QR"
-            description="Camara y deteccion de codigo para lectura operativa."
           >
             <div className="deposits-scan-camera">
               <video className="deposits-camera-preview" muted playsInline ref={videoRef} />
@@ -369,7 +367,6 @@ export function DepositsScanPage() {
 
           <ModuleSurface
             title="Ultimo resultado"
-            description="Respuesta de backend con estado del pallet."
           >
             {result?.item ? (
               <div className="deposits-result-card deposits-result-card--erp">
@@ -411,7 +408,6 @@ export function DepositsScanPage() {
         <ModuleSurface
           className="deposits-operation-surface"
           title="Operacion por QR"
-          description="Lookup, registro por scan y reubicacion."
         >
           <form className="deposits-form deposits-form--scan" onSubmit={handleScanSubmit}>
             <PanelMessage error={feedback.error} success={feedback.success} />
@@ -623,7 +619,6 @@ export function DepositsScanPage() {
         <ModuleSurface
           className="deposits-operation-surface"
           title="Alta manual de pallet"
-          description="Registro completo sin depender de QR."
         >
           <form className="deposits-form deposits-form--registry" onSubmit={handleManualSubmit}>
             <PanelMessage error={manualFeedback.error} success={manualFeedback.success} />
@@ -749,7 +744,6 @@ export function DepositsScanPage() {
       <section className="deposits-summary-grid">
         <ModuleSurface
           title="Eventos recientes"
-          description="Contexto operativo integrado."
         >
           {recentEvents.length ? (
             <div className="module-table-wrap deposits-table-wrap deposits-table-wrap--compact">
@@ -779,7 +773,6 @@ export function DepositsScanPage() {
 
         <ModuleSurface
           title="Guia rapida"
-          description="Secuencia recomendada de operacion."
         >
           <ol className="deposits-quick-list">
             <li>Escanea o ingresa QR manual.</li>

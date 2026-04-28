@@ -3,13 +3,12 @@ import { ModuleWorkspaceLayout } from '../modules/ModuleWorkspace.jsx'
 
 export function ProfileLayout() {
   const parentContext = useOutletContext()
-  const { user } = parentContext
 
   return (
     <ModuleWorkspaceLayout
       headerTitle=""
       headerSubtitle=""
-      moduleSubtitle="Gestion de cuenta y usuarios del sistema."
+      moduleSubtitle=""
       variant="erp"
       workspaceClassName="profile-workspace erp-platform-workspace"
       moduleTitle="Perfil"
@@ -26,21 +25,6 @@ export function ProfileLayout() {
             },
           ],
         },
-        ...(user?.is_admin
-          ? [
-              {
-                title: 'Administracion',
-                items: [
-                  {
-                    to: '/perfil/usuarios',
-                    label: 'Usuarios',
-                    hint: 'Altas, roles y accesos',
-                    shortLabel: 'U',
-                  },
-                ],
-              },
-            ]
-          : []),
       ]}
     >
       <Outlet context={parentContext} />

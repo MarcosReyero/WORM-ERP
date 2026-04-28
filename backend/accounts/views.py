@@ -9,13 +9,18 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 from .models import UserProfile
 from .services import (
     AccountsApiError,
+    permissions_meta_for_admin,
     create_profile_for_admin,
     get_profile_for_admin,
     list_profiles_for_admin,
     reset_profile_password_for_admin,
+    role_permissions_for_admin,
     serialize_user_profile,
+    save_role_permissions_for_admin,
     update_own_profile,
     update_profile_for_admin,
+    save_user_permissions_for_admin,
+    user_permissions_for_admin,
 )
 
 
@@ -183,5 +188,49 @@ def admin_profile_reset_password(request, profile_user_id):
             _request_payload(request),
         )
         return JsonResponse({"detail": "Password reset", "item": item})
+
+    return _handle_accounts_call(handler)
+
+
+@require_GET
+def admin_permissions_meta(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required"}, status=401)
+
+    return _handle_accounts_call(lambda: JsonResponse(permissions_meta_for_admin(request.user)))
+
+
+@require_http_methods(["GET", "POST"])
+def admin_role_permissions(request, role_code):
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required"}, status=401)
+
+    if request.method == "GET":
+        return _handle_accounts_call(
+            lambda: JsonResponse(role_permissions_for_admin(request.user, role_code))
+        )
+
+    def handler():
+        payload = _request_payload(request)
+        item = save_role_permissions_for_admin(request.user, role_code, payload)
+        return JsonResponse(item)
+
+    return _handle_accounts_call(handler)
+
+
+@require_http_methods(["GET", "POST"])
+def admin_user_permissions(request, profile_user_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required"}, status=401)
+
+    if request.method == "GET":
+        return _handle_accounts_call(
+            lambda: JsonResponse({"item": user_permissions_for_admin(request.user, profile_user_id)})
+        )
+
+    def handler():
+        payload = _request_payload(request)
+        item = save_user_permissions_for_admin(request.user, profile_user_id, payload)
+        return JsonResponse({"item": item})
 
     return _handle_accounts_call(handler)

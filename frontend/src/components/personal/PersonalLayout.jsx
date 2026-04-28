@@ -3,13 +3,12 @@ import { ModuleWorkspaceLayout } from '../modules/ModuleWorkspace.jsx'
 
 export function PersonalLayout() {
   const parentContext = useOutletContext()
-  const { user } = parentContext
 
   return (
     <ModuleWorkspaceLayout
       headerTitle=""
       headerSubtitle=""
-      moduleSubtitle={user ? `Espacio personal de ${user.full_name}.` : 'Espacio personal del usuario.'}
+      moduleSubtitle=""
       variant="erp"
       workspaceClassName="personal-workspace erp-platform-workspace"
       moduleTitle="Personal"

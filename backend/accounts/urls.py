@@ -4,6 +4,9 @@ from .views import (
     admin_profile_detail,
     admin_profile_reset_password,
     admin_profiles,
+    admin_permissions_meta,
+    admin_role_permissions,
+    admin_user_permissions,
     csrf,
     login_view,
     logout_view,
@@ -23,5 +26,12 @@ urlpatterns = [
         "admin/profiles/<int:profile_user_id>/reset-password/",
         admin_profile_reset_password,
         name="admin-profile-reset-password",
+    ),
+    path("admin/permissions/meta/", admin_permissions_meta, name="admin-permissions-meta"),
+    path("admin/permissions/roles/<str:role_code>/", admin_role_permissions, name="admin-role-permissions"),
+    path(
+        "admin/permissions/users/<int:profile_user_id>/",
+        admin_user_permissions,
+        name="admin-user-permissions",
     ),
 ]

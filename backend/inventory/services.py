@@ -1920,6 +1920,24 @@ def build_dashboard(user=None):
                 "badge": "0",
                 "status": "active",
             },
+            *(
+                [
+                    {
+                        "slug": "administracion",
+                        "name": "AdministraciÃ³n",
+                        "description": "Usuarios y permisos",
+                        "color": "#35596f",
+                        "badge": "0",
+                        "status": "active",
+                    }
+                ]
+                if user
+                and (
+                    user.is_superuser
+                    or get_profile(user).role == UserProfile.Role.ADMINISTRATOR
+                )
+                else []
+            ),
             {
                 "slug": "ventas",
                 "name": "Ventas",

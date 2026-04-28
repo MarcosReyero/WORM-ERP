@@ -215,7 +215,6 @@ export function DepositsRegistryPage() {
         <div className="deposits-summary-v2-header-copy">
           <p className="deposits-summary-v2-breadcrumb">Depositos / Resumen</p>
           <h2>Resumen operativo de pallets</h2>
-          <p>Consulta stock palletizado, movimiento reciente y contexto del deposito activo.</p>
         </div>
         <div className="deposits-summary-v2-metrics">
           <SummaryMetric label="Pallets visibles" value={filteredItems.length} />

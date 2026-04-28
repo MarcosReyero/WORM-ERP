@@ -21,6 +21,10 @@ import { PersonalReportsPage } from './components/personal/PersonalReportsPage.j
 import { ProfileDetailsPage } from './components/profile/ProfileDetailsPage.jsx'
 import { ProfileLayout } from './components/profile/ProfileLayout.jsx'
 import { ProfileUsersPage } from './components/profile/ProfileUsersPage.jsx'
+import { AdminLayout } from './components/admin/AdminLayout.jsx'
+import { AdminPermissionsPage } from './components/admin/AdminPermissionsPage.jsx'
+import { AdminRolesGuidePage } from './components/admin/AdminRolesGuidePage.jsx'
+import { AdminUsersPage } from './components/admin/AdminUsersPage.jsx'
 import { TiaAiReportsPage } from './components/tia/TiaAiReportsPage.jsx'
 import { TiaLayout } from './components/tia/TiaLayout.jsx'
 import { TiaVariableDashboardPage } from './components/tia/TiaVariableDashboardPage.jsx'
@@ -213,8 +217,8 @@ function App() {
     return (
       <div className="boot-screen">
         <div className="boot-card">
-          <span className="boot-logo">N</span>
-          <p className="boot-eyebrow">Nodum ERP</p>
+          <span className="boot-logo">W</span>
+          <p className="boot-eyebrow">Worm ERP</p>
           <h1>Inicializando panel</h1>
           <p>Comprobando sesion, modulos y datos del inventario.</p>
         </div>
@@ -256,7 +260,13 @@ function App() {
         <Route path="mensajes" element={<MessagesPage />} />
         <Route path="perfil" element={<ProfileLayout />}>
           <Route index element={<ProfileDetailsPage />} />
-          <Route path="usuarios" element={<ProfileUsersPage />} />
+          <Route path="usuarios" element={<Navigate replace to="/administracion/usuarios" />} />
+        </Route>
+        <Route path="administracion" element={<AdminLayout />}>
+          <Route index element={<Navigate replace to="usuarios" />} />
+          <Route path="usuarios" element={<AdminUsersPage />} />
+          <Route path="permisos" element={<AdminPermissionsPage />} />
+          <Route path="guia-roles" element={<AdminRolesGuidePage />} />
         </Route>
         <Route path="inventario" element={<InventoryLayout />}>
           <Route index element={<Navigate replace to="stock" />} />

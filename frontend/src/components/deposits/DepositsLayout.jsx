@@ -96,7 +96,7 @@ export function DepositsLayout() {
       headerTitle=""
       headerSubtitle=""
       moduleTitle={depositsState.data?.header?.title || 'Depositos'}
-      moduleSubtitle={depositsState.data?.header?.subtitle || 'Operacion de pallets y movimientos'}
+      moduleSubtitle=""
       variant="erp"
       workspaceClassName="deposits-workspace"
       sidebarActions={
@@ -148,7 +148,6 @@ export function DepositsLayout() {
       {depositsState.loading && !depositsState.data ? (
         <div className="module-empty-state">
           <strong>Cargando Depositos</strong>
-          <p>Armando pallets, layout fisico y ultimos eventos de escaneo.</p>
         </div>
       ) : (
         <Outlet

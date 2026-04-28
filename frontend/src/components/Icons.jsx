@@ -14,7 +14,7 @@ function BaseIcon({ children }) {
 }
 
 export function BrandIcon() {
-  return <span className="brand-mark">E</span>
+  return <span className="brand-mark">W</span>
 }
 
 export function SearchIcon() {
@@ -218,6 +218,15 @@ export function ModuleIcon({ slug }) {
         <path d="M9.5 10.5h.01" />
         <path d="M14.5 10.5h.01" />
         <path d="M10 14h4" />
+      </BaseIcon>
+    )
+  }
+
+  if (slug === 'administracion') {
+    return (
+      <BaseIcon>
+        <path d="M12 3 19 6v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z" />
+        <path d="M9.5 12.5 11.2 14.2 14.8 10.6" />
       </BaseIcon>
     )
   }

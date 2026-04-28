@@ -7,6 +7,7 @@ const ACTIVE_MODULE_ROUTES = {
   depositos: '/depositos',
   personal: '/personal',
   tia: '/tia',
+  administracion: '/administracion',
 }
 
 const TIA_MODULE = {

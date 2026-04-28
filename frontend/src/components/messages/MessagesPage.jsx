@@ -504,7 +504,6 @@ export function MessagesPage() {
   if (loading && !overview) {
     return (
       <ModuleEmptyState
-        description="Cargando conversaciones, contactos y alertas."
         title="Mensajes"
       />
     )
@@ -514,7 +513,6 @@ export function MessagesPage() {
     <div className="module-page-stack messages-page-shell">
       <ModulePageHeader
         actions={refreshing ? <span className="messages-top-pill">Actualizando</span> : null}
-        description="Mensajeria interna entre perfiles del ERP con alarmas y adjuntos."
         eyebrow="Comunicacion"
         title="Mensajes"
       />

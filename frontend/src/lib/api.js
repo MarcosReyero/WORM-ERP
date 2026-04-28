@@ -426,6 +426,38 @@ export function resetAdminProfilePassword(profileId, payload) {
   })
 }
 
+export function fetchAdminPermissionsMeta() {
+  return request('/api/auth/admin/permissions/meta/')
+}
+
+export function fetchAdminRolePermissions(role) {
+  return request(`/api/auth/admin/permissions/roles/${encodeURIComponent(role)}/`)
+}
+
+export function saveAdminRolePermissions(role, payload) {
+  return request(`/api/auth/admin/permissions/roles/${encodeURIComponent(role)}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function fetchAdminUserPermissions(userId) {
+  return request(`/api/auth/admin/permissions/users/${userId}/`)
+}
+
+export function saveAdminUserPermissions(userId, payload) {
+  return request(`/api/auth/admin/permissions/users/${userId}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
 export function fetchMessagesOverview() {
   return request('/api/messages/overview/')
 }

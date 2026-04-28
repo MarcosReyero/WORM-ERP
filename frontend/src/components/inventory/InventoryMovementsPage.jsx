@@ -1,5 +1,5 @@
-import { useDeferredValue, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useLocation, useOutletContext } from 'react-router-dom'
 import { createMovement } from '../../lib/api.js'
 import { CloseIcon, SearchIcon } from '../Icons.jsx'
 import {
@@ -54,6 +54,8 @@ function createEmptyMovementLine(articleId = '') {
     expiry_date: '',
   }
 }
+
+const EMPTY_ARRAY = []
 
 function movementNeedsReason(movementType) {
   return [
@@ -133,6 +135,7 @@ function sanitizeMovementPayload(form, article) {
 
 export function InventoryMovementsPage() {
   const { inventoryOverview, refreshInventoryModule, searchValue } = useOutletContext()
+  const location = useLocation()
   const deferredQuery = useDeferredValue(searchValue.trim().toLowerCase())
   const [articleSearch, setArticleSearch] = useState('')
   const deferredArticleQuery = useDeferredValue(articleSearch.trim().toLowerCase())
@@ -144,8 +147,9 @@ export function InventoryMovementsPage() {
     MOVEMENT_MODE_CONFIG.egress.defaultType,
   )
   const [movementLines, setMovementLines] = useState([])
+  const [presetKey, setPresetKey] = useState('')
 
-  const articles = inventoryOverview?.articles ?? []
+  const articles = inventoryOverview?.articles || EMPTY_ARRAY
   const catalogs = inventoryOverview?.catalogs ?? {
     movement_types: [],
     locations: [],
@@ -156,7 +160,10 @@ export function InventoryMovementsPage() {
   const permissions = inventoryOverview?.permissions ?? { can_record_movement: false }
   const movementMode = getMovementMode(registerMovementType)
   const movementModeConfig = MOVEMENT_MODE_CONFIG[movementMode]
-  const articlesById = new Map(articles.map((article) => [String(article.id), article]))
+  const articlesById = useMemo(
+    () => new Map(articles.map((article) => [String(article.id), article])),
+    [articles],
+  )
   const selectedArticleIds = new Set(movementLines.map((line) => String(line.article_id)))
   const unsupportedLine = movementLines.find((line) => {
     const article = articlesById.get(String(line.article_id))
@@ -186,6 +193,25 @@ export function InventoryMovementsPage() {
     movementLines.length > 0 &&
     pendingLinesWithoutQuantity === 0 &&
     !unsupportedMovementMessage
+
+  useEffect(() => {
+    const preset = location.state?.preset
+    if (!preset || presetKey === location.key) {
+      return
+    }
+
+    const nextMode = preset.mode === 'ingress' ? 'ingress' : 'egress'
+    const nextArticleId = preset.articleId ? String(preset.articleId) : ''
+    if (!nextArticleId || !articlesById.has(nextArticleId)) {
+      setPresetKey(location.key)
+      return
+    }
+
+    setPresetKey(location.key)
+    setActiveView('form')
+    applyMovementMode(nextMode)
+    setMovementLines([createEmptyMovementLine(nextArticleId)])
+  }, [articlesById, location.key, location.state, presetKey])
 
   async function handleMovementSubmit(event) {
     event.preventDefault()
@@ -285,7 +311,6 @@ export function InventoryMovementsPage() {
     <div className="module-page-stack">
       <ModulePageHeader
         actions={<span className="module-chip">{visibleMovements.length} movimientos visibles</span>}
-        description="Historial y registro operativo, limitado por ahora a ingresos y egresos."
         eyebrow="Inventario / Movimientos"
         title="Movimientos"
       />
@@ -314,7 +339,6 @@ export function InventoryMovementsPage() {
       {activeView === 'history' ? (
         <section className="module-page-stack">
           <ModuleTableSection
-            description="Se muestran origen, destino, actor y detalle cuando aplica."
             title="Historial operativo"
             toolbar={
               <ModuleToolbar>
@@ -410,7 +434,6 @@ export function InventoryMovementsPage() {
                   <article className="movement-panel movement-panel--search">
                     <div className="movement-panel-head">
                       <strong>Articulo</strong>
-                      <p>Busca por nombre o codigo y selecciona lo que vas a mover.</p>
                     </div>
                     <label className="movement-search-field" htmlFor="movement-article-search">
                       Buscar articulo

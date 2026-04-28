@@ -89,7 +89,7 @@ export function InventoryLayout() {
       headerTitle=""
       headerSubtitle=""
       moduleTitle={inventoryState.data?.header?.title || 'Inventario'}
-      moduleSubtitle={inventoryState.data?.header?.subtitle || 'Operacion de stock, movimientos y control'}
+      moduleSubtitle=""
       variant="erp"
       workspaceClassName="inventory-workspace erp-platform-workspace"
       sidebarActions={
@@ -190,7 +190,6 @@ export function InventoryLayout() {
       {inventoryState.loading && !inventoryState.data ? (
         <div className="module-empty-state">
           <strong>Cargando Inventario</strong>
-          <p>Armando el resumen operativo, el stock y la trazabilidad del modulo.</p>
         </div>
       ) : (
         <Outlet

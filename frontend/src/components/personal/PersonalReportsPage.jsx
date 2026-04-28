@@ -418,7 +418,6 @@ export function PersonalReportsPage() {
             </button>
           </>
         }
-        description="Selecciona informes por fecha o dia, desplega cada card y borra en grupo o todos."
         eyebrow="Personal / Informes"
         title="Informes"
       />
@@ -426,7 +425,6 @@ export function PersonalReportsPage() {
       <section className="module-page-grid">
         <div className="module-main-stack">
           <ModuleSurface
-            description="Filtra por fecha/dia, desplega para ver actividades. Usa los cuadraditos para borrar en grupo."
             title="Bandeja de informes"
           >
             <ModuleToolbar>
@@ -580,7 +578,6 @@ export function PersonalReportsPage() {
 
           {importSummary?.items?.length ? (
             <ModuleSurface
-              description="Resumen de la ultima importacion realizada."
               title="Ultima importacion"
             >
               <div className="module-list import-preview-list">
@@ -613,7 +610,6 @@ export function PersonalReportsPage() {
 
         <aside className="module-side-stack">
           <ModuleActionPanel
-            description="Agrega un informe nuevo o ajusta lo importado desde Excel."
             title={panelMode === 'edit' ? 'Editar informe' : 'Nuevo informe'}
           >
             <form className="ops-form" onSubmit={handleSubmitReport}>

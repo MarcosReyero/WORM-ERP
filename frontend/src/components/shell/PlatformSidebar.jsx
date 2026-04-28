@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   BoxesIcon,
@@ -22,6 +23,9 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
@@ -76,6 +80,12 @@ const MODULE_META = {
     shortLabel: 'T',
     to: '/tia',
   },
+  administracion: {
+    icon: ShieldAlertIcon,
+    label: 'Administracion',
+    shortLabel: 'A',
+    to: '/administracion',
+  },
 }
 
 function SidebarNavLink({ item }) {
@@ -119,12 +129,45 @@ function SidebarNavGroup({ group }) {
   )
 }
 
+function SidebarContextualNav({ groups }) {
+  const location = useLocation()
+
+  if (!groups?.length) {
+    return null
+  }
+
+  return (
+    <SidebarMenuSub>
+      {groups.map((group) => (
+        <Fragment key={group.title}>
+          <SidebarMenuSubItem className="platform-sidebar-sub-group-label">
+            <span className="platform-sidebar-sub-label">{group.title}</span>
+          </SidebarMenuSubItem>
+          {group.items.map((item) => {
+            const isActive = routeIsActive(location.pathname, item)
+            return (
+              <SidebarMenuSubItem key={item.to}>
+                <SidebarMenuSubButton asChild isActive={isActive} size="sm">
+                  <Link to={item.to}>
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            )
+          })}
+        </Fragment>
+      ))}
+    </SidebarMenuSub>
+  )
+}
+
 export function PlatformSidebar({
   dashboardData,
   onLogout,
   sidebarConfig,
   user,
 }) {
+  const location = useLocation()
   const globalGroups = [
     {
       title: 'Principal',
@@ -159,6 +202,7 @@ export function PlatformSidebar({
   const activeModuleItems = (dashboardData?.modules || [])
     .filter((module) => module.status === 'active' && MODULE_META[module.slug])
     .map((module) => ({
+      slug: module.slug,
       ...MODULE_META[module.slug],
       hint: module.description,
       badge: module.slug === 'inventario'
@@ -166,17 +210,8 @@ export function PlatformSidebar({
         : 0,
     }))
 
-  const moduleGroups = activeModuleItems.length
-    ? [
-        {
-          title: 'Modulos',
-          items: activeModuleItems,
-        },
-      ]
-    : []
-
   const contextualGroups = (sidebarConfig?.navGroups || []).filter((group) => group.items?.length)
-  const allGroups = [...globalGroups, ...moduleGroups, ...contextualGroups]
+  const allGroups = [...globalGroups]
 
   return (
     <Sidebar
@@ -187,11 +222,11 @@ export function PlatformSidebar({
       <SidebarHeader className="platform-sidebar-header">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip="Nodum ERP">
+            <SidebarMenuButton asChild size="lg" tooltip="WORM">
               <Link to="/">
-                <span className="platform-sidebar-brand-mark">N</span>
+                <span className="platform-sidebar-brand-mark">W</span>
                 <span className="platform-sidebar-brand-copy">
-                  <strong>Nodum ERP</strong>
+                  <strong>WORM</strong>
                   <small>Sistema interno</small>
                 </span>
               </Link>
@@ -208,6 +243,41 @@ export function PlatformSidebar({
         {allGroups.map((group) => (
           <SidebarNavGroup group={group} key={group.title} />
         ))}
+
+        {activeModuleItems.length ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Modulos</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {activeModuleItems.map((item) => {
+                  const isActive = routeIsActive(location.pathname, item)
+                  const badgeLabel = formatSidebarBadge(item.badge)
+                  const Icon = item.icon
+                  const tooltip = item.hint ? `${item.label} - ${item.hint}` : item.label
+
+                  return (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
+                        <Link to={item.to}>
+                          {Icon ? (
+                            <Icon className="platform-sidebar-item-icon" />
+                          ) : (
+                            <span className="platform-sidebar-item-mark">
+                              {item.shortLabel || item.label.slice(0, 1)}
+                            </span>
+                          )}
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      {badgeLabel ? <SidebarMenuBadge>{badgeLabel}</SidebarMenuBadge> : null}
+                      {isActive ? <SidebarContextualNav groups={contextualGroups} /> : null}
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
       </SidebarContent>
 
       <SidebarFooter className="platform-sidebar-footer">
