@@ -80,7 +80,7 @@ function buildUserMatrix(modules = [], actions = [], userPermissions = []) {
 }
 
 export function AdminPermissionsPage() {
-  const { user } = useOutletContext()
+  const { refreshSession, refreshWorkspace, user } = useOutletContext()
   const [metaState, setMetaState] = useState({ loading: true, error: '', data: null })
   const [profilesState, setProfilesState] = useState({ loading: true, error: '', items: [] })
   const [roleState, setRoleState] = useState({ loading: false, error: '', items: [] })
@@ -298,6 +298,12 @@ export function AdminPermissionsPage() {
       const refreshed = await fetchAdminRolePermissions(selectedRole)
       setRoleState({ loading: false, error: '', items: refreshed.items || [] })
       setFeedback({ error: '', success: 'Permisos de rol guardados.' })
+      if (refreshSession) {
+        refreshSession().catch(() => null)
+      }
+      if (refreshWorkspace) {
+        refreshWorkspace().catch(() => null)
+      }
     } catch (error) {
       setFeedback({ error: error.message || 'No se pudieron guardar.', success: '' })
     } finally {
@@ -331,6 +337,12 @@ export function AdminPermissionsPage() {
       const refreshed = await fetchAdminUserPermissions(selectedUserId)
       setUserState({ loading: false, error: '', item: refreshed.item })
       setFeedback({ error: '', success: 'Permisos de usuario guardados.' })
+      if (refreshSession) {
+        refreshSession().catch(() => null)
+      }
+      if (refreshWorkspace) {
+        refreshWorkspace().catch(() => null)
+      }
     } catch (error) {
       setFeedback({ error: error.message || 'No se pudieron guardar.', success: '' })
     } finally {
@@ -480,6 +492,10 @@ export function AdminPermissionsPage() {
                 <input checked={inheritRole} onChange={(event) => setInheritRole(event.target.checked)} type="checkbox" />
                 Hereda permisos del rol
               </label>
+
+              <p className="module-empty-copy">
+                Los permisos de sectores no habilitan módulos; solo limitan qué sectores puede operar el usuario dentro del inventario.
+              </p>
             </div>
 
             {userState.loading ? (

@@ -24,7 +24,10 @@ def has_module_permission(user, module_code, action_code="view"):
     Returns:
         bool: True si tiene permiso, False en caso contrario
     """
-    if user.is_superuser or user.is_staff:
+    # Superuser siempre tiene acceso total.
+    # Los usuarios `is_staff` NO se tratan como bypass: la plataforma
+    # usa `RolePermission`/`UserModulePermission` para controlar acceso.
+    if user.is_superuser:
         return True
 
     if not user.is_active:
@@ -106,7 +109,7 @@ def has_sector_permission(user, sector, action="view"):
     Returns:
         bool: True si tiene permiso
     """
-    if user.is_superuser or user.is_staff:
+    if user.is_superuser:
         return True
 
     sector_perm = SectorPermission.objects.filter(user=user, sector=sector).first()
