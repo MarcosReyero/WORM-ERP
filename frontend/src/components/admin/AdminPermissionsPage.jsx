@@ -31,6 +31,11 @@ const HUB_PERMISSION_GROUPS = [
     ],
   },
   {
+    key: 'compras',
+    title: 'Compras',
+    moduleCodes: ['purchasing'],
+  },
+  {
     key: 'depositos',
     title: 'Depositos',
     moduleCodes: [
@@ -423,7 +428,7 @@ export function AdminPermissionsPage() {
                             <div className="permissions-module-row is-missing" key={moduleCode}>
                               <div className="permissions-module-head">
                                 <strong>{moduleCode}</strong>
-                                <span className="module-empty-copy">No existe en catÃ¡logo</span>
+                                <span className="module-empty-copy">No existe en catálogo</span>
                               </div>
                             </div>
                           )

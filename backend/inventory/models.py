@@ -140,6 +140,11 @@ class Supplier(AuditedModel):
     phone = models.CharField(max_length=40, blank=True)
     email = models.EmailField(blank=True)
     address = models.CharField(max_length=255, blank=True)
+    availability_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Tiempo estimado de disponibilidad/entrega en días (lead time).",
+    )
     observations = models.TextField(blank=True)
 
     class Meta:
@@ -470,6 +475,67 @@ class SafetyStockAlertRule(AuditedModel):
         return f"Alarma {self.article.internal_code}"
 
 
+class MinimumStockAlarmConfig(AuditedModel):
+    key = models.CharField(max_length=32, unique=True, default="purchasing_default")
+    is_enabled = models.BooleanField(default=True)
+    recipients = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="minimum_stock_alarm_configs",
+    )
+    additional_emails = models.TextField(blank=True)
+    notify_email = models.BooleanField(default=True)
+    notify_telegram = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+    last_notified_at = models.DateTimeField(null=True, blank=True)
+    last_email_error = models.TextField(blank=True)
+    last_telegram_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["key"]
+        verbose_name = "Alarma global por stock minimo"
+        verbose_name_plural = "Alarmas globales por stock minimo"
+
+    def __str__(self):
+        return f"Config alarma stock minimo ({self.key})"
+
+
+class MinimumStockAlarmState(AuditedModel):
+    class AlarmStatus(models.TextChoices):
+        MONITORING = "monitoring", "En monitoreo"
+        TRIGGERED = "triggered", "Activada"
+
+    article = models.OneToOneField(
+        Article,
+        on_delete=models.CASCADE,
+        related_name="minimum_stock_alarm_state",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=AlarmStatus.choices,
+        default=AlarmStatus.MONITORING,
+    )
+    last_stock_value = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        null=True,
+        blank=True,
+    )
+    triggered_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    last_notified_at = models.DateTimeField(null=True, blank=True)
+    last_email_error = models.TextField(blank=True)
+    last_telegram_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["article__name"]
+        verbose_name = "Estado alarma stock minimo"
+        verbose_name_plural = "Estados alarmas stock minimo"
+
+    def __str__(self):
+        return f"Estado alarma {self.article.internal_code}"
+
+
 class MinimumStockDigestConfig(AuditedModel):
     class Frequency(models.TextChoices):
         DAILY = "daily", "Diario"
@@ -557,9 +623,12 @@ class FullStockReportConfig(AuditedModel):
         related_name="inventory_full_stock_report_configs",
     )
     additional_emails = models.TextField(blank=True)
+    notify_email = models.BooleanField(default=True)
+    notify_telegram = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
     last_notified_at = models.DateTimeField(null=True, blank=True)
     last_email_error = models.TextField(blank=True)
+    last_telegram_error = models.TextField(blank=True)
     last_summary_count = models.PositiveIntegerField(null=True, blank=True)
     last_period_key = models.CharField(max_length=64, blank=True)
     inflight_period_key = models.CharField(max_length=64, blank=True)

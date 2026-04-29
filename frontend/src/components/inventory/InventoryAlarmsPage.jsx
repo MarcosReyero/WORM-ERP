@@ -789,7 +789,7 @@ export function InventoryAlarmsPage() {
                     }))}
                     value={safetyForm.article_id}
                     onChange={(id) => handleSelectSafetyArticle(id)}
-                    placeholder="Buscar artÃ­culo..."
+                    placeholder="Buscar artículo..."
                   />
                 </label>
 
@@ -1060,25 +1060,25 @@ export function InventoryAlarmsPage() {
                           key: 'scheduler',
                           label: 'Runner',
                           state: automationStatus?.scheduler,
-                          description: 'Proceso ejecutor central de la automatizaciÃ³n. Verifica cada 60s si hay tareas pendientes (reconciliaciÃ³n, envÃ­o de digests).'
+                          description: 'Proceso ejecutor central de la automatización. Verifica cada 60s si hay tareas pendientes (reconciliación, envío de digests).'
                         },
                         {
                           key: 'minimum_stock_reconcile',
                           label: 'Reconciliacion',
                           state: automationStatus?.minimum_stock_reconcile,
-                          description: 'EvalÃºa todos los artÃ­culos y actualiza su estado de alerta segÃºn el stock actual. Se ejecuta cada 10 minutos.'
+                          description: 'Evalúa todos los artículos y actualiza su estado de alerta según el stock actual. Se ejecuta cada 10 minutos.'
                         },
                         {
                           key: 'minimum_stock_digest',
                           label: 'Digest',
                           state: automationStatus?.minimum_stock_digest,
-                          description: 'EnvÃ­a resumen periÃ³dico de artÃ­culos en stock mÃ­nimo. Se ejecuta segÃºn la configuraciÃ³n (diario/semanal a la hora especificada).'
+                          description: 'Envía resumen periódico de artículos en stock mínimo. Se ejecuta según la configuración (diario/semanal a la hora especificada).'
                         },
                         {
                           key: 'full_stock_report',
                           label: 'Reporte stock',
                           state: automationStatus?.full_stock_report,
-                          description: 'EnvÃ­a el reporte periÃ³dico del stock completo en Excel. Se ejecuta segÃºn la configuraciÃ³n (diario/semanal a la hora especificada).'
+                          description: 'Envía el reporte periódico del stock completo en Excel. Se ejecuta según la configuración (diario/semanal a la hora especificada).'
                         },
                       ].map((item) => (
                         <div className="alarm-automation-item" key={item.key}>
@@ -1089,7 +1089,7 @@ export function InventoryAlarmsPage() {
                                 type="button"
                                 className="info-button"
                                 onClick={() => setExpandedTooltip(expandedTooltip === item.key ? null : item.key)}
-                                title="Ver explicaciÃ³n"
+                                title="Ver explicación"
                               >
                                 ?
                               </button>

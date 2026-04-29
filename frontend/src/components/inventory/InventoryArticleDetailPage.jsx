@@ -316,6 +316,11 @@ export function InventoryArticleDetailPage() {
                   <div className="record-detail-item">
                     <span>Proveedor habitual</span>
                     <strong>{article.supplier || '-'}</strong>
+                    <small>
+                      {article.availability_days !== null && article.availability_days !== undefined
+                        ? `Disponibilidad estimada: ${article.availability_days} días`
+                        : 'Disponibilidad estimada: sin dato'}
+                    </small>
                   </div>
                   <div className="record-detail-item">
                     <span>Tracking</span>

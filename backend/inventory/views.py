@@ -1,4 +1,5 @@
 from django.http import HttpResponse, JsonResponse
+from django.db.utils import DatabaseError
 from django.views.decorators.http import require_GET, require_http_methods
 
 from accounts.permissions import has_module_permission
@@ -12,6 +13,7 @@ from communications.services import (
 
 from .models import (
     AssetCheckout,
+    Article,
     InventoryBalance,
     InventoryBatch,
     PhysicalCountSession,
@@ -26,11 +28,14 @@ from .services import (
     build_dashboard,
     build_inventory_overview,
     build_personal_daily_reports_export_excel,
+    create_internal_request,
     create_personal_daily_report,
     create_article,
+    list_internal_requests,
     get_article_detail,
     get_full_stock_report_config,
     get_minimum_stock_digest_config,
+    get_purchasing_minimum_stock_alarm_config,
     create_count_session,
     create_discrepancy,
     create_movement,
@@ -42,11 +47,13 @@ from .services import (
     list_articles,
     list_personal_daily_reports,
     list_safety_stock_alerts,
+    active_alarm_recipients,
     parse_json,
     resolve_discrepancy,
     return_checkout,
     save_minimum_stock_digest_config,
     save_full_stock_report_config,
+    save_purchasing_minimum_stock_alarm_config,
     save_safety_stock_alert_rule,
     serialize_article,
     serialize_balance,
@@ -88,6 +95,14 @@ def _handle_inventory_call(callback):
         return JsonResponse({"detail": exc.detail}, status=exc.status)
     except CommunicationsApiError as exc:
         return JsonResponse({"detail": exc.detail}, status=exc.status)
+    except DatabaseError as exc:
+        return JsonResponse(
+            {
+                "detail": "Error interno de base de datos. Verifica que corriste las migraciones del backend.",
+                "code": "DATABASE_ERROR",
+            },
+            status=500,
+        )
 
 
 def _request_payload(request):
@@ -111,16 +126,32 @@ def inventory_overview(request):
     denied = _require_permission(request, "inventory_overview", "view")
     if denied:
         return denied
-    return JsonResponse(build_inventory_overview(request.user))
+
+    def handler():
+        return JsonResponse(build_inventory_overview(request.user))
+
+    return _handle_inventory_call(handler)
 
 
 @require_GET
 def catalogs(request):
     if not request.user.is_authenticated:
         return _unauthorized()
-    denied = _require_permission(request, "inventory_overview", "view")
-    if denied:
-        return denied
+
+    ensure_permission_catalog()
+    can_view_any_module = any(
+        has_module_permission(request.user, module_code, "view")
+        for module_code in (
+            "inventory_overview",
+            "deposits_overview",
+            "personal",
+            "tia",
+            "purchasing",
+        )
+    )
+    if not can_view_any_module:
+        return _forbidden()
+
     return JsonResponse(serialize_catalogs())
 
 
@@ -650,5 +681,72 @@ def inventory_full_stock_report(request):
             return denied
         item = save_full_stock_report_config(request.user, parse_json(request))
         return JsonResponse({"detail": "Full stock report saved", "item": item}, status=201)
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["GET", "POST"])
+def internal_requests(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    if request.method == "GET":
+        denied = _require_permission(request, "purchasing", "view")
+        if denied:
+            return denied
+        return _handle_inventory_call(lambda: JsonResponse({"items": list_internal_requests(request.GET)}))
+
+    def handler():
+        denied = _require_permission(request, "purchasing", "create")
+        if denied:
+            return denied
+        item = create_internal_request(parse_json(request))
+        return JsonResponse({"detail": "Internal request created", "item": item}, status=201)
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["GET", "POST"])
+def purchasing_alarms(request):
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    if request.method == "GET":
+        denied = _require_permission(request, "purchasing", "view")
+        if denied:
+            return denied
+
+        def handler():
+            eligible_articles = [
+                {"id": item.id, "label": f"{item.name} ({item.internal_code})"}
+                for item in Article.objects.filter(
+                    status=Article.ArticleStatus.ACTIVE,
+                    minimum_stock__isnull=False,
+                ).order_by("name")[:2000]
+            ]
+            return JsonResponse(
+                {
+                    "global": get_purchasing_minimum_stock_alarm_config(request.user),
+                    "rules": list_safety_stock_alerts(request.user),
+                    "catalogs": {
+                        "alarm_recipients": active_alarm_recipients(request.user),
+                    },
+                    "articles": eligible_articles,
+                }
+            )
+
+        return _handle_inventory_call(handler)
+
+    def handler():
+        denied = _require_permission(request, "purchasing", "change")
+        if denied:
+            return denied
+        payload = parse_json(request)
+        if payload.get("scope") == "global":
+            item = save_purchasing_minimum_stock_alarm_config(request.user, payload)
+            return JsonResponse({"detail": "Purchasing alarm saved", "item": item}, status=201)
+
+        item = save_safety_stock_alert_rule(request.user, payload)
+        return JsonResponse({"detail": "Purchasing rule saved", "item": item}, status=201)
 
     return _handle_inventory_call(handler)

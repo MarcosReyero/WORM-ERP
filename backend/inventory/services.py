@@ -2,9 +2,12 @@ import json
 import logging
 import re
 import unicodedata
+import urllib.error
+import urllib.request
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -12,7 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import EmailMessage, send_mail
 from django.core.validators import validate_email
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_time
@@ -45,10 +48,14 @@ from .models import (
     ArticleCategory,
     AssetCheckout,
     FullStockReportConfig,
+    InternalRequest,
+    InternalRequestLine,
     InventoryBalance,
     InventoryBatch,
     Location,
     MinimumStockDigestConfig,
+    MinimumStockAlarmConfig,
+    MinimumStockAlarmState,
     Pallet,
     PalletEvent,
     PersonalDailyReport,
@@ -106,6 +113,7 @@ ALARM_ROLES = {
     UserProfile.Role.STOREKEEPER,
     UserProfile.Role.SUPERVISOR,
     UserProfile.Role.MAINTENANCE,
+    UserProfile.Role.PURCHASING,
 }
 
 ARTICLE_CODE_PREFIXES = {
@@ -155,6 +163,126 @@ def serialize_decimal(value):
     if value is None:
         return None
     return float(value)
+
+
+def serialize_internal_request_line(line):
+    return {
+        "id": line.id,
+        "article_id": line.article_id,
+        "article": line.article.name,
+        "internal_code": line.article.internal_code,
+        "quantity_requested": serialize_decimal(line.quantity_requested),
+        "quantity_delivered": serialize_decimal(line.quantity_delivered),
+        "notes": line.notes,
+    }
+
+
+def serialize_internal_request(request_item):
+    lines = list(request_item.lines.select_related("article").all())
+    return {
+        "id": request_item.id,
+        "request_number": request_item.request_number,
+        "requested_at": serialize_datetime(request_item.requested_at),
+        "requester_id": request_item.requester_id,
+        "requester": request_item.requester.full_name,
+        "requesting_sector_id": request_item.requesting_sector_id,
+        "requesting_sector": request_item.requesting_sector.name,
+        "status": request_item.status,
+        "status_label": request_item.get_status_display(),
+        "notes": request_item.notes,
+        "closed_at": serialize_datetime(request_item.closed_at),
+        "reject_reason": request_item.reject_reason,
+        "line_count": len(lines),
+        "quantity_requested_total": serialize_decimal(
+            sum((line.quantity_requested or 0) for line in lines)
+        ),
+        "quantity_delivered_total": serialize_decimal(
+            sum((line.quantity_delivered or 0) for line in lines)
+        ),
+        "lines": [serialize_internal_request_line(line) for line in lines],
+    }
+
+
+def list_internal_requests(filters=None):
+    filters = filters or {}
+    query = clean_casefold(filters.get("q") or "")
+    status_filter = clean_casefold(filters.get("status") or "all")
+
+    queryset = InternalRequest.objects.select_related(
+        "requester",
+        "requesting_sector",
+    ).prefetch_related("lines", "lines__article")
+
+    if status_filter and status_filter != "all":
+        queryset = queryset.filter(status=status_filter)
+
+    if query:
+        queryset = queryset.filter(
+            Q(request_number__icontains=query)
+            | Q(requester__full_name__icontains=query)
+            | Q(requesting_sector__name__icontains=query)
+        )
+
+    items = list(queryset.order_by("-requested_at", "-id")[:250])
+    return [serialize_internal_request(item) for item in items]
+
+
+def create_internal_request(payload):
+    if not isinstance(payload, dict):
+        raise InventoryApiError("Invalid payload")
+
+    requester_id = payload.get("requester_id")
+    sector_id = payload.get("requesting_sector_id")
+    notes = clean_string(payload.get("notes"))
+    lines_payload = payload.get("lines") or []
+
+    if not requester_id or not sector_id:
+        raise InventoryApiError("requester_id and requesting_sector_id are required")
+    if not isinstance(lines_payload, list) or not lines_payload:
+        raise InventoryApiError("lines must be a non-empty list")
+
+    requester = get_object_or_404(Person, pk=requester_id)
+    requesting_sector = get_object_or_404(Sector, pk=sector_id)
+
+    with transaction.atomic():
+        placeholder = f"TEMP-{uuid4()}"
+        request_item = InternalRequest.objects.create(
+            request_number=placeholder,
+            requester=requester,
+            requesting_sector=requesting_sector,
+            status=InternalRequest.RequestStatus.PENDING,
+            notes=notes,
+        )
+        request_item.request_number = f"REQ-{timezone.localdate().strftime('%Y%m%d')}-{request_item.id:06d}"
+        request_item.save(update_fields=["request_number"])
+
+        for entry in lines_payload:
+            if not isinstance(entry, dict):
+                continue
+            article_id = entry.get("article_id")
+            quantity_requested = entry.get("quantity_requested")
+            if not article_id or quantity_requested in (None, ""):
+                continue
+            article = get_object_or_404(Article, pk=article_id)
+            try:
+                qty = Decimal(str(quantity_requested))
+            except (InvalidOperation, TypeError) as exc:
+                raise InventoryApiError("Invalid quantity_requested") from exc
+            if qty <= 0:
+                raise InventoryApiError("quantity_requested must be greater than zero")
+
+            InternalRequestLine.objects.create(
+                request=request_item,
+                article=article,
+                quantity_requested=qty,
+                notes=clean_string(entry.get("notes")),
+            )
+
+    return serialize_internal_request(
+        InternalRequest.objects.select_related("requester", "requesting_sector")
+        .prefetch_related("lines", "lines__article")
+        .get(pk=request_item.pk)
+    )
 
 
 def get_profile(user):
@@ -589,8 +717,14 @@ def serialize_article(article, quantity_map, available_quantity_map, unit_total_
         "is_critical": article.is_critical,
         "supplier_id": article.supplier_id,
         "supplier": article.supplier.name if article.supplier else None,
+        "supplier_availability_days": article.supplier.availability_days if article.supplier else None,
         "reference_price": serialize_decimal(article.reference_price),
         "lead_time_days": article.lead_time_days,
+        "availability_days": (
+            article.supplier.availability_days
+            if article.supplier and article.supplier.availability_days is not None
+            else article.lead_time_days
+        ),
         "last_purchase": serialize_date(article.last_purchase),
         "unit_of_measure": {
             "id": article.unit_of_measure_id,
@@ -612,6 +746,153 @@ def current_stock_for_article(article):
     quantity_map, _available_quantity_map, unit_total_map, _unit_available_map = current_stock_maps()
     return article_current_stock(article, quantity_map, unit_total_map)
 
+
+def _system_person():
+    """
+    Usuario solicitante para eventos automaticos.
+
+    No usamos FK directa a User en InternalRequest; en modo automatico necesitamos
+    garantizar que exista una Persona disponible.
+    """
+    system_code = "SYSTEM-AUTO"
+    person = Person.objects.filter(employee_code=system_code).first()
+    if person:
+        return person
+    return Person.objects.create(
+        full_name="Sistema",
+        employee_code=system_code,
+        status=StatusCatalog.ACTIVE,
+    )
+
+
+def _purchase_quantity_for_minimum(article, current_stock):
+    candidates = [
+        article.suggested_purchase_qty,
+        (article.max_stock - current_stock) if article.max_stock is not None else None,
+        (article.reorder_point - current_stock) if article.reorder_point is not None else None,
+    ]
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        try:
+            value = Decimal(str(candidate))
+        except (InvalidOperation, TypeError):
+            continue
+        if value > 0:
+            return value
+    return Decimal("1")
+
+
+def maybe_create_purchase_request_for_minimum_stock(
+    article,
+    *,
+    previous_stock=None,
+    current_stock=None,
+    triggered_by_user=None,
+    requester_person=None,
+    requester_sector=None,
+    source_label="stock_minimum",
+):
+    """
+    Crea una solicitud de compra (InternalRequest) cuando el stock cruza por
+    debajo (o igual) del stock minimo.
+
+    Garantias:
+    - Idempotente: si ya existe una solicitud abierta para el articulo, no crea otra
+    - Seguro ante concurrencia: bloquea el articulo con SELECT FOR UPDATE
+    """
+    if article.minimum_stock is None:
+        return None
+
+    minimum_stock = article.minimum_stock
+    if current_stock is None:
+        current_stock = current_stock_for_article(article)
+
+    if current_stock != minimum_stock:
+        return None
+    if previous_stock is not None and previous_stock <= minimum_stock:
+        return None
+
+    requesting_sector = requester_sector or article.sector_responsible
+    if not requesting_sector:
+        return None
+
+    open_statuses = {
+        InternalRequest.RequestStatus.DRAFT,
+        InternalRequest.RequestStatus.PENDING,
+        InternalRequest.RequestStatus.APPROVED,
+        InternalRequest.RequestStatus.PARTIAL,
+    }
+
+    with transaction.atomic():
+        locked_article = (
+            Article.objects.select_for_update()
+            .select_related("sector_responsible")
+            .get(pk=article.pk)
+        )
+        if locked_article.minimum_stock is None:
+            return None
+        minimum_stock = locked_article.minimum_stock
+        current_stock = current_stock_for_article(locked_article)
+        if current_stock != minimum_stock:
+            return None
+
+        already_requested = InternalRequestLine.objects.filter(
+            article=locked_article,
+            request__status__in=open_statuses,
+        ).exists()
+        if already_requested:
+            return None
+
+        resolved_requester = requester_person
+        if not resolved_requester:
+            resolved_requester = (
+                Person.objects.filter(
+                    status=StatusCatalog.ACTIVE,
+                    sector=requesting_sector,
+                )
+                .order_by("id")
+                .first()
+            )
+        if not resolved_requester:
+            resolved_requester = _system_person()
+
+        qty = _purchase_quantity_for_minimum(locked_article, current_stock)
+        notes_parts = [
+            "Generada automaticamente por stock minimo.",
+            f"Articulo: {locked_article.internal_code}",
+            f"Stock actual: {serialize_decimal(current_stock)}",
+            f"Stock minimo: {serialize_decimal(minimum_stock)}",
+            f"Origen: {source_label}",
+        ]
+        if triggered_by_user is not None:
+            notes_parts.append(f"Registrado por: {getattr(triggered_by_user, 'username', '')}")
+
+        placeholder = f"TEMP-{uuid4()}"
+        request_item = InternalRequest.objects.create(
+            request_number=placeholder,
+            requester=resolved_requester,
+            requesting_sector=requesting_sector,
+            status=InternalRequest.RequestStatus.PENDING,
+            notes="\n".join([part for part in notes_parts if part]),
+            created_by=triggered_by_user if triggered_by_user else None,
+            updated_by=triggered_by_user if triggered_by_user else None,
+        )
+        request_item.request_number = (
+            f"REQ-{timezone.localdate().strftime('%Y%m%d')}-{request_item.id:06d}"
+        )
+        request_item.save(update_fields=["request_number"])
+
+        line = InternalRequestLine(
+            request=request_item,
+            article=locked_article,
+            quantity_requested=qty,
+            notes="",
+        )
+        update_audit(line, triggered_by_user, is_new=True)
+        save_validated(line)
+
+    return request_item
 
 def safety_alert_email_addresses(alert):
     recipient_emails = []
@@ -660,13 +941,100 @@ def serialize_safety_alert_rule(alert, quantity_map=None, unit_total_map=None):
         "recipients": [serialize_contact(user) for user in recipients],
         "additional_emails": alert.additional_emails,
         "additional_email_list": split_email_list(alert.additional_emails)[0],
+        "notify_email": alert.notify_email,
+        "notify_telegram": alert.notify_telegram,
         "notes": alert.notes,
         "last_stock_value": serialize_decimal(alert.last_stock_value),
         "triggered_at": serialize_datetime(alert.triggered_at),
         "resolved_at": serialize_datetime(alert.resolved_at),
         "last_notified_at": serialize_datetime(alert.last_notified_at),
         "last_email_error": alert.last_email_error,
+        "last_telegram_error": alert.last_telegram_error,
     }
+
+
+def serialize_minimum_stock_alarm_config(config):
+    recipients = list(
+        config.recipients.select_related("profile__sector_default").order_by(
+            "first_name",
+            "last_name",
+            "username",
+        )
+    )
+    return {
+        "id": config.id,
+        "key": config.key,
+        "is_enabled": config.is_enabled,
+        "notify_email": config.notify_email,
+        "notify_telegram": config.notify_telegram,
+        "recipients": [serialize_contact(user) for user in recipients],
+        "additional_emails": config.additional_emails,
+        "additional_email_list": split_email_list(config.additional_emails)[0],
+        "notes": config.notes,
+        "last_notified_at": serialize_datetime(config.last_notified_at),
+        "last_email_error": config.last_email_error,
+        "last_telegram_error": config.last_telegram_error,
+    }
+
+
+def get_purchasing_minimum_stock_alarm_config(user):
+    require_role(user, ALARM_ROLES)
+    config, _created = MinimumStockAlarmConfig.objects.get_or_create(key="purchasing_default")
+    return serialize_minimum_stock_alarm_config(config)
+
+
+def save_purchasing_minimum_stock_alarm_config(user, payload):
+    require_role(user, ALARM_ROLES)
+    if not isinstance(payload, dict):
+        raise InventoryApiError("Invalid payload")
+
+    recipient_ids = payload.get("recipient_user_ids") or []
+    if isinstance(recipient_ids, str):
+        recipient_ids = [item for item in re.split(r"[,\s]+", recipient_ids) if item]
+
+    is_enabled = parse_boolean(payload.get("is_enabled"))
+    notify_email = parse_boolean(payload.get("notify_email")) if "notify_email" in payload else True
+    notify_telegram = parse_boolean(payload.get("notify_telegram")) if "notify_telegram" in payload else False
+
+    if is_enabled and not (notify_email or notify_telegram):
+        raise InventoryApiError("Selecciona al menos un canal de notificacion (email o Telegram).")
+
+    recipients = validate_alarm_rule_recipients(
+        recipient_ids,
+        require_email=notify_email,
+        require_telegram=notify_telegram,
+    )
+
+    additional_emails = payload.get("additional_emails") or ""
+    validated_extra_emails = parse_email_list(additional_emails) if notify_email else []
+
+    if is_enabled and notify_email and not (recipients or validated_extra_emails):
+        raise InventoryApiError("Selecciona al menos un destinatario o agrega un email adicional.")
+    if is_enabled and notify_telegram and not recipients:
+        raise InventoryApiError("Selecciona al menos un destinatario con Telegram configurado.")
+
+    with transaction.atomic():
+        config, created = MinimumStockAlarmConfig.objects.get_or_create(
+            key="purchasing_default",
+            defaults={
+                "created_by": user,
+                "updated_by": user,
+            },
+        )
+        config.is_enabled = is_enabled
+        config.notify_email = notify_email
+        config.notify_telegram = notify_telegram
+        config.additional_emails = "\n".join(validated_extra_emails) if notify_email else ""
+        config.notes = payload.get("notes") or ""
+        update_audit(config, user, is_new=created)
+        save_validated(config)
+        config.recipients.set(recipients)
+
+    refreshed = (
+        MinimumStockAlarmConfig.objects.prefetch_related("recipients__profile__sector_default")
+        .get(pk=config.pk)
+    )
+    return serialize_minimum_stock_alarm_config(refreshed)
 
 
 def low_stock_articles_snapshot(serialized_articles=None):
@@ -1118,7 +1486,7 @@ def serialize_catalogs():
     }
 
 
-def validate_alarm_rule_recipients(user_ids):
+def validate_alarm_rule_recipients(user_ids, *, require_email=True, require_telegram=False):
     if not user_ids:
         return []
 
@@ -1144,8 +1512,12 @@ def validate_alarm_rule_recipients(user_ids):
         profile = get_profile(recipient)
         if profile.status != UserProfile.Status.ACTIVE:
             invalid_recipients.append(f"{recipient.get_full_name() or recipient.username} esta inactivo")
-        elif not clean_string(recipient.email):
+        elif require_email and not clean_string(recipient.email):
             invalid_recipients.append(f"{recipient.get_full_name() or recipient.username} no tiene email")
+        elif require_telegram and not clean_string(profile.telegram_chat_id):
+            invalid_recipients.append(
+                f"{recipient.get_full_name() or recipient.username} no tiene Telegram configurado"
+            )
 
     if invalid_recipients:
         raise InventoryApiError(", ".join(invalid_recipients))
@@ -1168,7 +1540,7 @@ def send_safety_stock_alert_email(alert):
     article = alert.article
     current_stock = alert.last_stock_value if alert.last_stock_value is not None else current_stock_for_article(article)
     location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
-    subject = f"[Inventario] Stock minimo alcanzado: {article.name} ({article.internal_code})"
+    subject = f"[Alarma] Stock minimo alcanzado: {article.name} ({article.internal_code})"
     body = "\n".join(
         [
             "Se activo una alarma automatica por stock minimo.",
@@ -1181,7 +1553,7 @@ def send_safety_stock_alert_email(alert):
             f"Sector responsable: {article.sector_responsible.name}",
             f"Ubicacion principal: {location_name}",
             "",
-            "Revisa el modulo de Inventario para tomar accion.",
+            "Revisa el modulo correspondiente para tomar accion.",
             alert.notes.strip() if alert.notes.strip() else "",
         ]
     ).strip()
@@ -1208,6 +1580,340 @@ def send_safety_stock_alert_email(alert):
     alert.last_email_error = "No se pudo confirmar el envio del mail."
     save_validated(alert)
     return False
+
+
+def send_safety_stock_alert_telegram(alert):
+    if not getattr(settings, "INVENTORY_ALARM_TELEGRAM_ENABLED", True):
+        alert.last_telegram_error = "El envio por Telegram esta desactivado en la configuracion."
+        save_validated(alert)
+        return False
+
+    bot_token = clean_string(getattr(settings, "TELEGRAM_BOT_TOKEN", ""))
+    if not bot_token:
+        alert.last_telegram_error = "Telegram no esta configurado (TELEGRAM_BOT_TOKEN)."
+        save_validated(alert)
+        return False
+
+    recipients = list(alert.recipients.select_related("profile").all())
+    chat_ids = []
+    seen = set()
+    for recipient in recipients:
+        chat_id = clean_string(getattr(get_profile(recipient), "telegram_chat_id", ""))
+        if not chat_id or chat_id in seen:
+            continue
+        seen.add(chat_id)
+        chat_ids.append(chat_id)
+
+    if not chat_ids:
+        alert.last_telegram_error = "No hay destinatarios con Telegram configurado para esta regla."
+        save_validated(alert)
+        return False
+
+    article = alert.article
+    current_stock = (
+        alert.last_stock_value
+        if alert.last_stock_value is not None
+        else current_stock_for_article(article)
+    )
+    location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
+    message = "\n".join(
+        [
+            "Alarma por stock minimo alcanzado.",
+            f"Articulo: {article.name} ({article.internal_code})",
+            f"Stock actual: {serialize_decimal(current_stock)}",
+            f"Stock minimo: {serialize_decimal(article.minimum_stock)}",
+            f"Sector: {article.sector_responsible.name}",
+            f"Ubicacion: {location_name}",
+        ]
+        + ([alert.notes.strip()] if alert.notes.strip() else [])
+    ).strip()
+
+    errors = []
+    sent_any = False
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    timeout = getattr(settings, "TELEGRAM_SEND_TIMEOUT", 8)
+    for chat_id in chat_ids:
+        payload = json.dumps(
+            {
+                "chat_id": chat_id,
+                "text": message,
+                "disable_web_page_preview": True,
+            }
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+                status = int(getattr(response, "status", 200) or 200)
+                if 200 <= status < 300:
+                    sent_any = True
+                else:
+                    errors.append(f"{chat_id}: status {status}")
+        except urllib.error.HTTPError as exc:
+            errors.append(f"{chat_id}: {exc.code}")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{chat_id}: {exc}")
+
+    if sent_any and not errors:
+        alert.last_notified_at = timezone.now()
+        alert.last_telegram_error = ""
+        save_validated(alert)
+        return True
+
+    if errors:
+        alert.last_telegram_error = "; ".join(errors)[:900]
+    else:
+        alert.last_telegram_error = "No se pudo confirmar el envio por Telegram."
+    if sent_any:
+        alert.last_notified_at = timezone.now()
+    save_validated(alert)
+    return sent_any
+
+
+def minimum_stock_alarm_email_addresses(config):
+    recipients = list(config.recipients.select_related("profile").all())
+    recipient_emails = []
+    seen = set()
+    for recipient in recipients:
+        email = clean_string(recipient.email).lower()
+        if not email or email in seen:
+            continue
+        seen.add(email)
+        recipient_emails.append(email)
+
+    valid_extra_emails, _invalid_extra_emails = split_email_list(config.additional_emails)
+    for email in valid_extra_emails:
+        if email in seen:
+            continue
+        seen.add(email)
+        recipient_emails.append(email)
+
+    return recipient_emails
+
+
+def send_minimum_stock_alarm_email(config, article, current_stock=None):
+    recipients = minimum_stock_alarm_email_addresses(config)
+    if not recipients:
+        config.last_email_error = "No hay destinatarios con email valido para esta regla."
+        save_validated(config)
+        return False
+
+    if not getattr(settings, "INVENTORY_ALARM_EMAILS_ENABLED", True):
+        config.last_email_error = "El envio por mail esta desactivado en la configuracion."
+        save_validated(config)
+        return False
+
+    current_stock_value = current_stock if current_stock is not None else current_stock_for_article(article)
+    location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
+    subject = f"[Compras] Stock minimo alcanzado: {article.name} ({article.internal_code})"
+    body = "\n".join(
+        [
+            "Se activo una alarma automatica por stock minimo.",
+            "",
+            f"Articulo: {article.name}",
+            f"Codigo interno: {article.internal_code}",
+            f"Tipo: {article.get_article_type_display()}",
+            f"Stock actual: {serialize_decimal(current_stock_value)}",
+            f"Stock minimo: {serialize_decimal(article.minimum_stock)}",
+            f"Sector responsable: {article.sector_responsible.name}",
+            f"Ubicacion principal: {location_name}",
+            "",
+            "Revisa el modulo de Compras para tomar accion.",
+            config.notes.strip() if config.notes.strip() else "",
+        ]
+    ).strip()
+
+    try:
+        sent = send_mail(
+            subject=subject,
+            message=body,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
+            recipient_list=recipients,
+            fail_silently=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        config.last_email_error = str(exc)
+        save_validated(config)
+        return False
+
+    if sent:
+        config.last_notified_at = timezone.now()
+        config.last_email_error = ""
+        save_validated(config)
+        return True
+
+    config.last_email_error = "No se pudo confirmar el envio del mail."
+    save_validated(config)
+    return False
+
+
+def send_minimum_stock_alarm_telegram(config, article, current_stock=None):
+    if not getattr(settings, "INVENTORY_ALARM_TELEGRAM_ENABLED", True):
+        config.last_telegram_error = "El envio por Telegram esta desactivado en la configuracion."
+        save_validated(config)
+        return False
+
+    bot_token = clean_string(getattr(settings, "TELEGRAM_BOT_TOKEN", ""))
+    if not bot_token:
+        config.last_telegram_error = "Telegram no esta configurado (TELEGRAM_BOT_TOKEN)."
+        save_validated(config)
+        return False
+
+    recipients = list(config.recipients.select_related("profile").all())
+    chat_ids = []
+    seen = set()
+    for recipient in recipients:
+        chat_id = clean_string(getattr(get_profile(recipient), "telegram_chat_id", ""))
+        if not chat_id or chat_id in seen:
+            continue
+        seen.add(chat_id)
+        chat_ids.append(chat_id)
+
+    if not chat_ids:
+        config.last_telegram_error = "No hay destinatarios con Telegram configurado para esta regla."
+        save_validated(config)
+        return False
+
+    current_stock_value = current_stock if current_stock is not None else current_stock_for_article(article)
+    location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
+    message = "\n".join(
+        [
+            "Alarma por stock minimo alcanzado.",
+            f"Articulo: {article.name} ({article.internal_code})",
+            f"Stock actual: {serialize_decimal(current_stock_value)}",
+            f"Stock minimo: {serialize_decimal(article.minimum_stock)}",
+            f"Sector: {article.sector_responsible.name}",
+            f"Ubicacion: {location_name}",
+        ]
+        + ([config.notes.strip()] if config.notes.strip() else [])
+    ).strip()
+
+    errors = []
+    sent_any = False
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    timeout = getattr(settings, "TELEGRAM_SEND_TIMEOUT", 8)
+    for chat_id in chat_ids:
+        payload = json.dumps(
+            {
+                "chat_id": chat_id,
+                "text": message,
+                "disable_web_page_preview": True,
+            }
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+                status = int(getattr(response, "status", 200) or 200)
+                if 200 <= status < 300:
+                    sent_any = True
+                else:
+                    errors.append(f"{chat_id}: status {status}")
+        except urllib.error.HTTPError as exc:
+            errors.append(f"{chat_id}: {exc.code}")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{chat_id}: {exc}")
+
+    if sent_any and not errors:
+        config.last_notified_at = timezone.now()
+        config.last_telegram_error = ""
+        save_validated(config)
+        return True
+
+    if errors:
+        config.last_telegram_error = "; ".join(errors)[:900]
+    else:
+        config.last_telegram_error = "No se pudo confirmar el envio por Telegram."
+    if sent_any:
+        config.last_notified_at = timezone.now()
+    save_validated(config)
+    return sent_any
+
+
+def evaluate_purchasing_minimum_stock_alarm(article):
+    try:
+        with transaction.atomic():
+            config = (
+                MinimumStockAlarmConfig.objects.select_for_update()
+                .prefetch_related("recipients__profile")
+                .filter(key="purchasing_default", is_enabled=True)
+                .first()
+            )
+            if not config:
+                return None
+            if not (config.notify_email or config.notify_telegram):
+                return None
+            if SafetyStockAlertRule.objects.filter(article=article, is_enabled=True).exists():
+                # Si hay regla individual, la global no aplica (override)
+                return None
+
+            if article.minimum_stock is None:
+                return None
+
+            current_stock = current_stock_for_article(article)
+            is_under_minimum = current_stock <= article.minimum_stock
+
+            state, created = MinimumStockAlarmState.objects.select_for_update().get_or_create(
+                article=article,
+                defaults={
+                    "created_by": None,
+                    "updated_by": None,
+                },
+            )
+            old_status = state.status
+            new_status = (
+                MinimumStockAlarmState.AlarmStatus.TRIGGERED
+                if is_under_minimum
+                else MinimumStockAlarmState.AlarmStatus.MONITORING
+            )
+            should_send = (
+                old_status == MinimumStockAlarmState.AlarmStatus.MONITORING
+                and new_status == MinimumStockAlarmState.AlarmStatus.TRIGGERED
+            )
+
+            state.status = new_status
+            state.last_stock_value = current_stock
+            if should_send:
+                state.triggered_at = timezone.now()
+                state.resolved_at = None
+                state.last_notified_at = timezone.now()
+                state.last_email_error = ""
+                state.last_telegram_error = ""
+            elif (
+                old_status == MinimumStockAlarmState.AlarmStatus.TRIGGERED
+                and new_status == MinimumStockAlarmState.AlarmStatus.MONITORING
+            ):
+                state.resolved_at = timezone.now()
+                state.last_email_error = ""
+                state.last_telegram_error = ""
+
+            update_audit(state, None, is_new=created)
+            save_validated(state)
+
+            if should_send:
+                try:
+                    if config.notify_email:
+                        send_minimum_stock_alarm_email(config, article, current_stock=current_stock)
+                    if config.notify_telegram:
+                        send_minimum_stock_alarm_telegram(config, article, current_stock=current_stock)
+                except Exception as exc:  # noqa: BLE001
+                    logging.getLogger("inventory.automation.alert").error(
+                        "purchasing_alarm_send_failed",
+                        extra={"article_id": article.id, "error": str(exc)},
+                        exc_info=True,
+                    )
+
+            return state
+    except MinimumStockAlarmConfig.DoesNotExist:
+        return None
 
 
 def evaluate_safety_stock_alert(article):
@@ -1246,7 +1952,7 @@ def evaluate_safety_stock_alert(article):
             new_status = SafetyStockAlertRule.AlertStatus.TRIGGERED if is_under_minimum else SafetyStockAlertRule.AlertStatus.MONITORING
             
             # *** CLAVE: Email solo en transición MONITORING -> TRIGGERED ***
-            should_send_email = (
+            should_send_notifications = (
                 old_status == SafetyStockAlertRule.AlertStatus.MONITORING and 
                 new_status == SafetyStockAlertRule.AlertStatus.TRIGGERED
             )
@@ -1255,23 +1961,28 @@ def evaluate_safety_stock_alert(article):
             alert.status = new_status
             alert.last_stock_value = current_stock
             
-            if should_send_email:
+            if should_send_notifications:
                 alert.triggered_at = timezone.now()
                 alert.resolved_at = None
                 alert.last_notified_at = timezone.now()
                 alert.last_email_error = ""
+                alert.last_telegram_error = ""
             elif old_status == SafetyStockAlertRule.AlertStatus.TRIGGERED and new_status == SafetyStockAlertRule.AlertStatus.MONITORING:
                 # Transición inversa: volvió arriba del mínimo
                 alert.resolved_at = timezone.now()
                 alert.last_email_error = ""
+                alert.last_telegram_error = ""
             
             # Guardaguarda el estado ANTES de intentar enviar email
             save_validated(alert)
             
-            # DESPUÉS de guardar estado, intenta enviar SI aplica
-            if should_send_email:
+            # Despues de guardar estado, intenta enviar si aplica
+            if should_send_notifications:
                 try:
-                    send_safety_stock_alert_email(alert)
+                    if alert.notify_email:
+                        send_safety_stock_alert_email(alert)
+                    if alert.notify_telegram:
+                        send_safety_stock_alert_telegram(alert)
                 except Exception as exc:  # noqa: BLE001
                     # Error de email: registralo pero no rompas la transacción
                     logging.getLogger("inventory.automation.alert").error(
@@ -1336,12 +2047,25 @@ def save_safety_stock_alert_rule(user, payload):
     recipient_ids = payload.get("recipient_user_ids") or []
     if isinstance(recipient_ids, str):
         recipient_ids = [item for item in re.split(r"[,\s]+", recipient_ids) if item]
-    recipients = validate_alarm_rule_recipients(recipient_ids)
     additional_emails = payload.get("additional_emails") or ""
-    validated_extra_emails = parse_email_list(additional_emails)
     is_enabled = parse_boolean(payload.get("is_enabled"))
-    if is_enabled and not (recipients or validated_extra_emails):
+    notify_email = parse_boolean(payload.get("notify_email")) if "notify_email" in payload else True
+    notify_telegram = parse_boolean(payload.get("notify_telegram")) if "notify_telegram" in payload else False
+
+    if is_enabled and not (notify_email or notify_telegram):
+        raise InventoryApiError("Selecciona al menos un canal de notificacion (email o Telegram).")
+
+    recipients = validate_alarm_rule_recipients(
+        recipient_ids,
+        require_email=notify_email,
+        require_telegram=notify_telegram,
+    )
+    validated_extra_emails = parse_email_list(additional_emails) if notify_email else []
+
+    if is_enabled and notify_email and not (recipients or validated_extra_emails):
         raise InventoryApiError("Selecciona al menos un destinatario o agrega un email adicional.")
+    if is_enabled and notify_telegram and not recipients:
+        raise InventoryApiError("Selecciona al menos un destinatario con Telegram configurado.")
 
     with transaction.atomic():
         alert, created = SafetyStockAlertRule.objects.get_or_create(
@@ -1352,7 +2076,9 @@ def save_safety_stock_alert_rule(user, payload):
             },
         )
         alert.is_enabled = is_enabled
-        alert.additional_emails = "\n".join(validated_extra_emails)
+        alert.notify_email = notify_email
+        alert.notify_telegram = notify_telegram
+        alert.additional_emails = "\n".join(validated_extra_emails) if notify_email else ""
         alert.notes = payload.get("notes") or ""
         update_audit(alert, user, is_new=created)
         save_validated(alert)
@@ -1397,7 +2123,7 @@ def save_minimum_stock_digest_config(user, payload):
     if isinstance(recipient_ids, str):
         recipient_ids = [item for item in re.split(r"[,\s]+", recipient_ids) if item]
 
-    recipients = validate_alarm_rule_recipients(recipient_ids)
+    recipients = validate_alarm_rule_recipients(recipient_ids, require_email=True)
     additional_emails = payload.get("additional_emails") or ""
     validated_extra_emails, invalid_extra_emails = split_email_list(additional_emails)
     is_enabled = parse_boolean(payload.get("is_enabled"))
@@ -1447,7 +2173,7 @@ def save_full_stock_report_config(user, payload):
     if isinstance(recipient_ids, str):
         recipient_ids = [item for item in re.split(r"[,\s]+", recipient_ids) if item]
 
-    recipients = validate_alarm_rule_recipients(recipient_ids)
+    recipients = validate_alarm_rule_recipients(recipient_ids, require_email=True)
     additional_emails = payload.get("additional_emails") or ""
     validated_extra_emails, invalid_extra_emails = split_email_list(additional_emails)
     is_enabled = parse_boolean(payload.get("is_enabled"))
@@ -1883,60 +2609,74 @@ def build_dashboard(user=None):
     active_pallets = Pallet.objects.exclude(status=Pallet.PalletStatus.ARCHIVED).count()
     deposit_events_today = PalletEvent.objects.filter(created_at__date=timezone.localdate()).count()
 
-    def module_status(module_code):
-        if not user:
-            return "restricted"
-        return "active" if has_module_permission(user, module_code, "view") else "restricted"
+    modules = []
 
-    modules = [
-        {
-            "slug": "inventario",
-            "name": "Inventario",
-            "description": "Stock, prestamos, conteos y diferencias",
-            "color": "#38a6ff",
-            "badge": str(low_stock_count or 0),
-            "status": module_status("inventory_overview"),
-        },
-        {
-            "slug": "depositos",
-            "name": "Depósitos",
-            "description": "Pallets, plano visual y escaneo QR",
-            "color": "#ff8b3d",
-            "badge": str(active_pallets or deposit_events_today or 0),
-            "status": "active" if deposit_permissions["can_view_module"] else "restricted",
-        },
-    ]
+    if user and has_module_permission(user, "inventory_overview", "view"):
+        modules.append(
+            {
+                "slug": "inventario",
+                "name": "Inventario",
+                "description": "Stock, prestamos, conteos y diferencias",
+                "color": "#38a6ff",
+                "badge": str(low_stock_count or 0),
+                "status": "active",
+            }
+        )
+
+    if deposit_permissions["can_view_module"]:
+        modules.append(
+            {
+                "slug": "depositos",
+                "name": "Depósitos",
+                "description": "Pallets, plano visual y escaneo QR",
+                "color": "#ff8b3d",
+                "badge": str(active_pallets or deposit_events_today or 0),
+                "status": "active",
+            }
+        )
 
     modules.extend(
         [
-            {
-                "slug": "tia",
-                "name": "TIA",
-                "description": "Integracion Siemens S7-300 y monitoreo industrial",
-                "color": "#14b8a6",
-                "badge": "0",
-                "status": module_status("tia"),
-            },
-            {
-                "slug": "personal",
-                "name": "Personal",
-                "description": "Informes y espacio personal del usuario",
-                "color": "#8b5cf6",
-                "badge": "0",
-                "status": module_status("personal"),
-            },
+            *(
+                [
+                    {
+                        "slug": "tia",
+                        "name": "TIA",
+                        "description": "Integracion Siemens S7-300 y monitoreo industrial",
+                        "color": "#14b8a6",
+                        "badge": "0",
+                        "status": "active",
+                    }
+                ]
+                if user and has_module_permission(user, "tia", "view")
+                else []
+            ),
+            *(
+                [
+                    {
+                        "slug": "personal",
+                        "name": "Personal",
+                        "description": "Informes y espacio personal del usuario",
+                        "color": "#8b5cf6",
+                        "badge": "0",
+                        "status": "active",
+                    }
+                ]
+                if user and has_module_permission(user, "personal", "view")
+                else []
+            ),
             *(
                 [
                     {
                         "slug": "administracion",
-                        "name": "AdministraciÃ³n",
+                        "name": "Administración",
                         "description": "Usuarios y permisos",
                         "color": "#35596f",
                         "badge": "0",
-                        "status": module_status("admin_users"),
+                        "status": "active",
                     }
                 ]
-                if user
+                if user and has_module_permission(user, "admin_users", "view")
                 else []
             ),
             {
@@ -1947,14 +2687,20 @@ def build_dashboard(user=None):
                 "badge": "3",
                 "status": "planned",
             },
-            {
-                "slug": "compras",
-                "name": "Compras",
-                "description": "Reposicion y abastecimiento",
-                "color": "#d0472f",
-                "badge": "1",
-                "status": "planned",
-            },
+            *(
+                [
+                    {
+                        "slug": "compras",
+                        "name": "Compras",
+                        "description": "Solicitudes de compra y abastecimiento",
+                        "color": "#d0472f",
+                        "badge": "0",
+                        "status": "active",
+                    }
+                ]
+                if user and has_module_permission(user, "purchasing", "view")
+                else []
+            ),
             {
                 "slug": "clientes",
                 "name": "Clientes",
@@ -2566,6 +3312,9 @@ def create_movement(user, payload, allow_initial_load=False, bypass_role_check=F
         raise InventoryApiError("Only supervisor roles can register sensitive movements", status=403)
 
     with transaction.atomic():
+        previous_stock = (
+            current_stock_for_article(article) if article.minimum_stock is not None else None
+        )
         movement = StockMovement(
             movement_type=movement_type,
             article=article,
@@ -2598,7 +3347,20 @@ def create_movement(user, payload, allow_initial_load=False, bypass_role_check=F
             _resolve_unit_article_movement(article, movement, payload, user)
 
         save_validated(movement)
+        current_stock = (
+            current_stock_for_article(article) if article.minimum_stock is not None else None
+        )
         evaluate_safety_stock_alert(article)
+        maybe_create_purchase_request_for_minimum_stock(
+            article,
+            previous_stock=previous_stock,
+            current_stock=current_stock,
+            triggered_by_user=user,
+            requester_person=movement.person,
+            requester_sector=movement.sector,
+            source_label=f"movement:{movement.movement_type}",
+        )
+        evaluate_purchasing_minimum_stock_alarm(article)
         return movement
 
 
@@ -2608,6 +3370,9 @@ def create_checkout(user, payload):
     with transaction.atomic():
         tracked_unit = resolve_instance(TrackedUnit, payload.get("tracked_unit_id"), "tracked_unit")
         article = tracked_unit.article
+        previous_stock = (
+            current_stock_for_article(article) if article.minimum_stock is not None else None
+        )
         if not article.loanable:
             raise InventoryApiError("This article is not configured as loanable")
         if tracked_unit.status == TrackedUnit.UnitStatus.CHECKED_OUT:
@@ -2664,7 +3429,20 @@ def create_checkout(user, payload):
         )
         update_audit(movement, user, is_new=True)
         save_validated(movement)
+        current_stock = (
+            current_stock_for_article(article) if article.minimum_stock is not None else None
+        )
         evaluate_safety_stock_alert(article)
+        maybe_create_purchase_request_for_minimum_stock(
+            article,
+            previous_stock=previous_stock,
+            current_stock=current_stock,
+            triggered_by_user=user,
+            requester_person=receiver_person,
+            requester_sector=receiver_sector,
+            source_label="checkout:loan_out",
+        )
+        evaluate_purchasing_minimum_stock_alarm(article)
         return checkout
 
 
@@ -2675,6 +3453,10 @@ def return_checkout(user, checkout_id, payload):
         checkout = get_object_or_404(
             AssetCheckout.objects.select_related("tracked_unit__article"),
             pk=checkout_id,
+        )
+        article = checkout.tracked_unit.article
+        previous_stock = (
+            current_stock_for_article(article) if article.minimum_stock is not None else None
         )
         if checkout.status != AssetCheckout.CheckoutStatus.OPEN:
             raise InventoryApiError("The checkout is already closed")
@@ -2715,7 +3497,20 @@ def return_checkout(user, checkout_id, payload):
         )
         update_audit(movement, user, is_new=True)
         save_validated(movement)
-        evaluate_safety_stock_alert(tracked_unit.article)
+        current_stock = (
+            current_stock_for_article(article) if article.minimum_stock is not None else None
+        )
+        evaluate_safety_stock_alert(article)
+        maybe_create_purchase_request_for_minimum_stock(
+            article,
+            previous_stock=previous_stock,
+            current_stock=current_stock,
+            triggered_by_user=user,
+            requester_person=None,
+            requester_sector=None,
+            source_label="checkout:return_in",
+        )
+        evaluate_purchasing_minimum_stock_alarm(article)
         return checkout
 
 
@@ -2833,6 +3628,9 @@ def resolve_discrepancy(user, discrepancy_id, payload):
 
         reason_text = (payload.get("reason_text") or "").strip() or "Ajuste por diferencia de inventario"
         article = discrepancy.article
+        previous_stock = (
+            current_stock_for_article(article) if article.minimum_stock is not None else None
+        )
         location = discrepancy.location or article.primary_location or get_default_location()
         if not location:
             raise InventoryApiError("A location is required to resolve the discrepancy")
@@ -2905,7 +3703,20 @@ def resolve_discrepancy(user, discrepancy_id, payload):
         discrepancy.action_taken = payload.get("action_taken") or "Ajuste aplicado"
         discrepancy.comment = payload.get("notes") or discrepancy.comment
         discrepancy.movement = movement
+        current_stock = (
+            current_stock_for_article(article) if article.minimum_stock is not None else None
+        )
         evaluate_safety_stock_alert(article)
+        maybe_create_purchase_request_for_minimum_stock(
+            article,
+            previous_stock=previous_stock,
+            current_stock=current_stock,
+            triggered_by_user=user,
+            requester_person=None,
+            requester_sector=None,
+            source_label="discrepancy:count_adjust",
+        )
+        evaluate_purchasing_minimum_stock_alarm(article)
         discrepancy.resolved_at = timezone.now()
         update_audit(discrepancy, user)
         save_validated(discrepancy)

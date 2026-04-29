@@ -26,8 +26,8 @@ DEFAULT_PERMISSION_MODULES = [
     },
     {
         "code": PermissionModule.Module.STOCK_MANAGEMENT,
-        "name": "GestiÃ³n de Stock",
-        "description": "AdministraciÃ³n de artÃ­culos y stock",
+        "name": "Gestión de Stock",
+        "description": "Administración de artículos y stock",
         "order": 2,
     },
     {
@@ -39,7 +39,7 @@ DEFAULT_PERMISSION_MODULES = [
     {
         "code": PermissionModule.Module.CHECKOUTS,
         "name": "Retiros",
-        "description": "GestiÃ³n de retiros y entregas",
+        "description": "Gestión de retiros y entregas",
         "order": 4,
     },
     {
@@ -51,19 +51,19 @@ DEFAULT_PERMISSION_MODULES = [
     {
         "code": PermissionModule.Module.COUNTS,
         "name": "Conteos",
-        "description": "GestiÃ³n de conteos y auditorÃ­as de stock",
+        "description": "Gestión de conteos y auditorías de stock",
         "order": 6,
     },
     {
         "code": PermissionModule.Module.DISCREPANCIES,
         "name": "Discrepancias",
-        "description": "IdentificaciÃ³n y resoluciÃ³n de discrepancias",
+        "description": "Identificación y resolución de discrepancias",
         "order": 7,
     },
     {
         "code": PermissionModule.Module.ADMIN_USERS,
-        "name": "AdministraciÃ³n de Usuarios",
-        "description": "GestiÃ³n de usuarios y permisos",
+        "name": "Administración de Usuarios",
+        "description": "Gestión de usuarios y permisos",
         "order": 8,
     },
     {
@@ -79,40 +79,46 @@ DEFAULT_PERMISSION_MODULES = [
         "order": 10,
     },
     {
+        "code": PermissionModule.Module.PURCHASING,
+        "name": "Compras",
+        "description": "Solicitudes internas y seguimiento de compras",
+        "order": 11,
+    },
+    {
         "code": PermissionModule.Module.REPORTS,
         "name": "Reportes",
-        "description": "GeneraciÃ³n y visualizaciÃ³n de reportes",
-        "order": 9,
+        "description": "Generación y visualización de reportes",
+        "order": 12,
     },
     {
         "code": PermissionModule.Module.SETTINGS,
-        "name": "ConfiguraciÃ³n",
-        "description": "ConfiguraciÃ³n del sistema",
-        "order": 10,
+        "name": "Configuración",
+        "description": "Configuración del sistema",
+        "order": 13,
     },
     {
         "code": PermissionModule.Module.DEPOSITS_OVERVIEW,
-        "name": "Panel de DepÃ³sitos",
-        "description": "Vista general del mÃ³dulo DepÃ³sitos",
-        "order": 11,
+        "name": "Panel de Depósitos",
+        "description": "Vista general del módulo Depósitos",
+        "order": 14,
     },
     {
         "code": PermissionModule.Module.PALLET_REGISTRY,
         "name": "Registro de Pallets",
         "description": "Alta, consulta y mantenimiento de pallets",
-        "order": 12,
+        "order": 15,
     },
     {
         "code": PermissionModule.Module.DEPOSIT_LAYOUT,
-        "name": "Plano de DepÃ³sitos",
-        "description": "VisualizaciÃ³n y gestiÃ³n del plano fÃ­sico",
-        "order": 13,
+        "name": "Plano de Depósitos",
+        "description": "Visualización y gestión del plano físico",
+        "order": 16,
     },
     {
         "code": PermissionModule.Module.PALLET_SCANS,
         "name": "Escaneo de Pallets",
         "description": "Escaneo QR, lookup y reubicaciones",
-        "order": 14,
+        "order": 17,
     },
 ]
 
@@ -209,6 +215,7 @@ def serialize_user_profile(user):
         "full_name": user.get_full_name() or user.username,
         "email": user.email,
         "phone": profile.phone,
+        "telegram_chat_id": profile.telegram_chat_id,
         "role": profile.role,
         "role_label": profile.get_role_display(),
         "status": profile.status,
@@ -258,6 +265,9 @@ def update_own_profile(user, payload, files=None):
         profile.preferred_theme = preferred_theme
 
     profile.phone = clean_string(profile_payload_value(payload, "phone", profile.phone))
+    profile.telegram_chat_id = clean_string(
+        profile_payload_value(payload, "telegram_chat_id", profile.telegram_chat_id)
+    )
 
     if files and files.get("avatar"):
         profile.avatar = files["avatar"]
@@ -291,6 +301,7 @@ def create_profile_for_admin(user, payload, files=None):
     profile.role = profile_payload_value(payload, "role", profile.role) or profile.role
     profile.status = profile_payload_value(payload, "status", profile.status) or profile.status
     profile.phone = clean_string(profile_payload_value(payload, "phone"))
+    profile.telegram_chat_id = clean_string(profile_payload_value(payload, "telegram_chat_id"))
     profile.preferred_theme = (
         profile_payload_value(payload, "preferred_theme", profile.preferred_theme) or profile.preferred_theme
     )
@@ -333,6 +344,9 @@ def update_profile_for_admin(user, profile_user_id, payload, files=None):
         profile.preferred_theme = preferred_theme
 
     profile.phone = clean_string(profile_payload_value(payload, "phone", profile.phone))
+    profile.telegram_chat_id = clean_string(
+        profile_payload_value(payload, "telegram_chat_id", profile.telegram_chat_id)
+    )
     sector_default_id = profile_payload_value(payload, "sector_default_id")
     if sector_default_id not in (None, "", []):
         from inventory.models import Sector
@@ -401,6 +415,7 @@ def _seed_default_role_permissions():
             "admin_users": ["view", "create", "change", "delete"],
             "personal": ["view", "create", "change", "delete", "export"],
             "tia": ["view", "change"],
+            "purchasing": ["view", "create", "change", "approve"],
             "reports": ["view", "export"],
             "settings": ["view", "change"],
             "deposits_overview": ["view"],
@@ -475,6 +490,7 @@ def _seed_default_role_permissions():
             "inventory_overview": ["view"],
             "stock_management": ["view"],
             "movements": ["view", "create"],
+            "purchasing": ["view", "create", "change"],
             "reports": ["view", "export"],
             "personal": ["view", "export"],
         },

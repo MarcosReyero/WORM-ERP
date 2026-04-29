@@ -385,13 +385,13 @@ export function InventoryStockPage() {
                               setStockSearch('')
                             }
                           }}
-                          placeholder="Buscar por nombre, cÃ³digo o categorÃ­a"
+                          placeholder="Buscar por nombre, código o categoría"
                           type="search"
                           value={stockSearch}
                         />
                         {stockSearch ? (
                           <button
-                            aria-label="Limpiar bÃºsqueda"
+                            aria-label="Limpiar búsqueda"
                             className="module-search-clear"
                             onClick={() => setStockSearch('')}
                             type="button"
@@ -706,7 +706,7 @@ export function InventoryStockPage() {
             ) : utilityMode === 'import' ? (
               <>
                 <p className="module-empty-copy">
-                  Analiza primero el archivo y confirma despues. Soporta tablas estructuradas y listas simples de paÃ±ol.
+                  Analiza primero el archivo y confirma despues. Soporta tablas estructuradas y listas simples de pañol.
                 </p>
                 <form className="ops-form" onSubmit={handleImportSubmit}>
                   <label>
@@ -724,7 +724,7 @@ export function InventoryStockPage() {
                   <p className="module-empty-copy">
                     Si el Excel viene armado como tabla, usa <strong>nombre</strong>, <strong>tipo</strong>,{' '}
                     <strong>unidad</strong> y <strong>sector</strong>. Tambien puede leer listas simples como la
-                    de paÃ±ol, con la primera columna <strong>nombre</strong> y categorias por bloque.
+                    de pañol, con la primera columna <strong>nombre</strong> y categorias por bloque.
                   </p>
 
                   <PanelMessage error={importFeedback.error} success={importFeedback.success} />
@@ -890,6 +890,7 @@ export function InventoryStockPage() {
                           <th>Disponible</th>
                           <th>Minimo</th>
                           <th>Ubicacion</th>
+                          <th>Proveedor</th>
                           <th>Estado</th>
                         </tr>
                       </thead>
@@ -926,6 +927,16 @@ export function InventoryStockPage() {
                               <td>{formatQuantity(article.available_stock)}</td>
                               <td>{formatQuantity(article.minimum_stock)}</td>
                               <td>{article.primary_location || '-'}</td>
+                              <td>
+                                <div className="module-table-item">
+                                  <strong>{article.supplier || '-'}</strong>
+                                  <span>
+                                    {article.availability_days !== null && article.availability_days !== undefined
+                                      ? `Disp. ${article.availability_days} días`
+                                      : 'Disp. sin dato'}
+                                  </span>
+                                </div>
+                              </td>
                               <td>
                                 <span className={`status-pill ${getArticleStockTone(article)}`}>
                                   {getArticleStockLabel(article)}

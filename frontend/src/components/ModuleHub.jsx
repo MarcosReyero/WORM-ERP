@@ -1,6 +1,7 @@
-import { useDeferredValue, useEffect, useRef } from 'react'
+import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { ModuleIcon } from './Icons.jsx'
+import { PaintbrushIcon } from 'lucide-react'
 
 const ACTIVE_MODULE_ROUTES = {
   inventario: '/inventario',
@@ -8,25 +9,13 @@ const ACTIVE_MODULE_ROUTES = {
   personal: '/personal',
   tia: '/tia',
   administracion: '/administracion',
+  compras: '/compras',
 }
 
-const TIA_MODULE = {
-  slug: 'tia',
-  name: 'TIA',
-  description: 'Integracion Siemens S7-300 y monitoreo industrial',
-  color: '#14b8a6',
-  badge: '0',
-  status: 'restricted',
-}
+const DASHBOARD_BACKGROUND_STORAGE_KEY = 'inventary.dashboard.customBackground.v1'
 
 function dashboardModulesForPanel(modules = []) {
-  const visibleModules = modules.filter((module) => module.slug !== 'mensajes')
-
-  if (visibleModules.some((module) => module.slug === TIA_MODULE.slug)) {
-    return visibleModules
-  }
-
-  return [...visibleModules, TIA_MODULE]
+  return modules.filter((module) => module.slug !== 'mensajes')
 }
 
 function matchesQuery(module, query) {
@@ -43,6 +32,17 @@ export function ModuleHub() {
   const deferredQuery = useDeferredValue(searchValue.trim().toLowerCase())
   const stageRef = useRef(null)
   const frameRef = useRef(0)
+  const backgroundInputRef = useRef(null)
+  const backgroundMenuRef = useRef(null)
+  const backgroundButtonRef = useRef(null)
+  const [isBackgroundMenuOpen, setIsBackgroundMenuOpen] = useState(false)
+  const [customBackground, setCustomBackground] = useState(() => {
+    try {
+      return window.localStorage.getItem(DASHBOARD_BACKGROUND_STORAGE_KEY) || ''
+    } catch {
+      return ''
+    }
+  })
 
   useEffect(() => {
     return () => {
@@ -51,6 +51,42 @@ export function ModuleHub() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!isBackgroundMenuOpen) {
+      return
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setIsBackgroundMenuOpen(false)
+      }
+    }
+
+    function handlePointerDown(event) {
+      const target = event.target
+      const menu = backgroundMenuRef.current
+      const button = backgroundButtonRef.current
+
+      if (!target || !(target instanceof Node)) {
+        return
+      }
+
+      if (menu?.contains(target) || button?.contains(target)) {
+        return
+      }
+
+      setIsBackgroundMenuOpen(false)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('pointerdown', handlePointerDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [isBackgroundMenuOpen])
 
   if (!dashboardData) {
     return (
@@ -103,12 +139,57 @@ export function ModuleHub() {
     stageRef.current.style.setProperty('--dashboard-pointer-y', '18%')
   }
 
+  function handleBackgroundPick(event) {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+
+      if (!result) {
+        return
+      }
+
+      try {
+        window.localStorage.setItem(DASHBOARD_BACKGROUND_STORAGE_KEY, result)
+      } catch {
+        window.alert('No se pudo guardar el fondo (imagen muy pesada o sin espacio). Probá con una imagen mas liviana.')
+      }
+
+      setCustomBackground(result)
+      setIsBackgroundMenuOpen(false)
+    }
+
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
+
+  function clearCustomBackground() {
+    try {
+      window.localStorage.removeItem(DASHBOARD_BACKGROUND_STORAGE_KEY)
+    } catch {
+      // ignore
+    }
+
+    setCustomBackground('')
+    setIsBackgroundMenuOpen(false)
+  }
+
   return (
     <div
       className="dashboard-scene"
       onPointerLeave={handlePointerLeave}
       onPointerMove={handlePointerMove}
       ref={stageRef}
+      style={
+        customBackground
+          ? { '--dashboard-custom-bg': `url("${customBackground}")` }
+          : undefined
+      }
     >
       <div aria-hidden="true" className="dashboard-backdrop">
         <span className="dashboard-particle dashboard-particle--1" />
@@ -120,6 +201,52 @@ export function ModuleHub() {
       </div>
 
       <div className="dashboard-content">
+        <div className="dashboard-background-control">
+          <button
+            aria-expanded={isBackgroundMenuOpen}
+            aria-label="Cambiar fondo del panel"
+            className="dashboard-background-button"
+            onClick={() => setIsBackgroundMenuOpen((open) => !open)}
+            ref={backgroundButtonRef}
+            type="button"
+          >
+            <PaintbrushIcon aria-hidden="true" />
+          </button>
+
+          {isBackgroundMenuOpen ? (
+            <div className="dashboard-background-menu" ref={backgroundMenuRef} role="menu">
+              <p className="dashboard-background-menu-title">Fondo personalizado</p>
+              <button
+                className="dashboard-background-menu-action"
+                onClick={() => backgroundInputRef.current?.click()}
+                role="menuitem"
+                type="button"
+              >
+                Cargar de archivo
+              </button>
+              <button
+                className="dashboard-background-menu-action danger"
+                disabled={!customBackground}
+                onClick={clearCustomBackground}
+                role="menuitem"
+                type="button"
+              >
+                Quitar fondo
+              </button>
+            </div>
+          ) : null}
+
+          <input
+            accept="image/*"
+            aria-hidden="true"
+            className="dashboard-background-input"
+            onChange={handleBackgroundPick}
+            ref={backgroundInputRef}
+            tabIndex={-1}
+            type="file"
+          />
+        </div>
+
         <section className="dashboard-header">
           <div className="dashboard-title-block">
             <p className="eyebrow">Panel principal</p>

@@ -23,6 +23,7 @@ function buildEmptyForm() {
     last_name: '',
     email: '',
     phone: '',
+    telegram_chat_id: '',
     role: 'operator',
     status: 'active',
     sector_default_id: '',
@@ -38,6 +39,7 @@ function buildFormFromProfile(profile) {
     last_name: profile?.last_name || '',
     email: profile?.email || '',
     phone: profile?.phone || '',
+    telegram_chat_id: profile?.telegram_chat_id || '',
     role: profile?.role || 'operator',
     status: profile?.status || 'active',
     sector_default_id: profile?.sector_default_id || '',
@@ -355,6 +357,17 @@ export function ProfileUsersPage({
                       }
                       type="text"
                       value={form.phone}
+                    />
+                  </label>
+                  <label>
+                    Telegram Chat ID
+                    <input
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, telegram_chat_id: event.target.value }))
+                      }
+                      placeholder="Opcional"
+                      type="text"
+                      value={form.telegram_chat_id}
                     />
                   </label>
                   <label>

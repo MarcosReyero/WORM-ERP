@@ -18,6 +18,9 @@ import { InventoryOverviewPage } from './components/inventory/InventoryOverviewP
 import { InventoryStockPage } from './components/inventory/InventoryStockPage.jsx'
 import { PersonalLayout } from './components/personal/PersonalLayout.jsx'
 import { PersonalReportsPage } from './components/personal/PersonalReportsPage.jsx'
+import { PurchasingLayout } from './components/purchasing/PurchasingLayout.jsx'
+import { RequestsPage } from './components/purchasing/RequestsPage.jsx'
+import { PurchasingAlarmsPage } from './components/purchasing/PurchasingAlarmsPage.jsx'
 import { ProfileDetailsPage } from './components/profile/ProfileDetailsPage.jsx'
 import { ProfileLayout } from './components/profile/ProfileLayout.jsx'
 import { ProfileUsersPage } from './components/profile/ProfileUsersPage.jsx'
@@ -288,6 +291,11 @@ function App() {
         <Route path="personal" element={<PersonalLayout />}>
           <Route index element={<Navigate replace to="informes" />} />
           <Route path="informes" element={<PersonalReportsPage />} />
+        </Route>
+        <Route path="compras" element={<PurchasingLayout />}>
+          <Route index element={<Navigate replace to="solicitudes" />} />
+          <Route path="solicitudes" element={<RequestsPage />} />
+          <Route path="alarmas" element={<PurchasingAlarmsPage />} />
         </Route>
         <Route path="tia" element={<TiaLayout />}>
           <Route index element={<Navigate replace to="enlace-s7" />} />

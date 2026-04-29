@@ -50,6 +50,7 @@ class UserProfile(models.Model):
         validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp", "gif"])],
     )
     phone = models.CharField(max_length=40, blank=True)
+    telegram_chat_id = models.CharField(max_length=64, blank=True)
     preferred_theme = models.CharField(
         max_length=16,
         choices=PreferredTheme.choices,
@@ -78,6 +79,7 @@ class PermissionModule(models.Model):
         ADMIN_USERS = "admin_users", "Administración de Usuarios"
         PERSONAL = "personal", "Personal"
         TIA = "tia", "TIA"
+        PURCHASING = "purchasing", "Compras"
         REPORTS = "reports", "Reportes"
         SETTINGS = "settings", "Configuración"
         DEPOSITS_OVERVIEW = "deposits_overview", "Panel de Depósitos"

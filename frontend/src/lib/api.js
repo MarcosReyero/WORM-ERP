@@ -10,21 +10,55 @@ function getCookie(name) {
 async function request(path, options = {}) {
   const { headers, body, ...rest } = options
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
-  const response = await fetch(path, {
-    credentials: 'include',
-    headers: {
-      ...(body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
-      ...headers,
-    },
-    body,
-    ...rest,
-  })
+  let response
+  try {
+    response = await fetch(path, {
+      credentials: 'include',
+      headers: {
+        ...(body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
+        ...headers,
+      },
+      body,
+      ...rest,
+    })
+  } catch (error) {
+    const connectionError = new Error(
+      'No se pudo conectar con el servidor. Verifica que el backend esté en línea.',
+    )
+    connectionError.cause = error
+    throw connectionError
+  }
 
-  const isJson = response.headers.get('content-type')?.includes('application/json')
-  const data = isJson ? await response.json() : null
+  const contentType = response.headers.get('content-type') || ''
+  const isJson = contentType.includes('application/json')
+  let data = null
+  let rawText = ''
+
+  if (isJson) {
+    try {
+      data = await response.json()
+    } catch {
+      data = null
+    }
+  } else {
+    try {
+      rawText = await response.text()
+    } catch {
+      rawText = ''
+    }
+  }
 
   if (!response.ok) {
-    const error = new Error(data?.detail || 'Request failed')
+    const fallback = response.status
+      ? `${response.status} ${response.statusText || ''}`.trim()
+      : 'No se pudo completar la solicitud'
+
+    const normalizedRawText = rawText
+      ? rawText.replace(/\s+/g, ' ').trim().slice(0, 220)
+      : ''
+
+    const message = data?.detail || normalizedRawText || fallback
+    const error = new Error(message)
     error.status = response.status
     throw error
   }
@@ -186,6 +220,44 @@ export function fetchInventoryCatalogs() {
   return request('/api/catalogs/')
 }
 
+export function fetchPurchaseRequests(filters = {}) {
+  const search = new URLSearchParams()
+
+  if (filters.status && filters.status !== 'all') {
+    search.set('status', filters.status)
+  }
+  if (filters.query) {
+    search.set('q', filters.query)
+  }
+
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  return request(`/api/purchasing/requests/${suffix}`)
+}
+
+export function createPurchaseRequest(payload) {
+  return request('/api/purchasing/requests/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function fetchPurchasingAlarms() {
+  return request('/api/purchasing/alarms/')
+}
+
+export function savePurchasingAlarm(payload) {
+  return request('/api/purchasing/alarms/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
 export function createArticle(payload) {
   return request('/api/articles/', {
     method: 'POST',
@@ -194,6 +266,10 @@ export function createArticle(payload) {
     },
     body: payload instanceof FormData ? payload : JSON.stringify(payload),
   })
+}
+
+export function fetchArticles() {
+  return request('/api/articles/')
 }
 
 export function fetchArticleDetail(articleId) {
