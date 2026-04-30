@@ -4,6 +4,7 @@ import { AppLayout } from './components/AppLayout.jsx'
 import { LoginView } from './components/LoginView.jsx'
 import { MessagesPage } from './components/messages/MessagesPage.jsx'
 import { ModuleHub } from './components/ModuleHub.jsx'
+import { BrandIcon } from './components/Icons.jsx'
 import { DepositsLayout } from './components/deposits/DepositsLayout.jsx'
 import { DepositsRegistryPage } from './components/deposits/DepositsRegistryPage.jsx'
 import { DepositsScanPage } from './components/deposits/DepositsScanPage.jsx'
@@ -220,7 +221,7 @@ function App() {
     return (
       <div className="boot-screen">
         <div className="boot-card">
-          <span className="boot-logo">W</span>
+          <BrandIcon />
           <p className="boot-eyebrow">Worm ERP</p>
           <h1>Inicializando panel</h1>
           <p>Comprobando sesion, modulos y datos del inventario.</p>

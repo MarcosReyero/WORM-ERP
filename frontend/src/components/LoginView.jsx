@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BrandIcon } from './Icons.jsx'
 
 export function LoginView({ onLogin }) {
   const navigate = useNavigate()
@@ -46,7 +47,7 @@ export function LoginView({ onLogin }) {
               <span className="workspace-caption">Acceso al sistema</span>
               <h2>Iniciar sesion</h2>
             </div>
-            <span className="brand-mark">W</span>
+            <BrandIcon />
           </div>
 
           <label htmlFor="username">
@@ -77,8 +78,6 @@ export function LoginView({ onLogin }) {
           <button className="primary-button" disabled={submitting} type="submit">
             {submitting ? 'Ingresando...' : 'Entrar al panel'}
           </button>
-
-          <p className="login-demo">Demo inicial: usuario `admin` y clave `admin1234`.</p>
         </form>
       </div>
     </div>

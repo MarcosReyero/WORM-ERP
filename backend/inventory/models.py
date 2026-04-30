@@ -449,6 +449,8 @@ class SafetyStockAlertRule(AuditedModel):
         related_name="inventory_safety_alert_rules",
     )
     additional_emails = models.TextField(blank=True)
+    notify_email = models.BooleanField(default=True)
+    notify_telegram = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
     status = models.CharField(
         max_length=16,
@@ -465,6 +467,7 @@ class SafetyStockAlertRule(AuditedModel):
     resolved_at = models.DateTimeField(null=True, blank=True)
     last_notified_at = models.DateTimeField(null=True, blank=True)
     last_email_error = models.TextField(blank=True)
+    last_telegram_error = models.TextField(blank=True)
 
     class Meta:
         ordering = ["article__name"]

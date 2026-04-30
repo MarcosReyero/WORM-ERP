@@ -14,7 +14,11 @@ function BaseIcon({ children }) {
 }
 
 export function BrandIcon() {
-  return <span className="brand-mark">W</span>
+  return (
+    <span className="brand-mark brand-mark--icon" aria-hidden="true">
+      <img className="brand-mark-icon" src="/favicon.svg" alt="" />
+    </span>
+  )
 }
 
 export function SearchIcon() {

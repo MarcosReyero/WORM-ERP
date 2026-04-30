@@ -167,6 +167,17 @@ a {
   box-shadow: 0 14px 30px rgba(70, 78, 204, 0.32);
 }
 
+.brand-mark--icon {
+  font-size: 0;
+  line-height: 0;
+}
+
+.brand-mark-icon {
+  width: 70%;
+  height: 70%;
+  display: block;
+}
+
 .boot-eyebrow,
 .eyebrow,
 .login-eyebrow {
@@ -1843,6 +1854,12 @@ a {
   flex: 0 0 auto;
 }
 
+.platform-sidebar-brand-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 .platform-sidebar-brand-copy,
 .platform-sidebar-user-copy {
   display: grid;
@@ -2051,7 +2068,7 @@ a {
 
 .dashboard-background-control {
   position: fixed;
-  top: 16px;
+  top: var(--dashboard-controls-top, 16px);
   right: 16px;
   z-index: 5;
   display: grid;

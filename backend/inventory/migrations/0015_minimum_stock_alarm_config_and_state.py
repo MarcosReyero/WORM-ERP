@@ -12,6 +12,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="MinimumStockAlarmConfig",
             fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
@@ -20,7 +29,7 @@ class Migration(migrations.Migration):
                         blank=True,
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="inventory_minimumstockalarmconfig_created",
+                        related_name="%(app_label)s_%(class)s_created",
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
@@ -30,7 +39,7 @@ class Migration(migrations.Migration):
                         blank=True,
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="inventory_minimumstockalarmconfig_updated",
+                        related_name="%(app_label)s_%(class)s_updated",
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
@@ -68,7 +77,7 @@ class Migration(migrations.Migration):
                         blank=True,
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="inventory_minimumstockalarmstate_created",
+                        related_name="%(app_label)s_%(class)s_created",
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
@@ -78,7 +87,7 @@ class Migration(migrations.Migration):
                         blank=True,
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="inventory_minimumstockalarmstate_updated",
+                        related_name="%(app_label)s_%(class)s_updated",
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),

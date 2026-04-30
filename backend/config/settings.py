@@ -2,12 +2,39 @@ import os
 import sys
 from pathlib import Path
 
+try:
+    import dj_database_url
+except ImportError:  # pragma: no cover
+    dj_database_url = None
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "inventary-dev-secret-key")
-DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
-ALLOWED_HOSTS = ["127.0.0.1","192.168.8.67", "localhost", "testserver"]
-CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:5173", "http://localhost:5173", "http://192.168.8.67:5173"]
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _env_csv(name: str, default=None):
+    raw = os.getenv(name)
+    if raw is None:
+        return default if default is not None else []
+    values = [item.strip() for item in raw.split(",")]
+    return [value for value in values if value]
+
+
+SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "inventary-dev-secret-key"))
+DEBUG = _env_bool("DEBUG", _env_bool("DJANGO_DEBUG", True))
+ALLOWED_HOSTS = _env_csv(
+    "ALLOWED_HOSTS",
+    default=["127.0.0.1", "localhost", "testserver"],
+)
+CSRF_TRUSTED_ORIGINS = _env_csv(
+    "CSRF_TRUSTED_ORIGINS",
+    default=["http://127.0.0.1:5173", "http://localhost:5173"],
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -50,12 +77,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if DATABASE_URL:
+    if dj_database_url is None:  # pragma: no cover
+        raise RuntimeError(
+            "DATABASE_URL está configurada pero falta la dependencia 'dj-database-url'. "
+            "Instala requirements.txt para continuar."
+        )
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=int(os.getenv("DB_CONN_MAX_AGE", "60")),
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -78,22 +119,21 @@ TIME_ZONE = "America/Argentina/Buenos_Aires"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_URL = "/static/"
+STATIC_ROOT = Path(os.getenv("STATIC_ROOT", str(BASE_DIR / "staticfiles")))
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", str(BASE_DIR / "media")))
 
-# Email configuration para desarrollo
-if DEBUG:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST = "smtp.gmail.com"
-    EMAIL_PORT = 587
-    EMAIL_USE_TLS = True
-    EMAIL_HOST_USER = os.getenv("DJANGO_EMAIL_HOST_USER", "reyeromateo@gmail.com")
-    EMAIL_HOST_PASSWORD = os.getenv("DJANGO_EMAIL_HOST_PASSWORD", "pgtv dkkc eyao iovh")
-else:
-    EMAIL_BACKEND = "django.core.mail.backends.file.EmailBackend"
-    EMAIL_FILE_PATH = BASE_DIR / "tmp" / "email-messages"
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", True)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_FILE_PATH = Path(os.getenv("EMAIL_FILE_PATH", str(BASE_DIR / "tmp" / "email-messages")))
 
 DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", "inventario@erp.local")
 INVENTORY_ALARM_EMAILS_ENABLED = (

@@ -1,7 +1,7 @@
 {
-  "name": "Nodum ERP",
-  "short_name": "Nodum",
-  "description": "ERP operativo con modulos de inventario, depositos y trazabilidad mobile-first.",
+  "name": "Worm ERP",
+  "short_name": "WORM",
+  "description": "Worm ERP: inventario, depósitos, compras y trazabilidad.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

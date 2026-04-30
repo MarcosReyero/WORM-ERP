@@ -231,7 +231,9 @@ export function PlatformSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip="WORM">
               <Link to="/">
-                <span className="platform-sidebar-brand-mark">W</span>
+                <span className="platform-sidebar-brand-mark" aria-hidden="true">
+                  <img className="platform-sidebar-brand-icon" src="/favicon.svg" alt="" />
+                </span>
                 <span className="platform-sidebar-brand-copy">
                   <strong>WORM</strong>
                   <small>Sistema interno</small>

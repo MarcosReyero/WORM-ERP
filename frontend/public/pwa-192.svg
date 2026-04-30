@@ -1,12 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Nodum ERP">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Worm ERP">
   <defs>
-    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
-      <stop offset="0%" stop-color="#5f6bff" />
-      <stop offset="100%" stop-color="#ff6b72" />
-    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity=".25" />
+    </filter>
+    <mask id="worm-mask">
+      <circle
+        cx="96"
+        cy="96"
+        r="44"
+        fill="none"
+        stroke="#fff"
+        stroke-width="26"
+        stroke-linecap="round"
+      />
+    </mask>
   </defs>
-  <rect width="192" height="192" rx="44" fill="url(#bg)" />
-  <path d="M48 58h96v18H48zm0 30h96v18H48zm0 30h58v18H48z" fill="#fff" opacity=".22" />
-  <path d="M58 48h76a20 20 0 0 1 20 20v56l-38-18-20 14-20-14-38 18V68a20 20 0 0 1 20-20Z" fill="#fff" />
-  <path d="M78 74h36M78 94h36M78 114h20" fill="none" stroke="#413d92" stroke-linecap="round" stroke-width="10" />
+
+  <rect width="192" height="192" rx="44" fill="#fff" />
+
+  <!-- Circular worm -->
+  <circle
+    cx="96"
+    cy="96"
+    r="44"
+    fill="none"
+    stroke="#0b0b0b"
+    stroke-width="34"
+    stroke-linecap="round"
+    filter="url(#shadow)"
+  />
+  <circle
+    cx="96"
+    cy="96"
+    r="44"
+    fill="none"
+    stroke="#1b1b1b"
+    stroke-width="22"
+    stroke-linecap="round"
+    opacity=".92"
+  />
+  <circle
+    cx="96"
+    cy="96"
+    r="44"
+    fill="none"
+    stroke="#050505"
+    stroke-width="22"
+    stroke-linecap="round"
+    stroke-dasharray="36 999"
+    stroke-dashoffset="92"
+    opacity=".9"
+  />
+
+  <!-- Segment cuts (show SVG white background) -->
+  <g mask="url(#worm-mask)">
+    <g stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".95">
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(8 96 96)" />
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(28 96 96)" />
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(48 96 96)" />
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(68 96 96)" />
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(88 96 96)" />
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(108 96 96)" />
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(128 96 96)" />
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(148 96 96)" />
+      <line x1="96" y1="10" x2="96" y2="182" transform="rotate(168 96 96)" />
+    </g>
+  </g>
+
+  <!-- Eye -->
+  <circle cx="106" cy="140" r="3" fill="#fff" opacity=".9" />
 </svg>

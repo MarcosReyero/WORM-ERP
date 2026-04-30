@@ -11,8 +11,8 @@ const ACTIVE_MODULE_ROUTES = {
   administracion: '/administracion',
   compras: '/compras',
 }
-
 const DASHBOARD_BACKGROUND_STORAGE_KEY = 'inventary.dashboard.customBackground.v1'
+const DASHBOARD_CONTROLS_TOP_KEY = '--dashboard-controls-top'
 
 function dashboardModulesForPanel(modules = []) {
   return modules.filter((module) => module.slug !== 'mensajes')
@@ -87,6 +87,47 @@ export function ModuleHub() {
       window.removeEventListener('pointerdown', handlePointerDown)
     }
   }, [isBackgroundMenuOpen])
+
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) {
+      return undefined
+    }
+
+    const topbar =
+      document.querySelector('.topbar--shell') ||
+      document.querySelector('.topbar')
+
+    if (!topbar) {
+      return undefined
+    }
+
+    function syncDashboardControlsTop() {
+      const rect = topbar.getBoundingClientRect()
+      const styles = window.getComputedStyle(topbar)
+      const marginBottom = Number.parseFloat(styles.marginBottom || '0') || 0
+      const offset = Math.round(rect.bottom + marginBottom + 12)
+      stage.style.setProperty(DASHBOARD_CONTROLS_TOP_KEY, `${offset}px`)
+    }
+
+    syncDashboardControlsTop()
+
+    let resizeObserver = null
+    if (typeof window.ResizeObserver === 'function') {
+      resizeObserver = new window.ResizeObserver(() => {
+        syncDashboardControlsTop()
+      })
+      resizeObserver.observe(topbar)
+    }
+
+    window.addEventListener('resize', syncDashboardControlsTop)
+
+    return () => {
+      window.removeEventListener('resize', syncDashboardControlsTop)
+      resizeObserver?.disconnect()
+      stage.style.removeProperty(DASHBOARD_CONTROLS_TOP_KEY)
+    }
+  }, [])
 
   if (!dashboardData) {
     return (

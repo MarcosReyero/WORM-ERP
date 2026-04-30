@@ -103,6 +103,16 @@ def _handle_inventory_call(callback):
             },
             status=500,
         )
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse(
+            {
+                "detail": "Error interno del servidor.",
+                "code": "INTERNAL_ERROR",
+                "error": str(exc),
+                "error_type": exc.__class__.__name__,
+            },
+            status=500,
+        )
 
 
 def _request_payload(request):
