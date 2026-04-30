@@ -1,4 +1,4 @@
-# Nodum ERP
+# WORM ERP
 
 Base inicial de un ERP modular con:
 
