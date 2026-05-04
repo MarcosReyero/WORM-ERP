@@ -54,6 +54,15 @@ Archivos en `deploy/`:
 docker compose -p worm_erp --env-file .env -f deploy/docker-compose.prod.yml up -d --build
 ```
 
+## Cámara / HTTPS (móvil)
+
+Los navegadores móviles bloquean el acceso a cámara (`getUserMedia`) si el sitio no está en un **contexto seguro** (HTTPS con certificado confiable, o `localhost`).
+
+El stack de producción incluye `caddy` (TLS automático) delante de nginx. Requiere:
+
+- Un dominio apuntando al server (A/AAAA) y puertos `80/443` abiertos.
+- Variables en `.env`: `PUBLIC_DOMAIN` y `ACME_EMAIL`.
+
 ## 🔧 Automatización de Stock Mínimo - Desarrollo
 
 ### Comenzar Quick (Recomendado)

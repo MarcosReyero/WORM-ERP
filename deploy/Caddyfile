@@ -1,0 +1,18 @@
+{
+  # Email para Let's Encrypt (opcional pero recomendado)
+  email {$ACME_EMAIL}
+}
+
+# Producción: reemplazar por tu dominio real (ej: worm.tudominio.com)
+{$PUBLIC_DOMAIN} {
+  encode gzip
+
+  # Aumenta límite de uploads si usás importaciones
+  request_body {
+    max_size 20MB
+  }
+
+  # Proxy al nginx interno (sirve SPA + /api + /admin + /static + /media)
+  reverse_proxy nginx:80
+}
+
