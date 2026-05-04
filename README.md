@@ -46,6 +46,14 @@ cd frontend
 npm run dev
 ```
 
+## Deploy con Docker (producción)
+
+Archivos en `deploy/`:
+
+```bash
+docker compose -p worm_erp --env-file .env -f deploy/docker-compose.prod.yml up -d --build
+```
+
 ## 🔧 Automatización de Stock Mínimo - Desarrollo
 
 ### Comenzar Quick (Recomendado)

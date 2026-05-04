@@ -1,0 +1,103 @@
+version: '3.8'
+
+# LEGACY: composición anterior (se conserva como referencia).
+# Recomendado: usar `deploy/docker-compose.prod.yml`.
+
+services:
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME:-inventary}
+      POSTGRES_USER: ${DB_USER:-inventary}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-inventary} -d ${DB_NAME:-inventary}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - inventory-net
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.legacy
+      target: web
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-inventary}:${DB_PASSWORD:-changeme}@db:5432/${DB_NAME:-inventary}
+      DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      INVENTORY_AUTOMATION_ENABLED: "false"
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-inventory@erp.local}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f gunicorn || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - inventory-net
+
+  inventory_automation:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.legacy
+      target: worker
+    command: python manage.py run_inventory_automation --poll-seconds 60 --wait-for-schema 30
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-inventary}:${DB_PASSWORD:-changeme}@db:5432/${DB_NAME:-inventary}
+      DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      INVENTORY_AUTOMATION_ENABLED: "true"
+      INVENTORY_AUTOMATION_POLL_SECONDS: "60"
+      INVENTORY_MINIMUM_STOCK_RECONCILE_SECONDS: "600"
+      INVENTORY_AUTOMATION_BATCH_SIZE: "100"
+      INVENTORY_AUTOMATION_SCHEDULER_LEASE_SECONDS: "90"
+      INVENTORY_AUTOMATION_DIGEST_LEASE_SECONDS: "300"
+      INVENTORY_AUTOMATION_JOB_HEARTBEAT_SECONDS: "15"
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-inventory@erp.local}
+      INVENTORY_ALARM_EMAILS_ENABLED: ${INVENTORY_ALARM_EMAILS_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: always
+    stop_grace_period: 30s
+    networks:
+      - inventory-net
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - inventory-net
+
+networks:
+  inventory-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+

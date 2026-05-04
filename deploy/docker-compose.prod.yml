@@ -1,0 +1,121 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-worm_erp}
+      POSTGRES_USER: ${DB_USER:-worm_erp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - worm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-worm_erp} -d ${DB_NAME:-worm_erp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - worm-net
+
+  web:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://${DB_USER:-worm_erp}:${DB_PASSWORD:-changeme}@db:5432/${DB_NAME:-worm_erp}}
+      DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+
+      INVENTORY_AUTOMATION_ENABLED: "false"
+
+      STATIC_ROOT: /var/www/static
+      MEDIA_ROOT: /var/www/media
+
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-inventory@erp.local}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - worm_static:/var/www/static
+      - worm_media:/var/www/media
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f gunicorn || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - worm-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  inventory_automation:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: python manage.py run_inventory_automation --poll-seconds 60 --wait-for-schema 30
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://${DB_USER:-worm_erp}:${DB_PASSWORD:-changeme}@db:5432/${DB_NAME:-worm_erp}}
+      DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+
+      INVENTORY_AUTOMATION_ENABLED: "true"
+      INVENTORY_AUTOMATION_POLL_SECONDS: "60"
+      INVENTORY_MINIMUM_STOCK_RECONCILE_SECONDS: "600"
+      INVENTORY_AUTOMATION_BATCH_SIZE: "100"
+      INVENTORY_AUTOMATION_SCHEDULER_LEASE_SECONDS: "90"
+      INVENTORY_AUTOMATION_DIGEST_LEASE_SECONDS: "300"
+      INVENTORY_AUTOMATION_JOB_HEARTBEAT_SECONDS: "15"
+
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-inventory@erp.local}
+      INVENTORY_ALARM_EMAILS_ENABLED: ${INVENTORY_ALARM_EMAILS_ENABLED:-true}
+
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: always
+    stop_grace_period: 30s
+    networks:
+      - worm-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  nginx:
+    image: nginx:1.25-alpine
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../frontend/dist:/usr/share/nginx/html:ro
+      - worm_static:/var/www/static:ro
+      - worm_media:/var/www/media:ro
+    restart: unless-stopped
+    networks:
+      - worm-net
+
+networks:
+  worm-net:
+    driver: bridge
+
+volumes:
+  worm_postgres_data:
+  worm_static:
+  worm_media:
+
