@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { createPallet, scanPallet } from '../../lib/api.js'
 import {
   ModuleEmptyState,
@@ -9,6 +9,13 @@ import {
   PanelMessage,
 } from '../modules/ModuleWorkspace.jsx'
 import { formatDateTime, formatQuantity } from './utils.js'
+
+function getIsMobileViewport() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false
+  }
+  return window.matchMedia('(max-width: 720px)').matches
+}
 
 function supportsBarcodeDetector() {
   return typeof window !== 'undefined' && 'BarcodeDetector' in window
@@ -31,10 +38,12 @@ function toNumber(value) {
 
 export function DepositsScanPage() {
   const { depositsOverview, refreshDepositsModule } = useOutletContext()
+  const navigate = useNavigate()
   const videoRef = useRef(null)
   const detectorRef = useRef(null)
   const streamRef = useRef(null)
   const frameRef = useRef(0)
+  const galleryInputRef = useRef(null)
   const [feedback, setFeedback] = useState({
     error: '',
     success: '',
@@ -51,6 +60,13 @@ export function DepositsScanPage() {
     error: '',
     notice: '',
   })
+  const [torchState, setTorchState] = useState({
+    supported: false,
+    enabled: false,
+  })
+  const [isMobile, setIsMobile] = useState(getIsMobileViewport)
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(true)
+  const [galleryBusy, setGalleryBusy] = useState(false)
   const [scanForm, setScanForm] = useState({
     action: 'lookup',
     qrValue: '',
@@ -145,6 +161,44 @@ export function DepositsScanPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined
+    }
+
+    const matcher = window.matchMedia('(max-width: 720px)')
+    const handleChange = () => setIsMobile(matcher.matches)
+    handleChange()
+
+    if (typeof matcher.addEventListener === 'function') {
+      matcher.addEventListener('change', handleChange)
+      return () => matcher.removeEventListener('change', handleChange)
+    }
+
+    matcher.addListener(handleChange)
+    return () => matcher.removeListener(handleChange)
+  }, [])
+
+  async function applyTorch(enabled) {
+    const track = streamRef.current?.getVideoTracks?.()?.[0]
+    if (!track || typeof track.applyConstraints !== 'function') {
+      return false
+    }
+
+    const torchCapable = Boolean(track.getCapabilities?.()?.torch)
+    if (!torchCapable) {
+      return false
+    }
+
+    try {
+      await track.applyConstraints({ advanced: [{ torch: enabled }] })
+      setTorchState({ supported: true, enabled })
+      return true
+    } catch {
+      return false
+    }
+  }
+
   async function stopCamera() {
     if (frameRef.current) {
       window.cancelAnimationFrame(frameRef.current)
@@ -157,6 +211,11 @@ export function DepositsScanPage() {
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
+
+    setTorchState({
+      supported: false,
+      enabled: false,
+    })
     setCameraState((current) => ({
       ...current,
       active: false,
@@ -190,6 +249,13 @@ export function DepositsScanPage() {
       detectorRef.current = qrSupported
         ? new window.BarcodeDetector({ formats: ['qr_code'] })
         : null
+
+      const track = stream.getVideoTracks?.()?.[0]
+      const torchCapable = Boolean(track?.getCapabilities?.()?.torch)
+      setTorchState({
+        supported: torchCapable,
+        enabled: false,
+      })
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
@@ -251,6 +317,55 @@ export function DepositsScanPage() {
         error: message,
         notice: '',
       }))
+    }
+  }
+
+  async function handleGalleryFile(file) {
+    if (!file || !supportsBarcodeDetector()) {
+      setFeedback({
+        error: 'Tu navegador no permite lectura automatica de QR desde imagen.',
+        success: '',
+      })
+      return
+    }
+
+    setGalleryBusy(true)
+    setFeedback({ error: '', success: '' })
+
+    try {
+      const detector = new window.BarcodeDetector({ formats: ['qr_code'] })
+      const bitmap = await createImageBitmap(file)
+      const detected = await detector.detect(bitmap)
+      const rawValue = detected?.[0]?.rawValue
+
+      if (!rawValue) {
+        setFeedback({
+          error: 'No se detecto un QR en la imagen seleccionada.',
+          success: '',
+        })
+        return
+      }
+
+      setScanForm((current) => ({
+        ...current,
+        qrValue: rawValue,
+        inputMethod: 'manual',
+      }))
+      setFeedback({
+        error: '',
+        success: 'QR leido desde galeria. Revisa accion y confirma.',
+      })
+      setMobileSheetOpen(true)
+    } catch (error) {
+      setFeedback({
+        error: error?.message || 'No se pudo leer el QR desde la imagen.',
+        success: '',
+      })
+    } finally {
+      setGalleryBusy(false)
+      if (galleryInputRef.current) {
+        galleryInputRef.current.value = ''
+      }
     }
   }
 
@@ -334,6 +449,310 @@ export function DepositsScanPage() {
         title="Registro no disponible"
         description="Tu perfil no tiene permiso para registrar pallets ni operar por QR."
       />
+    )
+  }
+
+  if (isMobile && canUseScanTools) {
+    return (
+      <div className="deposits-mobile-scan">
+        <header className="deposits-mobile-scan-header">
+          <button
+            className="deposits-mobile-scan-icon"
+            onClick={() => navigate('/depositos/resumen')}
+            type="button"
+          >
+            <svg
+              className="icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M15 18 9 12l6-6" />
+            </svg>
+          </button>
+          <div className="deposits-mobile-scan-title">
+            <h1>Escanear QR</h1>
+            <p>Coloca el código QR dentro del recuadro para escanear</p>
+          </div>
+          <button
+            className="deposits-mobile-scan-icon"
+            disabled={!torchState.supported || !cameraState.active}
+            onClick={() => void applyTorch(!torchState.enabled)}
+            type="button"
+            title={torchState.enabled ? 'Apagar flash' : 'Encender flash'}
+          >
+            <svg
+              className="icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M13 2 3 14h7l-1 8 12-14h-7l1-6Z" />
+            </svg>
+          </button>
+        </header>
+
+        <div className="deposits-mobile-scan-frame" role="region" aria-label="Vista de camara">
+          <video className="deposits-mobile-scan-video" muted playsInline ref={videoRef} />
+          <div className="deposits-mobile-scan-overlay" aria-hidden="true">
+            <div className="deposits-mobile-scan-corner deposits-mobile-scan-corner--tl" />
+            <div className="deposits-mobile-scan-corner deposits-mobile-scan-corner--tr" />
+            <div className="deposits-mobile-scan-corner deposits-mobile-scan-corner--bl" />
+            <div className="deposits-mobile-scan-corner deposits-mobile-scan-corner--br" />
+            {cameraState.active ? <div className="deposits-mobile-scan-line" /> : null}
+          </div>
+        </div>
+
+        <div className="deposits-mobile-scan-actions">
+          {!cameraState.active ? (
+            <button className="primary-button deposits-mobile-scan-main-button" onClick={() => void startCamera()} type="button">
+              Abrir camara
+            </button>
+          ) : (
+            <button className="secondary-button deposits-mobile-scan-main-button" onClick={() => void stopCamera()} type="button">
+              Detener camara
+            </button>
+          )}
+
+          <label className="deposits-mobile-scan-gallery">
+            <input
+              accept="image/*"
+              disabled={galleryBusy}
+              onChange={(event) => void handleGalleryFile(event.target.files?.[0])}
+              ref={galleryInputRef}
+              type="file"
+            />
+            Desde galeria
+          </label>
+        </div>
+
+        {cameraState.error ? <p className="deposits-mobile-scan-note is-error">{cameraState.error}</p> : null}
+        {cameraState.notice ? <p className="deposits-mobile-scan-note">{cameraState.notice}</p> : null}
+        {feedback.error ? <p className="deposits-mobile-scan-note is-error">{feedback.error}</p> : null}
+        {feedback.success ? <p className="deposits-mobile-scan-note is-success">{feedback.success}</p> : null}
+
+        <section className={`deposits-mobile-scan-sheet ${mobileSheetOpen ? 'is-open' : ''}`}>
+          <button
+            className="deposits-mobile-scan-sheet-handle"
+            onClick={() => setMobileSheetOpen((current) => !current)}
+            type="button"
+          >
+            <span />
+          </button>
+
+          <form className="deposits-mobile-scan-form" onSubmit={handleScanSubmit}>
+            <div className="deposits-mobile-scan-form-row">
+              <label>
+                <span>Accion</span>
+                <select
+                  value={scanForm.action}
+                  onChange={(event) =>
+                    setScanForm((current) => ({
+                      ...current,
+                      action: event.target.value,
+                    }))
+                  }
+                >
+                  {actionOptions.map((action) => (
+                    <option key={action.value} value={action.value}>
+                      {action.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>QR</span>
+                <input
+                  onChange={(event) =>
+                    setScanForm((current) => ({
+                      ...current,
+                      qrValue: event.target.value,
+                      inputMethod: current.inputMethod === 'camera' ? 'camera' : 'manual',
+                    }))
+                  }
+                  placeholder="PAL-000001"
+                  type="text"
+                  value={scanForm.qrValue}
+                />
+              </label>
+            </div>
+
+            {scanForm.action === 'register' ? (
+              <div className="deposits-mobile-scan-form-row">
+                <label>
+                  <span>Articulo</span>
+                  <select
+                    value={scanArticleId}
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        articleId: event.target.value,
+                        batchId: '',
+                      }))
+                    }
+                  >
+                    {articles.map((article) => (
+                      <option key={article.id} value={article.id}>
+                        {article.internal_code} / {article.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Lote</span>
+                  <select
+                    value={scanBatchId}
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        batchId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Sin lote</option>
+                    {scanFilteredBatches.map((batch) => (
+                      <option key={batch.id} value={batch.id}>
+                        {batch.lot_code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Deposito</span>
+                  <select
+                    value={scanLocationId}
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        locationId: event.target.value,
+                      }))
+                    }
+                  >
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.code} / {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Posicion</span>
+                  <select
+                    value={scanPositionId}
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        positionId: event.target.value,
+                      }))
+                    }
+                  >
+                    {scanFilteredPositions.map((position) => (
+                      <option key={position.id} value={position.id}>
+                        {position.zone} / {position.code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Cantidad</span>
+                  <input
+                    min="0.001"
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        quantity: event.target.value,
+                      }))
+                    }
+                    step="0.001"
+                    type="number"
+                    value={scanForm.quantity}
+                  />
+                </label>
+              </div>
+            ) : null}
+
+            {scanForm.action === 'relocate' ? (
+              <div className="deposits-mobile-scan-form-row">
+                <label>
+                  <span>Deposito destino</span>
+                  <select
+                    value={scanLocationId}
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        locationId: event.target.value,
+                      }))
+                    }
+                  >
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.code} / {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Posicion destino</span>
+                  <select
+                    value={scanPositionId}
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        positionId: event.target.value,
+                      }))
+                    }
+                  >
+                    {scanFilteredPositions.map((position) => (
+                      <option key={position.id} value={position.id}>
+                        {position.zone} / {position.code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+
+            <label className="deposits-mobile-scan-form-notes">
+              <span>Notas</span>
+              <textarea
+                onChange={(event) =>
+                  setScanForm((current) => ({
+                    ...current,
+                    notes: event.target.value,
+                  }))
+                }
+                rows="2"
+                value={scanForm.notes}
+              />
+            </label>
+
+            <div className="deposits-mobile-scan-form-actions">
+              <button className="primary-button" disabled={!scanForm.qrValue} type="submit">
+                Confirmar accion
+              </button>
+              {canUseManualRegistry ? (
+                <button className="secondary-button" onClick={() => navigate('/depositos/resumen')} type="button">
+                  Ir a resumen
+                </button>
+              ) : (
+                <button className="secondary-button" onClick={() => navigate('/depositos/resumen')} type="button">
+                  Ver resumen
+                </button>
+              )}
+            </div>
+          </form>
+        </section>
+      </div>
     )
   }
 

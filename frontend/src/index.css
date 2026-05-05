@@ -6830,6 +6830,303 @@ a {
   min-width: 170px;
 }
 
+/* Deposits scan (mobile scanner layout) */
+.deposits-mobile-scan {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 12px
+    calc(14px + env(safe-area-inset-bottom, 0px));
+  border-radius: 14px;
+  background:
+    radial-gradient(
+      110% 75% at 50% 20%,
+      color-mix(in srgb, var(--deposits-erp-accent) 26%, transparent) 0%,
+      color-mix(in srgb, var(--deposits-erp-canvas-bg) 94%, #000000 6%) 60%,
+      var(--deposits-erp-canvas-bg) 100%
+    );
+  color: var(--deposits-erp-text);
+}
+
+.deposits-mobile-scan-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+}
+
+.deposits-mobile-scan-title h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--deposits-erp-head-text);
+}
+
+.deposits-mobile-scan-title p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  text-align: center;
+  color: color-mix(in srgb, var(--deposits-erp-text) 72%, transparent);
+}
+
+.deposits-mobile-scan-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
+  background: color-mix(in srgb, var(--deposits-erp-surface-alt) 22%, transparent);
+  color: var(--deposits-erp-head-text);
+}
+
+.deposits-mobile-scan-icon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.deposits-mobile-scan-frame {
+  position: relative;
+  flex: 1;
+  min-height: min(58vh, 520px);
+  border-radius: 22px;
+  overflow: hidden;
+  background: #050b13;
+  border: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--deposits-erp-accent) 14%, transparent),
+    0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+.deposits-mobile-scan-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.deposits-mobile-scan-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.deposits-mobile-scan-corner {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  border: 4px solid transparent;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--deposits-erp-accent) 40%, transparent));
+}
+
+.deposits-mobile-scan-corner--tl {
+  left: 18px;
+  top: 18px;
+  border-left-color: var(--deposits-erp-accent);
+  border-top-color: var(--deposits-erp-accent);
+}
+
+.deposits-mobile-scan-corner--tr {
+  right: 18px;
+  top: 18px;
+  border-right-color: var(--deposits-erp-accent);
+  border-top-color: var(--deposits-erp-accent);
+}
+
+.deposits-mobile-scan-corner--bl {
+  left: 18px;
+  bottom: 18px;
+  border-left-color: var(--deposits-erp-accent);
+  border-bottom-color: var(--deposits-erp-accent);
+}
+
+.deposits-mobile-scan-corner--br {
+  right: 18px;
+  bottom: 18px;
+  border-right-color: var(--deposits-erp-accent);
+  border-bottom-color: var(--deposits-erp-accent);
+}
+
+.deposits-mobile-scan-line {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--deposits-erp-accent) 88%, #ffffff 12%),
+    transparent
+  );
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--deposits-erp-accent) 80%, transparent),
+    0 0 50px color-mix(in srgb, var(--deposits-erp-accent) 55%, transparent);
+  animation: depositsScanLine 2.4s ease-in-out infinite;
+}
+
+@keyframes depositsScanLine {
+  0% {
+    transform: translateY(-160px);
+    opacity: 0.2;
+  }
+  15% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(0);
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(160px);
+    opacity: 0.2;
+  }
+}
+
+.deposits-mobile-scan-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.deposits-mobile-scan-main-button {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+}
+
+.deposits-mobile-scan-gallery {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
+  background: color-mix(in srgb, var(--deposits-erp-surface-alt) 18%, transparent);
+  color: var(--deposits-erp-text);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.deposits-mobile-scan-gallery input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.deposits-mobile-scan-note {
+  margin: 0;
+  font-size: 0.92rem;
+  color: color-mix(in srgb, var(--deposits-erp-text) 78%, transparent);
+  text-align: center;
+}
+
+.deposits-mobile-scan-note.is-error {
+  color: color-mix(in srgb, var(--workspace-error-text) 90%, var(--deposits-erp-text));
+}
+
+.deposits-mobile-scan-note.is-success {
+  color: color-mix(in srgb, var(--workspace-success-text) 88%, var(--deposits-erp-text));
+}
+
+.deposits-mobile-scan-sheet {
+  margin-top: auto;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
+  background: color-mix(in srgb, var(--deposits-erp-surface-bg) 82%, transparent);
+  box-shadow: 0 14px 48px rgba(0, 0, 0, 0.24);
+  overflow: hidden;
+}
+
+.deposits-mobile-scan-sheet-handle {
+  width: 100%;
+  padding: 10px 0 0;
+  background: transparent;
+  border: 0;
+}
+
+.deposits-mobile-scan-sheet-handle span {
+  display: block;
+  width: 52px;
+  height: 4px;
+  border-radius: 999px;
+  margin: 0 auto;
+  background: color-mix(in srgb, var(--deposits-erp-border) 64%, transparent);
+}
+
+.deposits-mobile-scan-form {
+  padding: 10px 12px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.deposits-mobile-scan-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.deposits-mobile-scan-form-row label,
+.deposits-mobile-scan-form-notes {
+  display: grid;
+  gap: 4px;
+}
+
+.deposits-mobile-scan-form-row label span,
+.deposits-mobile-scan-form-notes span {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--deposits-erp-text) 78%, transparent);
+}
+
+.deposits-mobile-scan-form-row input,
+.deposits-mobile-scan-form-row select,
+.deposits-mobile-scan-form-notes textarea {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
+  background: color-mix(in srgb, var(--deposits-erp-surface-bg) 90%, transparent);
+  color: var(--deposits-erp-text);
+  padding: 0 10px;
+}
+
+.deposits-mobile-scan-form-notes textarea {
+  padding: 8px 10px;
+  min-height: 68px;
+}
+
+.deposits-mobile-scan-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.deposits-mobile-scan-form-actions .primary-button,
+.deposits-mobile-scan-form-actions .secondary-button {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+}
+
+@media (min-width: 721px) {
+  .deposits-mobile-scan {
+    display: none;
+  }
+}
+
 .deposits-result-card,
 .deposits-result-card--erp,
 .deposits-plan-card,
