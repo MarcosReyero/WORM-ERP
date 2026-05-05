@@ -86,6 +86,31 @@ export function TiaLayout() {
 
   const connection = tiaState.data?.connection
   const alertCount = tiaState.data?.tags?.filter((tag) => tag.health?.pill !== 'ok').length || 0
+  const navGroups = [
+    {
+      title: 'Operacion',
+      items: [
+        {
+          to: '/tia/enlace-s7',
+          label: 'Enlace S7-300',
+          hint: 'Integracion, diagnostico y monitoreo',
+          shortLabel: 'S7',
+          badge: alertCount,
+        },
+      ],
+    },
+    {
+      title: 'Analitica',
+      items: [
+        {
+          to: '/tia/analisis-ia',
+          label: 'Analisis IA',
+          hint: 'Reportes periodicos y recomendaciones',
+          shortLabel: 'IA',
+        },
+      ],
+    },
+  ]
 
   return (
     <ModuleWorkspaceLayout
@@ -116,31 +141,7 @@ export function TiaLayout() {
           </span>
         ) : null
       }
-      navGroups={[
-        {
-          title: 'Operacion',
-          items: [
-            {
-              to: '/tia/enlace-s7',
-              label: 'Enlace S7-300',
-              hint: 'Integracion, diagnostico y monitoreo',
-              shortLabel: 'S7',
-              badge: alertCount,
-            },
-          ],
-        },
-        {
-          title: 'Analitica',
-          items: [
-            {
-              to: '/tia/analisis-ia',
-              label: 'Analisis IA',
-              hint: 'Reportes periodicos y recomendaciones',
-              shortLabel: 'IA',
-            },
-          ],
-        },
-      ]}
+      navGroups={navGroups}
     >
       {tiaState.error ? <div className="form-error">{tiaState.error}</div> : null}
 
@@ -154,6 +155,7 @@ export function TiaLayout() {
             refreshSession,
             refreshTiaModule,
             searchValue,
+            navGroups,
             tiaOverview: tiaState.data,
             user,
           }}

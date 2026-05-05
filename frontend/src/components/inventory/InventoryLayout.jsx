@@ -84,6 +84,85 @@ export function InventoryLayout() {
     }
   }
 
+  const navGroups = [
+    {
+      title: 'Vista',
+      items: [
+        {
+          to: '/inventario/resumen',
+          label: 'Resumen',
+          hint: 'Stock actual y alertas',
+          shortLabel: 'R',
+        },
+        {
+          to: '/inventario/stock',
+          label: 'Stock',
+          hint: 'Maestro y existencias',
+          shortLabel: 'S',
+          badge: inventoryState.data?.articles.length || 0,
+        },
+      ],
+    },
+    {
+      title: 'Operacion',
+      items: [
+        {
+          to: '/inventario/movimientos',
+          label: 'Movimientos',
+          hint: 'Ingresos, egresos y transferencias',
+          shortLabel: 'M',
+        },
+        {
+          to: '/inventario/prestamos',
+          label: 'Prestamos',
+          hint: 'Herramientas y unidades',
+          shortLabel: 'P',
+          badge:
+            inventoryState.data?.checkouts.filter((item) => item.status === 'open').length || 0,
+        },
+      ],
+    },
+    {
+      title: 'Control',
+      items: [
+        {
+          to: '/inventario/conteos',
+          label: 'Conteos',
+          hint: 'Inventario fisico',
+          shortLabel: 'C',
+          badge:
+            inventoryState.data?.count_sessions.filter((item) => item.status !== 'closed').length ||
+            0,
+        },
+        {
+          to: '/inventario/diferencias',
+          label: 'Diferencias',
+          hint: 'Ajustes pendientes',
+          shortLabel: 'D',
+          badge:
+            inventoryState.data?.discrepancies.filter((item) => item.status === 'open').length ||
+            0,
+        },
+        ...(inventoryState.data?.permissions?.can_manage_alarms
+          ? [
+              {
+                to: '/inventario/alarmas',
+                label: 'Alarmas',
+                hint: 'Stock de seguridad y avisos',
+                shortLabel: 'A',
+                badge:
+                  (inventoryState.data?.safety_alerts.filter(
+                    (item) => item.is_enabled && item.status === 'triggered',
+                  ).length || 0) +
+                  (inventoryState.data?.alarms.filter((item) => item.status !== 'closed').length ||
+                    0),
+              },
+            ]
+          : []),
+      ],
+    },
+  ]
+
   return (
     <ModuleWorkspaceLayout
       headerTitle=""
@@ -106,84 +185,7 @@ export function InventoryLayout() {
           <RefreshIcon />
         </button>
       }
-      navGroups={[
-        {
-          title: 'Vista',
-          items: [
-            {
-              to: '/inventario/resumen',
-              label: 'Resumen',
-              hint: 'Stock actual y alertas',
-              shortLabel: 'R',
-            },
-            {
-              to: '/inventario/stock',
-              label: 'Stock',
-              hint: 'Maestro y existencias',
-              shortLabel: 'S',
-              badge: inventoryState.data?.articles.length || 0,
-            },
-          ],
-        },
-        {
-          title: 'Operacion',
-          items: [
-            {
-              to: '/inventario/movimientos',
-              label: 'Movimientos',
-              hint: 'Ingresos, egresos y transferencias',
-              shortLabel: 'M',
-            },
-            {
-              to: '/inventario/prestamos',
-              label: 'Prestamos',
-              hint: 'Herramientas y unidades',
-              shortLabel: 'P',
-              badge:
-                inventoryState.data?.checkouts.filter((item) => item.status === 'open').length || 0,
-            },
-          ],
-        },
-        {
-          title: 'Control',
-          items: [
-            {
-              to: '/inventario/conteos',
-              label: 'Conteos',
-              hint: 'Inventario fisico',
-              shortLabel: 'C',
-              badge:
-                inventoryState.data?.count_sessions.filter((item) => item.status !== 'closed').length ||
-                0,
-            },
-            {
-              to: '/inventario/diferencias',
-              label: 'Diferencias',
-              hint: 'Ajustes pendientes',
-              shortLabel: 'D',
-              badge:
-                inventoryState.data?.discrepancies.filter((item) => item.status === 'open').length ||
-                0,
-            },
-            ...(inventoryState.data?.permissions?.can_manage_alarms
-              ? [
-                  {
-                    to: '/inventario/alarmas',
-                    label: 'Alarmas',
-                    hint: 'Stock de seguridad y avisos',
-                    shortLabel: 'A',
-                    badge:
-                      (inventoryState.data?.safety_alerts.filter(
-                        (item) => item.is_enabled && item.status === 'triggered',
-                      ).length || 0) +
-                      (inventoryState.data?.alarms.filter((item) => item.status !== 'closed').length ||
-                        0),
-                  },
-                ]
-              : []),
-          ],
-        },
-      ]}
+      navGroups={navGroups}
     >
       {inventoryState.error ? <div className="form-error">{inventoryState.error}</div> : null}
 
@@ -195,6 +197,7 @@ export function InventoryLayout() {
         <Outlet
           context={{
             inventoryOverview: inventoryState.data,
+            navGroups,
             refreshInventoryModule,
             refreshSession,
             searchValue,

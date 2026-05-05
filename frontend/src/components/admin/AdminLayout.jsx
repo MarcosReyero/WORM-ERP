@@ -9,6 +9,32 @@ export function AdminLayout() {
     return <Navigate replace to="/" />
   }
 
+  const navGroups = [
+    {
+      title: 'Gestion',
+      items: [
+        {
+          to: '/administracion/usuarios',
+          label: 'Usuarios',
+          hint: 'Alta, roles y accesos',
+          shortLabel: 'U',
+        },
+        {
+          to: '/administracion/permisos',
+          label: 'Permisos',
+          hint: 'Roles, modulos y sectores',
+          shortLabel: 'P',
+        },
+        {
+          to: '/administracion/guia-roles',
+          label: 'Guia de roles',
+          hint: 'Que hace cada rol',
+          shortLabel: 'G',
+        },
+      ],
+    },
+  ]
+
   return (
     <ModuleWorkspaceLayout
       headerTitle=""
@@ -17,33 +43,9 @@ export function AdminLayout() {
       variant="erp"
       workspaceClassName="admin-workspace erp-platform-workspace"
       moduleTitle="Administracion"
-      navGroups={[
-        {
-          title: 'Gestion',
-          items: [
-            {
-              to: '/administracion/usuarios',
-              label: 'Usuarios',
-              hint: 'Alta, roles y accesos',
-              shortLabel: 'U',
-            },
-            {
-              to: '/administracion/permisos',
-              label: 'Permisos',
-              hint: 'Roles, modulos y sectores',
-              shortLabel: 'P',
-            },
-            {
-              to: '/administracion/guia-roles',
-              label: 'Guia de roles',
-              hint: 'Que hace cada rol',
-              shortLabel: 'G',
-            },
-          ],
-        },
-      ]}
+      navGroups={navGroups}
     >
-      <Outlet context={parentContext} />
+      <Outlet context={{ ...parentContext, navGroups }} />
     </ModuleWorkspaceLayout>
   )
 }

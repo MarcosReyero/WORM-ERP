@@ -40,6 +40,7 @@ import {
   logoutRequest,
   updateProfile,
 } from './lib/api.js'
+import { ModuleNavIndexRedirect } from './components/modules/ModuleNavIndexRedirect.jsx'
 
 const THEME_STORAGE_KEY = 'inventary-workspace-theme'
 
@@ -273,7 +274,7 @@ function App() {
           <Route path="guia-roles" element={<AdminRolesGuidePage />} />
         </Route>
         <Route path="inventario" element={<InventoryLayout />}>
-          <Route index element={<Navigate replace to="stock" />} />
+          <Route index element={<ModuleNavIndexRedirect fallbackTo="/inventario/stock" />} />
           <Route path="resumen" element={<InventoryOverviewPage />} />
           <Route path="stock" element={<InventoryStockPage />} />
           <Route path="stock/:articleId" element={<InventoryArticleDetailPage />} />
@@ -284,22 +285,22 @@ function App() {
           <Route path="alarmas" element={<InventoryAlarmsPage />} />
         </Route>
         <Route path="depositos" element={<DepositsLayout />}>
-          <Route index element={<Navigate replace to="resumen" />} />
+          <Route index element={<ModuleNavIndexRedirect fallbackTo="/depositos/resumen" />} />
           <Route path="resumen" element={<DepositsRegistryPage />} />
           <Route path="registro" element={<DepositsScanPage />} />
           <Route path="escaneo" element={<Navigate replace to="../registro" />} />
         </Route>
         <Route path="personal" element={<PersonalLayout />}>
-          <Route index element={<Navigate replace to="informes" />} />
+          <Route index element={<ModuleNavIndexRedirect fallbackTo="/personal/informes" />} />
           <Route path="informes" element={<PersonalReportsPage />} />
         </Route>
         <Route path="compras" element={<PurchasingLayout />}>
-          <Route index element={<Navigate replace to="solicitudes" />} />
+          <Route index element={<ModuleNavIndexRedirect fallbackTo="/compras/solicitudes" />} />
           <Route path="solicitudes" element={<RequestsPage />} />
           <Route path="alarmas" element={<PurchasingAlarmsPage />} />
         </Route>
         <Route path="tia" element={<TiaLayout />}>
-          <Route index element={<Navigate replace to="enlace-s7" />} />
+          <Route index element={<ModuleNavIndexRedirect fallbackTo="/tia/enlace-s7" />} />
           <Route path="enlace-s7" element={<TiaVariableDashboardPage />} />
           <Route path="analisis-ia" element={<TiaAiReportsPage />} />
         </Route>

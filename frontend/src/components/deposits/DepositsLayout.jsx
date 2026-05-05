@@ -86,6 +86,35 @@ export function DepositsLayout() {
 
   const permissions = depositsState.data?.permissions
   const canAccessModule = permissions?.can_view_module ?? true
+  const navGroups = [
+    {
+      title: 'Operacion',
+      items: [
+        ...(permissions?.can_view_registry
+          ? [
+              {
+                to: '/depositos/resumen',
+                label: 'Resumen',
+                hint: 'Movimientos y pallets recientes',
+                shortLabel: 'Rs',
+                badge: depositsState.data?.pallets_recent?.length || 0,
+              },
+            ]
+          : []),
+        ...(permissions?.can_scan || permissions?.can_manage_registry
+          ? [
+              {
+                to: '/depositos/registro',
+                label: 'Registro',
+                hint: 'Alta manual, QR y reubicacion',
+                shortLabel: 'Rg',
+                badge: depositsState.data?.events_recent?.length || 0,
+              },
+            ]
+          : []),
+      ],
+    },
+  ]
 
   if (!depositsState.loading && depositsState.data && !canAccessModule) {
     return <Navigate replace to="/" />
@@ -113,35 +142,7 @@ export function DepositsLayout() {
           <RefreshIcon />
         </button>
       }
-      navGroups={[
-        {
-          title: 'Operacion',
-          items: [
-            ...(permissions?.can_view_registry
-              ? [
-                  {
-                    to: '/depositos/resumen',
-                    label: 'Resumen',
-                    hint: 'Movimientos y pallets recientes',
-                    shortLabel: 'Rs',
-                    badge: depositsState.data?.pallets_recent?.length || 0,
-                  },
-                ]
-              : []),
-            ...(permissions?.can_scan || permissions?.can_manage_registry
-              ? [
-                  {
-                    to: '/depositos/registro',
-                    label: 'Registro',
-                    hint: 'Alta manual, QR y reubicacion',
-                    shortLabel: 'Rg',
-                    badge: depositsState.data?.events_recent?.length || 0,
-                  },
-                ]
-              : []),
-          ],
-        },
-      ]}
+      navGroups={navGroups}
     >
       {depositsState.error ? <div className="form-error">{depositsState.error}</div> : null}
 
@@ -153,6 +154,7 @@ export function DepositsLayout() {
         <Outlet
           context={{
             depositsOverview: depositsState.data,
+            navGroups,
             refreshDepositsModule,
             refreshSession,
             searchValue,

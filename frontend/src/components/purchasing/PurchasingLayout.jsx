@@ -3,6 +3,25 @@ import { ModuleWorkspaceLayout } from '../modules/ModuleWorkspace.jsx'
 
 export function PurchasingLayout() {
   const parentContext = useOutletContext()
+  const navGroups = [
+    {
+      title: 'Gestion',
+      items: [
+        {
+          to: '/compras/solicitudes',
+          label: 'Solicitud de compras',
+          hint: 'Crear y seguir solicitudes internas',
+          shortLabel: 'S',
+        },
+        {
+          to: '/compras/alarmas',
+          label: 'Alarmas',
+          hint: 'Minimos, destinatarios y canales',
+          shortLabel: 'A',
+        },
+      ],
+    },
+  ]
 
   return (
     <ModuleWorkspaceLayout
@@ -12,27 +31,9 @@ export function PurchasingLayout() {
       variant="erp"
       workspaceClassName="purchasing-workspace erp-platform-workspace"
       moduleTitle="Compras"
-      navGroups={[
-        {
-          title: 'Gestion',
-          items: [
-            {
-              to: '/compras/solicitudes',
-              label: 'Solicitud de compras',
-              hint: 'Crear y seguir solicitudes internas',
-              shortLabel: 'S',
-            },
-            {
-              to: '/compras/alarmas',
-              label: 'Alarmas',
-              hint: 'Minimos, destinatarios y canales',
-              shortLabel: 'A',
-            },
-          ],
-        },
-      ]}
+      navGroups={navGroups}
     >
-      <Outlet context={parentContext} />
+      <Outlet context={{ ...parentContext, navGroups }} />
     </ModuleWorkspaceLayout>
   )
 }

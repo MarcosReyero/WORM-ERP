@@ -3,6 +3,19 @@ import { ModuleWorkspaceLayout } from '../modules/ModuleWorkspace.jsx'
 
 export function PersonalLayout() {
   const parentContext = useOutletContext()
+  const navGroups = [
+    {
+      title: 'Secciones',
+      items: [
+        {
+          to: '/personal/informes',
+          label: 'Informes',
+          hint: 'Importar o exportar Excel',
+          shortLabel: 'I',
+        },
+      ],
+    },
+  ]
 
   return (
     <ModuleWorkspaceLayout
@@ -12,21 +25,9 @@ export function PersonalLayout() {
       variant="erp"
       workspaceClassName="personal-workspace erp-platform-workspace"
       moduleTitle="Personal"
-      navGroups={[
-        {
-          title: 'Secciones',
-          items: [
-            {
-              to: '/personal/informes',
-              label: 'Informes',
-              hint: 'Importar o exportar Excel',
-              shortLabel: 'I',
-            },
-          ],
-        },
-      ]}
+      navGroups={navGroups}
     >
-      <Outlet context={parentContext} />
+      <Outlet context={{ ...parentContext, navGroups }} />
     </ModuleWorkspaceLayout>
   )
 }
