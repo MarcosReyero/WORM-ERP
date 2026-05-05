@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { ChevronDownIcon, InboxIcon, LogoutIcon, MoonIcon, ProfileIcon, SearchIcon, SunIcon } from './Icons.jsx'
+import { ChevronDownIcon, InboxIcon, LogoutIcon, MoonIcon, ProfileIcon, SunIcon } from './Icons.jsx'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { PlatformSidebar } from './shell/PlatformSidebar.jsx'
 import { PlatformShellProvider } from './shell/PlatformShellContext.jsx'
@@ -70,12 +70,10 @@ export function AppLayout({
   user,
 }) {
   const location = useLocation()
-  const [searchByPath, setSearchByPath] = useState({})
   const [menuOpen, setMenuOpen] = useState(false)
   const [sidebarConfig, setSidebarConfigState] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarOpen)
   const menuRef = useRef(null)
-  const searchValue = searchByPath[location.pathname] || ''
   const unreadBadge = formatBadge(user?.unread_messages_count)
   const workspaceHeading = getWorkspaceHeading(location.pathname, sidebarConfig)
 
@@ -146,22 +144,6 @@ export function AppLayout({
                 {workspaceHeading.subtitle ? <span>{workspaceHeading.subtitle}</span> : null}
               </div>
             </div>
-
-            <label className="workspace-search" htmlFor="workspace-search">
-              <SearchIcon />
-              <input
-                id="workspace-search"
-                onChange={(event) =>
-                  setSearchByPath((current) => ({
-                    ...current,
-                    [location.pathname]: event.target.value,
-                  }))
-                }
-                placeholder="Buscar en el sistema"
-                type="search"
-                value={searchValue}
-              />
-            </label>
 
             <div className="topbar-right">
               <Link
@@ -265,7 +247,7 @@ export function AppLayout({
                 dashboardData,
                 refreshSession: onRefreshSession,
                 refreshWorkspace: onRefresh,
-                searchValue,
+                searchValue: '',
                 setWorkspaceTheme: onThemeChange,
                 theme,
                 user,
