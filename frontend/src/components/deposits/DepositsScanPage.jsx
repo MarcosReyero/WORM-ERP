@@ -67,6 +67,7 @@ export function DepositsScanPage() {
   const [isMobile, setIsMobile] = useState(getIsMobileViewport)
   const [mobileSheetOpen, setMobileSheetOpen] = useState(true)
   const [galleryBusy, setGalleryBusy] = useState(false)
+  const [scanOverlay, setScanOverlay] = useState('')
   const [scanForm, setScanForm] = useState({
     action: 'lookup',
     qrValue: '',
@@ -179,6 +180,18 @@ export function DepositsScanPage() {
     return () => matcher.removeListener(handleChange)
   }, [])
 
+  useEffect(() => {
+    if (!scanOverlay) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setScanOverlay('')
+    }, 900)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [scanOverlay])
+
   async function applyTorch(enabled) {
     const track = streamRef.current?.getVideoTracks?.()?.[0]
     if (!track || typeof track.applyConstraints !== 'function') {
@@ -286,6 +299,7 @@ export function DepositsScanPage() {
               qrValue: rawValue,
               inputMethod: 'camera',
             }))
+            setScanOverlay('success')
             setFeedback({
               error: '',
               success: 'QR leido desde camara. Revisa accion y confirma.',
@@ -326,6 +340,7 @@ export function DepositsScanPage() {
         error: 'Tu navegador no permite lectura automatica de QR desde imagen.',
         success: '',
       })
+      setScanOverlay('error')
       return
     }
 
@@ -343,6 +358,7 @@ export function DepositsScanPage() {
           error: 'No se detecto un QR en la imagen seleccionada.',
           success: '',
         })
+        setScanOverlay('error')
         return
       }
 
@@ -351,6 +367,7 @@ export function DepositsScanPage() {
         qrValue: rawValue,
         inputMethod: 'manual',
       }))
+      setScanOverlay('success')
       setFeedback({
         error: '',
         success: 'QR leido desde galeria. Revisa accion y confirma.',
@@ -361,6 +378,7 @@ export function DepositsScanPage() {
         error: error?.message || 'No se pudo leer el QR desde la imagen.',
         success: '',
       })
+      setScanOverlay('error')
     } finally {
       setGalleryBusy(false)
       if (galleryInputRef.current) {
@@ -387,6 +405,7 @@ export function DepositsScanPage() {
       })
 
       setResult(response)
+      setScanOverlay('success')
       setFeedback({
         error: '',
         success: response.detail || 'Escaneo procesado.',
@@ -401,6 +420,7 @@ export function DepositsScanPage() {
         quantity: current.action === 'register' ? '1' : current.quantity,
       }))
     } catch (error) {
+      setScanOverlay('error')
       setFeedback({
         error: error.message || 'No se pudo procesar el escaneo.',
         success: '',
@@ -469,7 +489,9 @@ export function DepositsScanPage() {
               stroke="currentColor"
               aria-hidden="true"
             >
-              <path d="M15 18 9 12l6-6" />
+              <path d="M4 7h16" />
+              <path d="M4 12h16" />
+              <path d="M4 17h16" />
             </svg>
           </button>
           <div className="deposits-mobile-scan-title">
@@ -498,12 +520,47 @@ export function DepositsScanPage() {
 
         <div className="deposits-mobile-scan-frame" role="region" aria-label="Vista de camara">
           <video className="deposits-mobile-scan-video" muted playsInline ref={videoRef} />
-          <div className="deposits-mobile-scan-overlay" aria-hidden="true">
+          <div className="deposits-mobile-scan-overlay">
+            <button
+              className="deposits-mobile-scan-fab"
+              disabled={!torchState.supported || !cameraState.active}
+              onClick={() => void applyTorch(!torchState.enabled)}
+              type="button"
+              aria-label={torchState.enabled ? 'Apagar flash' : 'Encender flash'}
+              title={torchState.enabled ? 'Apagar flash' : 'Encender flash'}
+            >
+              <svg
+                className="icon"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="2"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M13 2 3 14h7l-1 8 12-14h-7l1-6Z" />
+              </svg>
+            </button>
             <div className="deposits-mobile-scan-corner deposits-mobile-scan-corner--tl" />
             <div className="deposits-mobile-scan-corner deposits-mobile-scan-corner--tr" />
             <div className="deposits-mobile-scan-corner deposits-mobile-scan-corner--bl" />
             <div className="deposits-mobile-scan-corner deposits-mobile-scan-corner--br" />
             {cameraState.active ? <div className="deposits-mobile-scan-line" /> : null}
+            {scanOverlay ? (
+              <div className={`deposits-mobile-scan-status deposits-mobile-scan-status--${scanOverlay}`}>
+                <div className="deposits-mobile-scan-status-icon">
+                  {scanOverlay === 'success' ? (
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6 6l12 12" />
+                      <path d="M18 6 6 18" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
