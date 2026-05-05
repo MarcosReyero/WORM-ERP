@@ -6,8 +6,11 @@ import {
   InboxIcon as InboxLucideIcon,
   LayoutDashboardIcon,
   LogOutIcon,
+  MoonIcon,
+  RefreshCwIcon,
   ShoppingCartIcon,
   ShieldAlertIcon,
+  SunIcon,
   UserRoundIcon,
   UsersRoundIcon,
   WarehouseIcon,
@@ -171,10 +174,16 @@ function SidebarContextualNav({ groups }) {
 export function PlatformSidebar({
   dashboardData,
   onLogout,
+  onRefresh,
+  onRefreshSession,
+  onThemeChange,
   sidebarConfig,
+  theme,
   user,
 }) {
   const location = useLocation()
+  const themeSwitchLabel = theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'
+  const ThemeSwitchIcon = theme === 'dark' ? SunIcon : MoonIcon
   const globalGroups = [
     {
       title: 'Principal',
@@ -300,6 +309,26 @@ export function PlatformSidebar({
         <SidebarSeparator />
 
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => void onThemeChange(theme === 'dark' ? 'light' : 'dark')} tooltip={themeSwitchLabel}>
+              <ThemeSwitchIcon className="platform-sidebar-item-icon" />
+              <span>{themeSwitchLabel}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => {
+                void onRefreshSession()
+                void onRefresh()
+              }}
+              tooltip="Actualizar datos"
+            >
+              <RefreshCwIcon className="platform-sidebar-item-icon" />
+              <span>Actualizar</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip={user?.full_name || 'Perfil'}>
               <Link to="/perfil">

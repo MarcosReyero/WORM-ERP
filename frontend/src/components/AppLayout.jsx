@@ -131,7 +131,11 @@ export function AppLayout({
         <PlatformSidebar
           dashboardData={dashboardData}
           onLogout={onLogout}
+          onRefresh={onRefresh}
+          onRefreshSession={onRefreshSession}
+          onThemeChange={onThemeChange}
           sidebarConfig={sidebarConfig}
+          theme={theme}
           user={user}
         />
 
@@ -147,96 +151,117 @@ export function AppLayout({
 
             <div className="topbar-right">
               <Link
-                aria-label="Abrir mensajes"
-                className={`topbar-icon-button ${user?.open_alarm_count ? 'has-alert' : ''}`}
-                title="Mensajes"
-                to="/mensajes"
+                aria-label="Abrir perfil"
+                className="topbar-profile-button"
+                title="Perfil"
+                to="/perfil"
               >
-                <InboxIcon />
-                {unreadBadge ? <span className="topbar-icon-badge">{unreadBadge}</span> : null}
-                {user?.open_alarm_count ? <span className="topbar-icon-dot" /> : null}
+                {user?.avatar_url ? (
+                  <img
+                    alt={user.full_name}
+                    className="topbar-profile-avatar"
+                    src={user.avatar_url}
+                  />
+                ) : (
+                  <span className="topbar-profile-avatar" aria-hidden="true">
+                    {getInitials(user?.full_name || user?.username || '?')}
+                  </span>
+                )}
               </Link>
 
-              <button
-                aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-                aria-pressed={theme === 'dark'}
-                className={`theme-switch ${theme === 'dark' ? 'is-dark' : 'is-light'}`}
-                onClick={() => {
-                  const nextTheme = theme === 'dark' ? 'light' : 'dark'
-                  void onThemeChange(nextTheme)
-                }}
-                title={theme === 'dark' ? 'Modo oscuro activo' : 'Modo claro activo'}
-                type="button"
-              >
-                <span className="theme-switch-icon theme-switch-icon--sun">
-                  <SunIcon />
-                </span>
-                <span className="theme-switch-icon theme-switch-icon--moon">
-                  <MoonIcon />
-                </span>
-                <span className="theme-switch-thumb" />
-              </button>
+              <div className="topbar-actions topbar-actions--desktop">
+                <Link
+                  aria-label="Abrir mensajes"
+                  className={`topbar-icon-button ${user?.open_alarm_count ? 'has-alert' : ''}`}
+                  title="Mensajes"
+                  to="/mensajes"
+                >
+                  <InboxIcon />
+                  {unreadBadge ? <span className="topbar-icon-badge">{unreadBadge}</span> : null}
+                  {user?.open_alarm_count ? <span className="topbar-icon-dot" /> : null}
+                </Link>
 
-              <div className="user-menu-wrap" ref={menuRef}>
                 <button
-                  aria-expanded={menuOpen}
-                  className="user-chip user-chip-button"
-                  onClick={() => setMenuOpen((current) => !current)}
+                  aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                  aria-pressed={theme === 'dark'}
+                  className={`theme-switch ${theme === 'dark' ? 'is-dark' : 'is-light'}`}
+                  onClick={() => {
+                    const nextTheme = theme === 'dark' ? 'light' : 'dark'
+                    void onThemeChange(nextTheme)
+                  }}
+                  title={theme === 'dark' ? 'Modo oscuro activo' : 'Modo claro activo'}
                   type="button"
                 >
-                  {user?.avatar_url ? (
-                    <img
-                      alt={user.full_name}
-                      className="user-avatar user-avatar-image"
-                      src={user.avatar_url}
-                    />
-                  ) : (
-                    <span className="user-avatar">{getInitials(user.full_name)}</span>
-                  )}
-                  <div>
-                    <span className="user-name">{user.full_name}</span>
-                    <span className="user-role">{user.role_label || user.username}</span>
-                  </div>
-                  <span className="user-chip-caret">
-                    <ChevronDownIcon />
+                  <span className="theme-switch-icon theme-switch-icon--sun">
+                    <SunIcon />
                   </span>
+                  <span className="theme-switch-icon theme-switch-icon--moon">
+                    <MoonIcon />
+                  </span>
+                  <span className="theme-switch-thumb" />
                 </button>
 
-                {menuOpen ? (
-                  <div className="user-menu">
-                    <Link
-                      className="user-menu-link"
-                      onClick={() => setMenuOpen(false)}
-                      to="/perfil"
-                    >
-                      <ProfileIcon />
-                      Mi perfil
-                    </Link>
-                    <button
-                      className="user-menu-link"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        void onRefreshSession()
-                        void onRefresh()
-                      }}
-                      type="button"
-                    >
-                      <SunIcon />
-                      Actualizar shell
-                    </button>
-                    <button
-                      className="user-menu-link is-danger"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        void onLogout()
-                      }}
-                      type="button"
-                    >
-                      <LogoutIcon />
-                      Salir
-                    </button>
-                  </div>
-                ) : null}
+                <div className="user-menu-wrap" ref={menuRef}>
+                  <button
+                    aria-expanded={menuOpen}
+                    className="user-chip user-chip-button"
+                    onClick={() => setMenuOpen((current) => !current)}
+                    type="button"
+                  >
+                    {user?.avatar_url ? (
+                      <img
+                        alt={user.full_name}
+                        className="user-avatar user-avatar-image"
+                        src={user.avatar_url}
+                      />
+                    ) : (
+                      <span className="user-avatar">{getInitials(user.full_name)}</span>
+                    )}
+                    <div>
+                      <span className="user-name">{user.full_name}</span>
+                      <span className="user-role">{user.role_label || user.username}</span>
+                    </div>
+                    <span className="user-chip-caret">
+                      <ChevronDownIcon />
+                    </span>
+                  </button>
+
+                  {menuOpen ? (
+                    <div className="user-menu">
+                      <Link
+                        className="user-menu-link"
+                        onClick={() => setMenuOpen(false)}
+                        to="/perfil"
+                      >
+                        <ProfileIcon />
+                        Mi perfil
+                      </Link>
+                      <button
+                        className="user-menu-link"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          void onRefreshSession()
+                          void onRefresh()
+                        }}
+                        type="button"
+                      >
+                        <SunIcon />
+                        Actualizar shell
+                      </button>
+                      <button
+                        className="user-menu-link is-danger"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          void onLogout()
+                        }}
+                        type="button"
+                      >
+                        <LogoutIcon />
+                        Salir
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </header>

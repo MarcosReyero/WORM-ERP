@@ -6897,7 +6897,10 @@ a {
 
 .deposits-mobile-scan-frame {
   position: relative;
-  flex: 1 1 0;
+  flex: 0 0 auto;
+  width: min(100%, 420px);
+  margin: 0 auto;
+  aspect-ratio: 1 / 1;
   min-height: 220px;
   border-radius: 22px;
   overflow: hidden;
@@ -9159,7 +9162,7 @@ a {
   top: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: auto minmax(280px, 520px) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   min-height: 42px;
@@ -9175,6 +9178,42 @@ a {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-profile-button {
+  display: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  color: #eff4f8;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.topbar-profile-button:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.topbar-profile-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1;
+  background: #35596f;
+  color: #ffffff;
+  object-fit: cover;
 }
 
 .topbar-section-copy {
@@ -9791,23 +9830,10 @@ a {
 
 @media (max-width: 1100px) {
   .topbar.topbar--shell {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas:
-      "left right"
-      "search search";
-  }
-
-  .topbar-left--shell {
-    grid-area: left;
-  }
-
-  .workspace-search {
-    grid-area: search;
-    max-width: none;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .topbar-right {
-    grid-area: right;
     justify-content: flex-end;
   }
 
@@ -9819,6 +9845,27 @@ a {
   .tia-connection-grid,
   .tia-report-status-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar.topbar--shell {
+    min-height: 36px;
+    padding: 4px 8px;
+    gap: 8px;
+  }
+
+  .topbar-left--shell {
+    gap: 0;
+  }
+
+  .topbar-section-copy,
+  .topbar-actions--desktop {
+    display: none;
+  }
+
+  .topbar-profile-button {
+    display: inline-flex;
   }
 }
 
