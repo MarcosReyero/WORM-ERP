@@ -6832,13 +6832,14 @@ a {
 
 /* Deposits scan (mobile scanner layout) */
 .deposits-mobile-scan {
-  min-height: 100svh;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: calc(12px + env(safe-area-inset-top, 0px)) 12px
     calc(14px + env(safe-area-inset-bottom, 0px));
   border-radius: 14px;
+  overflow: hidden;
   background:
     radial-gradient(
       110% 75% at 50% 20%,
@@ -6890,8 +6891,8 @@ a {
 
 .deposits-mobile-scan-frame {
   position: relative;
-  flex: 1;
-  min-height: min(58vh, 520px);
+  flex: 1 1 0;
+  min-height: 220px;
   border-radius: 22px;
   overflow: hidden;
   background: #050b13;
@@ -7027,7 +7028,7 @@ a {
 
 .deposits-mobile-scan-note {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   color: color-mix(in srgb, var(--deposits-erp-text) 78%, transparent);
   text-align: center;
 }
@@ -7047,6 +7048,13 @@ a {
   background: color-mix(in srgb, var(--deposits-erp-surface-bg) 82%, transparent);
   box-shadow: 0 14px 48px rgba(0, 0, 0, 0.24);
   overflow: hidden;
+  max-height: 42svh;
+  flex: 0 0 auto;
+  transition: max-height 0.22s ease;
+}
+
+.deposits-mobile-scan-sheet:not(.is-open) {
+  max-height: 66px;
 }
 
 .deposits-mobile-scan-sheet-handle {
@@ -7069,6 +7077,9 @@ a {
   padding: 10px 12px 12px;
   display: grid;
   gap: 10px;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: calc(42svh - 40px);
 }
 
 .deposits-mobile-scan-form-row {
@@ -7112,6 +7123,11 @@ a {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  position: sticky;
+  bottom: 0;
+  padding-top: 6px;
+  padding-bottom: 2px;
+  background: color-mix(in srgb, var(--deposits-erp-surface-bg) 92%, transparent);
 }
 
 .deposits-mobile-scan-form-actions .primary-button,
@@ -7124,6 +7140,26 @@ a {
 @media (min-width: 721px) {
   .deposits-mobile-scan {
     display: none;
+  }
+}
+
+@media (max-height: 700px) {
+  .deposits-mobile-scan {
+    gap: 10px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 10px
+      calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .deposits-mobile-scan-frame {
+    min-height: 190px;
+  }
+
+  .deposits-mobile-scan-sheet {
+    max-height: 48svh;
+  }
+
+  .deposits-mobile-scan-form {
+    max-height: calc(48svh - 40px);
   }
 }
 
