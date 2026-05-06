@@ -386,12 +386,12 @@ export function DepositsRegistryPage() {
                       onClick={() => setSelectedPalletId(item.id)}
                     >
                       <td className="is-code">{item.pallet_code}</td>
-                      <td>{item.article}</td>
-                      <td>{item.batch || '-'}</td>
+                      <td>{item.pallet_type || item.article || '-'}</td>
+                      <td>{item.pallet_lot || item.batch || '-'}</td>
                       <td>{item.location}</td>
-                      <td>{item.zone}</td>
-                      <td>{item.position}</td>
-                      <td>{formatQuantity(item.quantity)}</td>
+                      <td>{item.zone || '-'}</td>
+                      <td>{item.position || '-'}</td>
+                      <td>{item.quantity ? formatQuantity(item.quantity) : '-'}</td>
                       <td>
                         <span className={`status-pill ${item.status === 'active' ? 'ok' : ''}`}>
                           {item.status_label}

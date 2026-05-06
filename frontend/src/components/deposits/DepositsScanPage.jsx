@@ -72,6 +72,8 @@ export function DepositsScanPage() {
     action: 'lookup',
     qrValue: '',
     inputMethod: 'manual',
+    palletType: '',
+    palletLot: '',
     locationId: '',
     positionId: '',
     articleId: '',
@@ -392,16 +394,30 @@ export function DepositsScanPage() {
     setFeedback({ error: '', success: '' })
 
     try {
-      const response = await scanPallet({
+      const basePayload = {
         action: scanForm.action,
         qr_value: scanForm.qrValue,
-        location_id: toNumber(scanLocationId),
-        position_id: toNumber(scanPositionId),
-        article_id: toNumber(scanArticleId),
-        batch_id: toNumber(scanBatchId),
-        quantity: scanForm.quantity,
         input_method: scanForm.inputMethod,
         notes: scanForm.notes,
+      }
+
+      const actionPayload = scanForm.action === 'register'
+        ? {
+          pallet_type: scanForm.palletType,
+          pallet_lot: scanForm.palletLot,
+          location_id: toNumber(scanLocationId),
+          position_id: toNumber(scanPositionId),
+        }
+        : scanForm.action === 'relocate'
+          ? {
+            location_id: toNumber(scanLocationId),
+            position_id: toNumber(scanPositionId),
+          }
+          : {}
+
+      const response = await scanPallet({
+        ...basePayload,
+        ...actionPayload,
       })
 
       setResult(response)
@@ -417,6 +433,9 @@ export function DepositsScanPage() {
         ...current,
         batchId: '',
         notes: '',
+        palletType: current.action === 'register' ? current.palletType : '',
+        palletLot: current.action === 'register' ? current.palletLot : '',
+        qrValue: current.action === 'register' ? '' : current.qrValue,
         quantity: current.action === 'register' ? '1' : current.quantity,
       }))
     } catch (error) {
@@ -632,7 +651,7 @@ export function DepositsScanPage() {
                       inputMethod: current.inputMethod === 'camera' ? 'camera' : 'manual',
                     }))
                   }
-                  placeholder="PAL-000001"
+                  placeholder={scanForm.action === 'register' ? 'CP Nº 000' : 'PAL-000001'}
                   type="text"
                   value={scanForm.qrValue}
                 />
@@ -642,43 +661,34 @@ export function DepositsScanPage() {
             {scanForm.action === 'register' ? (
               <div className="deposits-mobile-scan-form-row">
                 <label>
-                  <span>Articulo</span>
-                  <select
-                    value={scanArticleId}
+                  <span>Tipo</span>
+                  <input
                     onChange={(event) =>
                       setScanForm((current) => ({
                         ...current,
-                        articleId: event.target.value,
-                        batchId: '',
+                        palletType: event.target.value,
                       }))
                     }
-                  >
-                    {articles.map((article) => (
-                      <option key={article.id} value={article.id}>
-                        {article.internal_code} / {article.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="LCD 25X40"
+                    type="text"
+                    value={scanForm.palletType}
+                  />
                 </label>
 
                 <label>
                   <span>Lote</span>
-                  <select
-                    value={scanBatchId}
+                  <input
+                    inputMode="numeric"
                     onChange={(event) =>
                       setScanForm((current) => ({
                         ...current,
-                        batchId: event.target.value,
+                        palletLot: event.target.value,
                       }))
                     }
-                  >
-                    <option value="">Sin lote</option>
-                    {scanFilteredBatches.map((batch) => (
-                      <option key={batch.id} value={batch.id}>
-                        {batch.lot_code}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="2605"
+                    type="text"
+                    value={scanForm.palletLot}
+                  />
                 </label>
 
                 <label>
@@ -698,41 +708,6 @@ export function DepositsScanPage() {
                       </option>
                     ))}
                   </select>
-                </label>
-
-                <label>
-                  <span>Posicion</span>
-                  <select
-                    value={scanPositionId}
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        positionId: event.target.value,
-                      }))
-                    }
-                  >
-                    {scanFilteredPositions.map((position) => (
-                      <option key={position.id} value={position.id}>
-                        {position.zone} / {position.code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  <span>Cantidad</span>
-                  <input
-                    min="0.001"
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        quantity: event.target.value,
-                      }))
-                    }
-                    step="0.001"
-                    type="number"
-                    value={scanForm.quantity}
-                  />
                 </label>
               </div>
             ) : null}
@@ -794,7 +769,15 @@ export function DepositsScanPage() {
             </label>
 
             <div className="deposits-mobile-scan-form-actions">
-              <button className="primary-button" disabled={!scanForm.qrValue} type="submit">
+              <button
+                className="primary-button"
+                disabled={
+                  scanForm.action === 'register'
+                    ? !scanForm.qrValue || !scanForm.palletType || !scanForm.palletLot
+                    : !scanForm.qrValue
+                }
+                type="submit"
+              >
                 Confirmar accion
               </button>
               {canUseManualRegistry ? (
@@ -847,15 +830,15 @@ export function DepositsScanPage() {
             {result?.item ? (
               <div className="deposits-result-card deposits-result-card--erp">
                 <strong>{result.item.pallet_code}</strong>
-                <p>{result.item.article}</p>
+                <p>{result.item.pallet_type || result.item.article || ''}</p>
                 <dl className="deposits-card-meta">
                   <div>
                     <dt>Cantidad</dt>
-                    <dd>{formatQuantity(result.item.quantity)}</dd>
+                    <dd>{result.item.quantity ? formatQuantity(result.item.quantity) : '-'}</dd>
                   </div>
                   <div>
                     <dt>Lote</dt>
-                    <dd>{result.item.batch || 'Sin lote'}</dd>
+                    <dd>{result.item.pallet_lot || result.item.batch || 'Sin lote'}</dd>
                   </div>
                   <div>
                     <dt>Ubicacion</dt>
@@ -864,7 +847,7 @@ export function DepositsScanPage() {
                   <div>
                     <dt>Posicion</dt>
                     <dd>
-                      {result.item.zone} / {result.item.position}
+                      {result.item.zone && result.item.position ? `${result.item.zone} / ${result.item.position}` : '-'}
                     </dd>
                   </div>
                   <div>
@@ -919,7 +902,7 @@ export function DepositsScanPage() {
                         inputMethod: current.inputMethod === 'camera' ? 'camera' : 'manual',
                       }))
                     }
-                    placeholder="PAL-000001"
+                    placeholder={scanForm.action === 'register' ? 'CP Nº 000' : 'PAL-000001'}
                     type="text"
                     value={scanForm.qrValue}
                   />
@@ -930,43 +913,34 @@ export function DepositsScanPage() {
             {scanForm.action === 'register' ? (
               <>
                 <label>
-                  <span>Articulo</span>
-                  <select
-                    value={scanArticleId}
+                  <span>Tipo</span>
+                  <input
                     onChange={(event) =>
                       setScanForm((current) => ({
                         ...current,
-                        articleId: event.target.value,
-                        batchId: '',
+                        palletType: event.target.value,
                       }))
                     }
-                  >
-                    {articles.map((article) => (
-                      <option key={article.id} value={article.id}>
-                        {article.internal_code} / {article.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="LCD 25X40"
+                    type="text"
+                    value={scanForm.palletType}
+                  />
                 </label>
 
                 <label>
-                  <span>Lote (opcional)</span>
-                  <select
-                    value={scanBatchId}
+                  <span>Lote</span>
+                  <input
+                    inputMode="numeric"
                     onChange={(event) =>
                       setScanForm((current) => ({
                         ...current,
-                        batchId: event.target.value,
+                        palletLot: event.target.value,
                       }))
                     }
-                  >
-                    <option value="">Sin lote</option>
-                    {scanFilteredBatches.map((batch) => (
-                      <option key={batch.id} value={batch.id}>
-                        {batch.lot_code}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="0000"
+                    type="text"
+                    value={scanForm.palletLot}
+                  />
                 </label>
 
                 <label>
@@ -986,41 +960,6 @@ export function DepositsScanPage() {
                       </option>
                     ))}
                   </select>
-                </label>
-
-                <label>
-                  <span>Posicion</span>
-                  <select
-                    value={scanPositionId}
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        positionId: event.target.value,
-                      }))
-                    }
-                  >
-                    {scanFilteredPositions.map((position) => (
-                      <option key={position.id} value={position.id}>
-                        {position.zone} / {position.code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  <span>Cantidad</span>
-                  <input
-                    min="0.001"
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        quantity: event.target.value,
-                      }))
-                    }
-                    step="0.001"
-                    type="number"
-                    value={scanForm.quantity}
-                  />
                 </label>
               </>
             ) : null}
@@ -1082,10 +1021,20 @@ export function DepositsScanPage() {
             </label>
 
             <div className="deposits-form-actions">
-              <button className="primary-button" type="submit">
+              <button
+                className="primary-button"
+                disabled={
+                  scanForm.action === 'register'
+                    ? !scanForm.qrValue || !scanForm.palletType || !scanForm.palletLot
+                    : !scanForm.qrValue
+                }
+                type="submit"
+              >
                 Confirmar accion
               </button>
-              <p className="form-note">Alta por scan genera pallet PAL-###### y deja trazabilidad.</p>
+              <p className="form-note">
+                En registro: escaneÃ¡ o escribÃ­ el nÃºmero (CP NÂº 000) y lote (4 dÃ­gitos).
+              </p>
             </div>
           </form>
         </ModuleSurface>

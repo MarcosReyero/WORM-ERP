@@ -7152,6 +7152,7 @@ a {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   max-height: calc(54svh - 40px);
+  padding-bottom: calc(12px + 58px + env(safe-area-inset-bottom, 0px));
 }
 
 .deposits-mobile-scan-form-row {
@@ -7198,7 +7199,7 @@ a {
   position: sticky;
   bottom: 0;
   padding-top: 6px;
-  padding-bottom: 2px;
+  padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
   background: color-mix(in srgb, var(--deposits-erp-surface-bg) 92%, transparent);
 }
 
@@ -7232,6 +7233,12 @@ a {
 
   .deposits-mobile-scan-form {
     max-height: calc(48svh - 40px);
+  }
+}
+
+@media (max-width: 720px) {
+  .deposits-mobile-scan-form-row {
+    grid-template-columns: 1fr;
   }
 }
 

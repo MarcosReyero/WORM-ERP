@@ -59,6 +59,8 @@ DEPOSIT_MODULE_CODES = {
     "scans": "pallet_scans",
 }
 PALLET_CODE_PREFIX = "PAL"
+PALLET_REGISTRY_CODE_PATTERN = re.compile(r"^CP\s*(?:N[º°o]?\s*)?(\d{3})$", re.IGNORECASE)
+PALLET_LOT_PATTERN = re.compile(r"^\d{4}$")
 DEPOSIT_LOCATION_TYPES = {
     Location.LocationType.WAREHOUSE,
     Location.LocationType.TOOLROOM,
@@ -207,17 +209,19 @@ def serialize_pallet(pallet):
         "id": pallet.id,
         "pallet_code": pallet.pallet_code,
         "qr_value": pallet.qr_value,
-        "article": pallet.article.name,
+        "pallet_type": pallet.pallet_type,
+        "pallet_lot": pallet.pallet_lot,
+        "article": pallet.article.name if pallet.article else None,
         "article_id": pallet.article_id,
-        "quantity": serialize_decimal(pallet.quantity),
+        "quantity": serialize_decimal(pallet.quantity) if pallet.quantity is not None else None,
         "batch": pallet.batch.lot_code if pallet.batch else None,
         "batch_id": pallet.batch_id,
         "location": pallet.location.name,
         "location_id": pallet.location_id,
-        "position": pallet.position.code,
+        "position": pallet.position.code if pallet.position_id else None,
         "position_id": pallet.position_id,
-        "zone": pallet.position.zone.name,
-        "zone_id": pallet.position.zone_id,
+        "zone": pallet.position.zone.name if pallet.position_id else None,
+        "zone_id": pallet.position.zone_id if pallet.position_id else None,
         "status": pallet.status,
         "status_label": pallet.get_status_display(),
         "notes": pallet.notes,
@@ -267,6 +271,38 @@ def ensure_position_available(position, exclude_pallet_id=None):
         raise InventoryApiError("The target position is already at full pallet capacity", status=400)
 
 
+def normalize_registry_pallet_code(value):
+    raw = clean_string(value)
+    match = PALLET_REGISTRY_CODE_PATTERN.match(raw)
+    if not match:
+        raise InventoryApiError("Invalid pallet code format. Expected: CP Nº 000", status=400)
+    digits = match.group(1)
+    return f"CP Nº {digits}"
+
+
+def normalize_registry_lot(value):
+    raw = clean_string(value)
+    if not PALLET_LOT_PATTERN.match(raw):
+        raise InventoryApiError("Invalid lot format. Expected 4 digits (e.g. 2605)", status=400)
+    return raw
+
+
+def choose_available_position(location):
+    positions = (
+        StoragePosition.objects.select_related("zone", "zone__location")
+        .filter(zone__location=location)
+        .exclude(status=StoragePosition.PositionStatus.BLOCKED)
+        .order_by("zone__sort_order", "code")
+    )
+    for position in positions:
+        try:
+            ensure_position_available(position)
+        except InventoryApiError:
+            continue
+        return position
+    raise InventoryApiError("No available positions in the selected location", status=400)
+
+
 def sync_position_statuses(position_ids):
     normalized_ids = [position_id for position_id in dict.fromkeys(position_ids) if position_id]
     if not normalized_ids:
@@ -303,6 +339,11 @@ def resolve_pallet_by_qr(qr_value):
     if not normalized_qr:
         raise InventoryApiError("qr_value is required")
 
+    registry_match = PALLET_REGISTRY_CODE_PATTERN.match(normalized_qr)
+    registry_normalized = None
+    if registry_match:
+        registry_normalized = f"CP Nº {registry_match.group(1)}"
+
     pallet = (
         Pallet.objects.select_related("article", "batch", "location", "position__zone")
         .filter(qr_value__iexact=normalized_qr)
@@ -310,6 +351,14 @@ def resolve_pallet_by_qr(qr_value):
     )
     if pallet:
         return pallet
+    if registry_normalized and registry_normalized != normalized_qr:
+        pallet = (
+            Pallet.objects.select_related("article", "batch", "location", "position__zone")
+            .filter(qr_value__iexact=registry_normalized)
+            .first()
+        )
+        if pallet:
+            return pallet
 
     pallet = (
         Pallet.objects.select_related("article", "batch", "location", "position__zone")
@@ -318,6 +367,14 @@ def resolve_pallet_by_qr(qr_value):
     )
     if pallet:
         return pallet
+    if registry_normalized and registry_normalized != normalized_qr:
+        pallet = (
+            Pallet.objects.select_related("article", "batch", "location", "position__zone")
+            .filter(pallet_code__iexact=registry_normalized)
+            .first()
+        )
+        if pallet:
+            return pallet
 
     raise InventoryApiError("Pallet not found", status=404)
 
@@ -381,6 +438,8 @@ def list_pallets(user, query_params=None):
             Q(article__name__icontains=query)
             | Q(pallet_code__icontains=query)
             | Q(qr_value__icontains=query)
+            | Q(pallet_type__icontains=query)
+            | Q(pallet_lot__icontains=query)
             | Q(position__code__icontains=query)
             | Q(location__name__icontains=query)
         )
@@ -412,6 +471,66 @@ def get_pallet_detail(user, pallet_id):
 def create_pallet(user, payload, *, input_method=PalletEvent.InputMethod.MANUAL, scanned_qr=""):
     require_registry_manage(user)
 
+    raw_qr = clean_string(scanned_qr or payload.get("qr_value"))
+    notes = clean_string(payload.get("notes"))
+
+    pallet_type = clean_string(payload.get("pallet_type") or payload.get("type"))
+    if pallet_type:
+        if not raw_qr:
+            raise InventoryApiError("qr_value is required", status=400)
+
+        pallet_code = normalize_registry_pallet_code(raw_qr or payload.get("pallet_code"))
+        pallet_lot = normalize_registry_lot(payload.get("pallet_lot") or payload.get("lot"))
+
+        location = resolve_instance(
+            Location,
+            payload.get("location_id"),
+            "location",
+            required=False,
+        ) or get_default_location()
+        ensure_deposit_location(location)
+
+        position = resolve_instance(
+            StoragePosition,
+            payload.get("position_id"),
+            "position",
+            required=False,
+        ) or choose_available_position(location)
+        ensure_deposit_location(position.zone.location)
+        if position.zone.location_id != location.id:
+            raise InventoryApiError("The selected position does not belong to the target location")
+
+        with transaction.atomic():
+            pallet = Pallet(
+                pallet_code=pallet_code,
+                qr_value=pallet_code,
+                pallet_type=pallet_type,
+                pallet_lot=pallet_lot,
+                article=None,
+                batch=None,
+                quantity=None,
+                location=location,
+                position=position,
+                status=Pallet.PalletStatus.ACTIVE,
+                notes=notes,
+                last_scanned_at=timezone.now(),
+            )
+            update_audit(pallet, user, is_new=True)
+            save_validated(pallet)
+
+            record_pallet_event(
+                pallet,
+                user,
+                PalletEvent.EventType.REGISTERED,
+                input_method=input_method,
+                target_position=position,
+                raw_qr=raw_qr,
+                notes=notes,
+            )
+            sync_position_statuses([position.id])
+
+        return pallet
+
     article = resolve_instance(Article, payload.get("article_id"), "article")
     batch = resolve_existing_batch(article, payload)
     quantity = parse_decimal(payload.get("quantity"), "quantity")
@@ -430,9 +549,7 @@ def create_pallet(user, payload, *, input_method=PalletEvent.InputMethod.MANUAL,
 
     ensure_position_available(position)
 
-    raw_qr = clean_string(scanned_qr or payload.get("qr_value"))
     pallet_code = _next_pallet_code()
-    notes = clean_string(payload.get("notes"))
 
     with transaction.atomic():
         pallet = Pallet(
@@ -510,7 +627,11 @@ def relocate_pallet(user, pallet, target_position, *, input_method, raw_qr="", n
     target_location = target_position.zone.location
 
     with transaction.atomic():
-        if source_location.id != target_location.id:
+        if (
+            source_location.id != target_location.id
+            and pallet.article_id
+            and pallet.quantity is not None
+        ):
             movement_payload = {
                 "article_id": pallet.article_id,
                 "movement_type": StockMovement.MovementType.TRANSFER,
@@ -563,16 +684,21 @@ def scan_pallet(user, payload):
         if not permissions["can_register_via_scan"]:
             raise InventoryApiError("You do not have permission to register pallets via scan", status=403)
 
-        if qr_value:
+        registry_type = clean_string(payload.get("pallet_type") or payload.get("type"))
+        normalized_qr = normalize_registry_pallet_code(qr_value) if registry_type else qr_value
+
+        if normalized_qr:
             try:
-                resolve_pallet_by_qr(qr_value)
+                resolve_pallet_by_qr(normalized_qr)
             except InventoryApiError as exc:
                 if exc.status != 404:
                     raise
             else:
                 raise InventoryApiError("The scanned pallet code already exists", status=400)
 
-        pallet = create_pallet(user, payload, input_method=input_method, scanned_qr=qr_value)
+        if registry_type:
+            payload = {**payload, "qr_value": normalized_qr}
+        pallet = create_pallet(user, payload, input_method=input_method, scanned_qr=normalized_qr)
         return {
             "action": action,
             "item": serialize_pallet(pallet),

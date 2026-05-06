@@ -763,9 +763,13 @@ class Pallet(AuditedModel):
 
     pallet_code = models.CharField(max_length=40, unique=True)
     qr_value = models.CharField(max_length=120, unique=True)
+    pallet_type = models.CharField(max_length=80, blank=True)
+    pallet_lot = models.CharField(max_length=4, blank=True)
     article = models.ForeignKey(
         Article,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="pallets",
     )
     batch = models.ForeignKey(
@@ -775,7 +779,7 @@ class Pallet(AuditedModel):
         blank=True,
         related_name="pallets",
     )
-    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
     location = models.ForeignKey(
         Location,
         on_delete=models.PROTECT,
@@ -801,9 +805,13 @@ class Pallet(AuditedModel):
         return self.pallet_code
 
     def clean(self):
-        if self.quantity <= 0:
+        if self.pallet_lot:
+            normalized_lot = self.pallet_lot.strip()
+            if len(normalized_lot) != 4 or not normalized_lot.isdigit():
+                raise ValidationError({"pallet_lot": "El lote debe tener 4 digitos."})
+        if self.quantity is not None and self.quantity <= 0:
             raise ValidationError({"quantity": "La cantidad debe ser mayor a cero."})
-        if self.article.tracking_mode != Article.TrackingMode.QUANTITY:
+        if self.article and self.article.tracking_mode != Article.TrackingMode.QUANTITY:
             raise ValidationError(
                 {"article": "Solo los articulos por cantidad pueden registrarse en pallets v1."}
             )
