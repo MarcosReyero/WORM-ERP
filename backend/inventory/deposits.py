@@ -907,8 +907,8 @@ def build_deposits_overview(user):
             ],
             "positions": [serialize_position_option(position) for position in positions.order_by("zone__sort_order", "code")],
             "scan_actions": [
-                {"value": "lookup", "label": "Consultar"},
                 {"value": "register", "label": "Registrar"},
+                {"value": "lookup", "label": "Consultar"},
                 {"value": "relocate", "label": "Reubicar"},
             ],
             "pallet_statuses": [
