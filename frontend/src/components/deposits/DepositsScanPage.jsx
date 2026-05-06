@@ -69,7 +69,7 @@ export function DepositsScanPage() {
   const [galleryBusy, setGalleryBusy] = useState(false)
   const [scanOverlay, setScanOverlay] = useState('')
   const [scanForm, setScanForm] = useState({
-    action: 'lookup',
+    action: 'register',
     qrValue: '',
     inputMethod: 'manual',
     palletType: '',
@@ -152,6 +152,28 @@ export function DepositsScanPage() {
   const recentEvents = (depositsOverview?.events_recent || []).slice(0, 8)
   const canUseScanTools = Boolean(permissions?.can_scan)
   const canUseManualRegistry = Boolean(permissions?.can_manage_registry)
+
+  useEffect(() => {
+    if (!actionOptions.length) {
+      return
+    }
+
+    setScanForm((current) => {
+      if (actionOptions.some((action) => action.value === current.action)) {
+        return current
+      }
+
+      const preferredAction = actionOptions.find((action) => action.value === 'register') ?? actionOptions[0]
+      if (!preferredAction || preferredAction.value === current.action) {
+        return current
+      }
+
+      return {
+        ...current,
+        action: preferredAction.value,
+      }
+    })
+  }, [actionOptions])
 
   useEffect(() => {
     return () => {
@@ -1210,5 +1232,4 @@ export function DepositsScanPage() {
     </div>
   )
 }
-
 

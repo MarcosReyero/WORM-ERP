@@ -7187,6 +7187,11 @@ a {
   padding: 0 10px;
 }
 
+.deposits-mobile-scan-form-row select option {
+  background: #ffffff;
+  color: #1f245b;
+}
+
 .deposits-mobile-scan-form-notes textarea {
   padding: 8px 10px;
   min-height: 68px;
