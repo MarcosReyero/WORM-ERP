@@ -685,7 +685,7 @@ export function DepositsScanPage() {
                         palletLot: event.target.value,
                       }))
                     }
-                    placeholder="2605"
+                    placeholder="0000"
                     type="text"
                     value={scanForm.palletLot}
                   />
