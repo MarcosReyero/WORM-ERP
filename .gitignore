@@ -9,4 +9,8 @@ backend/runtime/
 
 frontend/node_modules/
 frontend/dist/
-comandos_prod.md
+
+# Certificados locales (mkcert): NO commitear keys
+deploy/certs/*.pem
+deploy/certs/*.key
+deploy/certs/*.crt

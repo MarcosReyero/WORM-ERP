@@ -10,6 +10,9 @@ Documentación visual de la arquitectura y flujos del módulo de inventario.
   - Integración con automatización y emails
   - Todas las vistas principales
 
+### 🖥️ Frontend / UX
+- **[07_frontend_ui.md](./07_frontend_ui.md)** - Cambios de UI/UX (móvil + navegación)
+
 ### 🔄 Flujos de Procesos Principales
 - **[02_flujo_movimientos.md](./02_flujo_movimientos.md)** - Flujo Detallado de Movimiento de Stock
   - Creación de movimientos (ingreso, salida, transferencia)

@@ -56,12 +56,14 @@ docker compose -p worm_erp --env-file .env -f deploy/docker-compose.prod.yml up 
 
 ## Cámara / HTTPS (móvil)
 
-Los navegadores móviles bloquean el acceso a cámara (`getUserMedia`) si el sitio no está en un **contexto seguro** (HTTPS con certificado confiable, o `localhost`).
+Los navegadores móviles bloquean el acceso a cámara (`getUserMedia`) si el sitio no está en un **contexto seguro**.
 
-El stack de producción incluye `caddy` (TLS automático) delante de nginx. Requiere:
+Opciones:
 
-- Un dominio apuntando al server (A/AAAA) y puertos `80/443` abiertos.
-- Variables en `.env`: `PUBLIC_DOMAIN` y `ACME_EMAIL`.
+- **Dominio público (Let's Encrypt)**: `caddy` obtiene TLS automático (requiere dominio real + puertos `80/443`).
+- **Solo LAN (mkcert)**: certificado propio y CA confiable en cada dispositivo.
+
+Guía completa (LAN + HTTPS + PWA): `deploy/GUIA_LAN_HTTPS_PWA.md`
 
 ## 🔧 Automatización de Stock Mínimo - Desarrollo
 
