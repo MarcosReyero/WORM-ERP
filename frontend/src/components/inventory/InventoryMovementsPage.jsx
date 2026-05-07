@@ -754,6 +754,28 @@ export function InventoryMovementsPage() {
                   )}
 
                   <div className="movement-mobile-action">
+                    <div className="movement-mobile-action-summary">
+                      <span>Items</span>
+                      <strong>
+                        {movementLines.length
+                          ? `${movementLines.length} articulo${movementLines.length === 1 ? '' : 's'}`
+                          : 'Sin seleccionar'}
+                      </strong>
+                      <p>
+                        {movementLines.length
+                          ? pendingLinesWithoutQuantity
+                            ? 'Completa la cantidad en cada item para habilitar el registro.'
+                            : `Operacion: ${movementModeConfig.label}`
+                          : 'Elige uno o mas articulos y completa la cantidad en cada uno para registrar.'}
+                      </p>
+                    </div>
+
+                    {unsupportedMovementMessage ? (
+                      <div className="form-error">{unsupportedMovementMessage}</div>
+                    ) : null}
+
+                    <PanelMessage error={movementFeedback.error} success={movementFeedback.success} />
+
                     <button
                       className="primary-button"
                       disabled={!canSubmitMovement}
