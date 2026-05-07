@@ -65,7 +65,6 @@ export function DepositsScanPage() {
     enabled: false,
   })
   const [isMobile, setIsMobile] = useState(getIsMobileViewport)
-  const [mobileSheetOpen, setMobileSheetOpen] = useState(true)
   const [galleryBusy, setGalleryBusy] = useState(false)
   const [scanOverlay, setScanOverlay] = useState('')
   const [scanForm, setScanForm] = useState({
@@ -516,49 +515,6 @@ export function DepositsScanPage() {
   if (isMobile && canUseScanTools) {
     return (
       <div className="deposits-mobile-scan">
-        <header className="deposits-mobile-scan-header">
-          <button
-            className="deposits-mobile-scan-icon"
-            onClick={() => navigate('/depositos/resumen')}
-            type="button"
-          >
-            <svg
-              className="icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="2"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M4 7h16" />
-              <path d="M4 12h16" />
-              <path d="M4 17h16" />
-            </svg>
-          </button>
-          <div className="deposits-mobile-scan-title">
-            <h1>Escanear QR</h1>
-            <p>Coloca el código QR dentro del recuadro para escanear</p>
-          </div>
-          <button
-            className="deposits-mobile-scan-icon"
-            disabled={!torchState.supported || !cameraState.active}
-            onClick={() => void applyTorch(!torchState.enabled)}
-            type="button"
-            title={torchState.enabled ? 'Apagar flash' : 'Encender flash'}
-          >
-            <svg
-              className="icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="2"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M13 2 3 14h7l-1 8 12-14h-7l1-6Z" />
-            </svg>
-          </button>
-        </header>
-
         <div className="deposits-mobile-scan-frame" role="region" aria-label="Vista de camara">
           <video className="deposits-mobile-scan-video" muted playsInline ref={videoRef} />
           <div className="deposits-mobile-scan-overlay">
@@ -633,15 +589,7 @@ export function DepositsScanPage() {
         {feedback.error ? <p className="deposits-mobile-scan-note is-error">{feedback.error}</p> : null}
         {feedback.success ? <p className="deposits-mobile-scan-note is-success">{feedback.success}</p> : null}
 
-        <section className={`deposits-mobile-scan-sheet ${mobileSheetOpen ? 'is-open' : ''}`}>
-          <button
-            className="deposits-mobile-scan-sheet-handle"
-            onClick={() => setMobileSheetOpen((current) => !current)}
-            type="button"
-          >
-            <span />
-          </button>
-
+        <section className="deposits-mobile-scan-sheet is-open">
           <form className="deposits-mobile-scan-form" onSubmit={handleScanSubmit}>
             <div className="deposits-mobile-scan-form-fields">
               <div className="deposits-mobile-scan-form-row">

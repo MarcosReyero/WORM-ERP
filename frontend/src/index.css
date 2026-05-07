@@ -6840,7 +6840,8 @@ a {
   padding: calc(12px + env(safe-area-inset-top, 0px)) 12px
     calc(14px + env(safe-area-inset-bottom, 0px));
   border-radius: 14px;
-  overflow: hidden;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   background:
     radial-gradient(
       110% 75% at 50% 20%,
