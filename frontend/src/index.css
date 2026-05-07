@@ -2039,18 +2039,17 @@ a {
 .dashboard-backdrop::after {
   content: '';
   position: absolute;
-  inset: -16%;
-  will-change: transform;
+  inset: -8%;
 }
 
 .dashboard-backdrop::before {
   background:
-    radial-gradient(circle at var(--dashboard-pointer-x) var(--dashboard-pointer-y), var(--dashboard-spotlight), transparent 20%),
+    radial-gradient(circle at 50% 18%, var(--dashboard-spotlight), transparent 22%),
     radial-gradient(circle at 10% 14%, var(--dashboard-orb-a), transparent 28%),
     radial-gradient(circle at 84% 18%, var(--dashboard-orb-b), transparent 26%),
     radial-gradient(circle at 54% 86%, var(--dashboard-orb-c), transparent 30%);
   opacity: 0.98;
-  animation: dashboard-aurora 16s ease-in-out infinite;
+  animation: none;
 }
 
 .dashboard-backdrop::after {
@@ -2063,7 +2062,7 @@ a {
   background-size: 160px 160px, 160px 160px, 32px 32px, 32px 32px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.58) 72%, transparent 100%);
   opacity: 0.9;
-  animation: dashboard-grid-pan 12s linear infinite;
+  animation: none;
 }
 
 .dashboard-background-control {
@@ -2185,9 +2184,9 @@ a {
   border-radius: 999px;
   background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.95), var(--dashboard-particle-core));
   border: 1px solid var(--dashboard-particle-border);
-  box-shadow: 0 0 22px var(--dashboard-particle-core);
+  box-shadow: none;
   opacity: 0.78;
-  animation: dashboard-particle-float 10s ease-in-out infinite;
+  animation: dashboard-particle-float 18s ease-in-out infinite;
 }
 
 .dashboard-particle--1 {

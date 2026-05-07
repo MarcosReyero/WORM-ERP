@@ -31,7 +31,6 @@ export function ModuleHub() {
   const { dashboardData, searchValue } = useOutletContext()
   const deferredQuery = useDeferredValue(searchValue.trim().toLowerCase())
   const stageRef = useRef(null)
-  const frameRef = useRef(0)
   const backgroundInputRef = useRef(null)
   const backgroundMenuRef = useRef(null)
   const backgroundButtonRef = useRef(null)
@@ -43,14 +42,6 @@ export function ModuleHub() {
       return ''
     }
   })
-
-  useEffect(() => {
-    return () => {
-      if (frameRef.current) {
-        window.cancelAnimationFrame(frameRef.current)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     if (!isBackgroundMenuOpen) {
@@ -142,44 +133,6 @@ export function ModuleHub() {
     matchesQuery(module, deferredQuery),
   )
 
-  function updatePointer(clientX, clientY) {
-    if (!stageRef.current) {
-      return
-    }
-
-    const bounds = stageRef.current.getBoundingClientRect()
-    const relativeX = ((clientX - bounds.left) / bounds.width) * 100
-    const relativeY = ((clientY - bounds.top) / bounds.height) * 100
-
-    stageRef.current.style.setProperty('--dashboard-pointer-x', `${relativeX.toFixed(2)}%`)
-    stageRef.current.style.setProperty('--dashboard-pointer-y', `${relativeY.toFixed(2)}%`)
-  }
-
-  function handlePointerMove(event) {
-    if (event.pointerType === 'touch') {
-      return
-    }
-
-    if (frameRef.current) {
-      window.cancelAnimationFrame(frameRef.current)
-    }
-
-    const { clientX, clientY } = event
-    frameRef.current = window.requestAnimationFrame(() => {
-      updatePointer(clientX, clientY)
-      frameRef.current = 0
-    })
-  }
-
-  function handlePointerLeave() {
-    if (!stageRef.current) {
-      return
-    }
-
-    stageRef.current.style.setProperty('--dashboard-pointer-x', '50%')
-    stageRef.current.style.setProperty('--dashboard-pointer-y', '18%')
-  }
-
   function handleBackgroundPick(event) {
     const file = event.target.files?.[0]
 
@@ -223,8 +176,6 @@ export function ModuleHub() {
   return (
     <div
       className="dashboard-scene"
-      onPointerLeave={handlePointerLeave}
-      onPointerMove={handlePointerMove}
       ref={stageRef}
       style={
         customBackground
@@ -236,9 +187,6 @@ export function ModuleHub() {
         <span className="dashboard-particle dashboard-particle--1" />
         <span className="dashboard-particle dashboard-particle--2" />
         <span className="dashboard-particle dashboard-particle--3" />
-        <span className="dashboard-particle dashboard-particle--4" />
-        <span className="dashboard-particle dashboard-particle--5" />
-        <span className="dashboard-particle dashboard-particle--6" />
       </div>
 
       <div className="dashboard-content">
