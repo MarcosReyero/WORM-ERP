@@ -643,152 +643,154 @@ export function DepositsScanPage() {
           </button>
 
           <form className="deposits-mobile-scan-form" onSubmit={handleScanSubmit}>
-            <div className="deposits-mobile-scan-form-row">
-              <label>
-                <span>Accion</span>
-                <select
-                  value={scanForm.action}
-                  onChange={(event) =>
-                    setScanForm((current) => ({
-                      ...current,
-                      action: event.target.value,
-                    }))
-                  }
-                >
-                  {actionOptions.map((action) => (
-                    <option key={action.value} value={action.value}>
-                      {action.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="deposits-mobile-scan-form-fields">
+              <div className="deposits-mobile-scan-form-row">
+                <label>
+                  <span>Accion</span>
+                  <select
+                    value={scanForm.action}
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        action: event.target.value,
+                      }))
+                    }
+                  >
+                    {actionOptions.map((action) => (
+                      <option key={action.value} value={action.value}>
+                        {action.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label>
-                <span>QR</span>
-                <input
+                <label>
+                  <span>QR</span>
+                  <input
+                    onChange={(event) =>
+                      setScanForm((current) => ({
+                        ...current,
+                        qrValue: event.target.value,
+                        inputMethod: current.inputMethod === 'camera' ? 'camera' : 'manual',
+                      }))
+                    }
+                    placeholder={scanForm.action === 'register' ? 'CP Nº 000' : 'PAL-000001'}
+                    type="text"
+                    value={scanForm.qrValue}
+                  />
+                </label>
+              </div>
+
+              {scanForm.action === 'register' ? (
+                <div className="deposits-mobile-scan-form-row">
+                  <label>
+                    <span>Tipo</span>
+                    <input
+                      onChange={(event) =>
+                        setScanForm((current) => ({
+                          ...current,
+                          palletType: event.target.value,
+                        }))
+                      }
+                      placeholder="LCD 25X40"
+                      type="text"
+                      value={scanForm.palletType}
+                    />
+                  </label>
+
+                  <label>
+                    <span>Lote</span>
+                    <input
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        setScanForm((current) => ({
+                          ...current,
+                          palletLot: event.target.value,
+                        }))
+                      }
+                      placeholder="0000"
+                      type="text"
+                      value={scanForm.palletLot}
+                    />
+                  </label>
+
+                  <label>
+                    <span>Deposito</span>
+                    <select
+                      value={scanLocationId}
+                      onChange={(event) =>
+                        setScanForm((current) => ({
+                          ...current,
+                          locationId: event.target.value,
+                        }))
+                      }
+                    >
+                      {locations.map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.code} / {location.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+
+              {scanForm.action === 'relocate' ? (
+                <div className="deposits-mobile-scan-form-row">
+                  <label>
+                    <span>Deposito destino</span>
+                    <select
+                      value={scanLocationId}
+                      onChange={(event) =>
+                        setScanForm((current) => ({
+                          ...current,
+                          locationId: event.target.value,
+                        }))
+                      }
+                    >
+                      {locations.map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.code} / {location.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Posicion destino</span>
+                    <select
+                      value={scanPositionId}
+                      onChange={(event) =>
+                        setScanForm((current) => ({
+                          ...current,
+                          positionId: event.target.value,
+                        }))
+                      }
+                    >
+                      {scanFilteredPositions.map((position) => (
+                        <option key={position.id} value={position.id}>
+                          {position.zone} / {position.code}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+
+              <label className="deposits-mobile-scan-form-notes">
+                <span>Notas</span>
+                <textarea
                   onChange={(event) =>
                     setScanForm((current) => ({
                       ...current,
-                      qrValue: event.target.value,
-                      inputMethod: current.inputMethod === 'camera' ? 'camera' : 'manual',
+                      notes: event.target.value,
                     }))
                   }
-                  placeholder={scanForm.action === 'register' ? 'CP Nº 000' : 'PAL-000001'}
-                  type="text"
-                  value={scanForm.qrValue}
+                  rows="2"
+                  value={scanForm.notes}
                 />
               </label>
             </div>
-
-            {scanForm.action === 'register' ? (
-              <div className="deposits-mobile-scan-form-row">
-                <label>
-                  <span>Tipo</span>
-                  <input
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        palletType: event.target.value,
-                      }))
-                    }
-                    placeholder="LCD 25X40"
-                    type="text"
-                    value={scanForm.palletType}
-                  />
-                </label>
-
-                <label>
-                  <span>Lote</span>
-                  <input
-                    inputMode="numeric"
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        palletLot: event.target.value,
-                      }))
-                    }
-                    placeholder="0000"
-                    type="text"
-                    value={scanForm.palletLot}
-                  />
-                </label>
-
-                <label>
-                  <span>Deposito</span>
-                  <select
-                    value={scanLocationId}
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        locationId: event.target.value,
-                      }))
-                    }
-                  >
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.code} / {location.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ) : null}
-
-            {scanForm.action === 'relocate' ? (
-              <div className="deposits-mobile-scan-form-row">
-                <label>
-                  <span>Deposito destino</span>
-                  <select
-                    value={scanLocationId}
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        locationId: event.target.value,
-                      }))
-                    }
-                  >
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.code} / {location.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  <span>Posicion destino</span>
-                  <select
-                    value={scanPositionId}
-                    onChange={(event) =>
-                      setScanForm((current) => ({
-                        ...current,
-                        positionId: event.target.value,
-                      }))
-                    }
-                  >
-                    {scanFilteredPositions.map((position) => (
-                      <option key={position.id} value={position.id}>
-                        {position.zone} / {position.code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ) : null}
-
-            <label className="deposits-mobile-scan-form-notes">
-              <span>Notas</span>
-              <textarea
-                onChange={(event) =>
-                  setScanForm((current) => ({
-                    ...current,
-                    notes: event.target.value,
-                  }))
-                }
-                rows="2"
-                value={scanForm.notes}
-              />
-            </label>
 
             <div className="deposits-mobile-scan-form-actions">
               <button
@@ -1232,4 +1234,3 @@ export function DepositsScanPage() {
     </div>
   )
 }
-

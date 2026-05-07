@@ -7146,13 +7146,19 @@ a {
 }
 
 .deposits-mobile-scan-form {
-  padding: 10px 12px 12px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  max-height: calc(54svh - 40px);
+  min-height: 0;
+}
+
+.deposits-mobile-scan-form-fields {
+  padding: 10px 12px 8px;
   display: grid;
   gap: 10px;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  max-height: calc(54svh - 40px);
-  padding-bottom: calc(12px + 58px + env(safe-area-inset-bottom, 0px));
+  min-height: 0;
 }
 
 .deposits-mobile-scan-form-row {
@@ -7201,11 +7207,9 @@ a {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  position: sticky;
-  bottom: 0;
-  padding-top: 6px;
-  padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
-  background: color-mix(in srgb, var(--deposits-erp-surface-bg) 92%, transparent);
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
+  background: color-mix(in srgb, var(--deposits-erp-surface-bg) 94%, transparent);
 }
 
 .deposits-mobile-scan-form-actions .primary-button,
