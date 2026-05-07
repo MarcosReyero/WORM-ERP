@@ -25,6 +25,7 @@ from .services import (
 
 
 def _parse_json(request):
+    """Maneja parse json."""
     if not request.body:
         return {}
 
@@ -35,6 +36,7 @@ def _parse_json(request):
 
 
 def _request_payload(request):
+    """Maneja request payload."""
     content_type = request.headers.get("Content-Type", "")
     if "application/json" in content_type:
         return _parse_json(request)
@@ -42,6 +44,7 @@ def _request_payload(request):
 
 
 def _handle_accounts_call(callback):
+    """Maneja handle accounts call."""
     try:
         return callback()
     except AccountsApiError as exc:
@@ -51,12 +54,14 @@ def _handle_accounts_call(callback):
 @require_GET
 @ensure_csrf_cookie
 def csrf(request):
+    """Maneja csrf."""
     return JsonResponse({"detail": "CSRF cookie initialized"})
 
 
 @require_GET
 @ensure_csrf_cookie
 def session_status(request):
+    """Maneja session status."""
     if not request.user.is_authenticated:
         return JsonResponse({"authenticated": False})
 
@@ -80,6 +85,7 @@ def session_status(request):
 
 @require_POST
 def login_view(request):
+    """Maneja login view."""
     try:
         payload = _parse_json(request)
     except AccountsApiError as exc:
@@ -118,12 +124,14 @@ def login_view(request):
 
 @require_POST
 def logout_view(request):
+    """Maneja logout view."""
     auth_logout(request)
     return JsonResponse({"detail": "Session closed"})
 
 
 @require_http_methods(["GET", "POST"])
 def profile_view(request):
+    """Maneja profile view."""
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication required"}, status=401)
 
@@ -131,6 +139,7 @@ def profile_view(request):
         return JsonResponse({"item": serialize_user_profile(request.user)})
 
     def handler():
+        """Maneja handler."""
         item = update_own_profile(request.user, _request_payload(request), files=request.FILES)
         return JsonResponse({"detail": "Profile updated", "item": item})
 
@@ -139,6 +148,7 @@ def profile_view(request):
 
 @require_http_methods(["GET", "POST"])
 def admin_profiles(request):
+    """Maneja admin profiles."""
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication required"}, status=401)
 
@@ -148,6 +158,7 @@ def admin_profiles(request):
         )
 
     def handler():
+        """Maneja handler."""
         item = create_profile_for_admin(request.user, _request_payload(request), files=request.FILES)
         return JsonResponse({"detail": "Profile created", "item": item}, status=201)
 
@@ -156,6 +167,7 @@ def admin_profiles(request):
 
 @require_http_methods(["GET", "POST"])
 def admin_profile_detail(request, profile_user_id):
+    """Maneja admin profile detail."""
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication required"}, status=401)
 
@@ -165,6 +177,7 @@ def admin_profile_detail(request, profile_user_id):
         )
 
     def handler():
+        """Maneja handler."""
         item = update_profile_for_admin(
             request.user,
             profile_user_id,
@@ -178,10 +191,12 @@ def admin_profile_detail(request, profile_user_id):
 
 @require_POST
 def admin_profile_reset_password(request, profile_user_id):
+    """Maneja admin profile reset password."""
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication required"}, status=401)
 
     def handler():
+        """Maneja handler."""
         item = reset_profile_password_for_admin(
             request.user,
             profile_user_id,
@@ -194,6 +209,7 @@ def admin_profile_reset_password(request, profile_user_id):
 
 @require_GET
 def admin_permissions_meta(request):
+    """Maneja admin permissions meta."""
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication required"}, status=401)
 
@@ -202,6 +218,7 @@ def admin_permissions_meta(request):
 
 @require_http_methods(["GET", "POST"])
 def admin_role_permissions(request, role_code):
+    """Maneja admin role permissions."""
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication required"}, status=401)
 
@@ -211,6 +228,7 @@ def admin_role_permissions(request, role_code):
         )
 
     def handler():
+        """Maneja handler."""
         payload = _request_payload(request)
         item = save_role_permissions_for_admin(request.user, role_code, payload)
         return JsonResponse(item)
@@ -220,6 +238,7 @@ def admin_role_permissions(request, role_code):
 
 @require_http_methods(["GET", "POST"])
 def admin_user_permissions(request, profile_user_id):
+    """Maneja admin user permissions."""
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication required"}, status=401)
 
@@ -229,6 +248,7 @@ def admin_user_permissions(request, profile_user_id):
         )
 
     def handler():
+        """Maneja handler."""
         payload = _request_payload(request)
         item = save_user_permissions_for_admin(request.user, profile_user_id, payload)
         return JsonResponse({"item": item})

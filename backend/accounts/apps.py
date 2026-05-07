@@ -6,4 +6,5 @@ class AccountsConfig(AppConfig):
     name = "accounts"
 
     def ready(self):
+        """Maneja ready."""
         from . import signals  # noqa: F401

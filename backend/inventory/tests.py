@@ -59,6 +59,7 @@ from inventory.services import dispatch_full_stock_report, dispatch_minimum_stoc
 
 class InventoryApiTests(TestCase):
     def build_excel_upload(self, workbook, name="articulos.xlsx"):
+        """Construye excel upload."""
         buffer = BytesIO()
         workbook.save(buffer)
         buffer.seek(0)
@@ -69,9 +70,11 @@ class InventoryApiTests(TestCase):
         )
 
     def read_excel_response(self, response):
+        """Maneja read excel response."""
         return load_workbook(BytesIO(response.content))
 
     def setUp(self):
+        """Maneja setUp."""
         self.media_dir = TemporaryDirectory()
         self.override_media = override_settings(MEDIA_ROOT=self.media_dir.name)
         self.override_media.enable()
@@ -97,15 +100,18 @@ class InventoryApiTests(TestCase):
         self.person = Person.objects.first()
 
     def tearDown(self):
+        """Maneja tearDown."""
         self.override_media.disable()
         self.media_dir.cleanup()
         super().tearDown()
 
     def test_inventory_endpoint_requires_authentication(self):
+        """Maneja test inventory endpoint requires authentication."""
         response = self.client.get("/api/inventory/overview/")
         self.assertEqual(response.status_code, 401)
 
     def test_inventory_overview_returns_new_workspace_shape(self):
+        """Maneja test inventory overview returns new workspace shape."""
         self.client.force_login(self.storekeeper)
 
         response = self.client.get("/api/inventory/overview/")
@@ -124,6 +130,7 @@ class InventoryApiTests(TestCase):
         self.assertIn("full_stock_report", payload["automation_status"])
 
     def test_consumable_article_requires_minimum_stock(self):
+        """Maneja test consumable article requires minimum stock."""
         self.client.force_login(self.storekeeper)
         unit = UnitOfMeasure.objects.get(code="UN")
         sector = Sector.objects.get(code="DEP")
@@ -145,6 +152,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_article_code_is_auto_generated_when_missing(self):
+        """Maneja test article code is auto generated when missing."""
         self.client.force_login(self.storekeeper)
         unit = UnitOfMeasure.objects.get(code="UN")
         sector = Sector.objects.get(code="DEP")
@@ -174,6 +182,7 @@ class InventoryApiTests(TestCase):
         )
 
     def test_article_detail_can_update_fields_and_image(self):
+        """Maneja test article detail can update fields and image."""
         self.client.force_login(self.storekeeper)
         article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
         upload = SimpleUploadedFile(
@@ -205,6 +214,7 @@ class InventoryApiTests(TestCase):
         self.assertIsNone(clear_response.json()["item"]["article"]["image_url"])
 
     def test_excel_import_requires_preview_then_confirm(self):
+        """Maneja test excel import requires preview then confirm."""
         self.client.force_login(self.storekeeper)
 
         workbook = Workbook()
@@ -242,6 +252,7 @@ class InventoryApiTests(TestCase):
         self.assertTrue(Article.objects.filter(name="Lubricante cadena").exists())
 
     def test_excel_import_accepts_simple_inventory_list(self):
+        """Maneja test excel import accepts simple inventory list."""
         self.client.force_login(self.storekeeper)
 
         workbook = Workbook()
@@ -294,6 +305,7 @@ class InventoryApiTests(TestCase):
         )
 
     def test_personal_report_excel_import_creates_and_updates_reports(self):
+        """Maneja test personal report excel import creates and updates reports."""
         self.client.force_login(self.storekeeper)
 
         first_workbook = Workbook()
@@ -354,6 +366,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(list_payload["items"][0]["report_date"], "2026-04-15")
 
     def test_personal_report_excel_import_requires_expected_columns(self):
+        """Maneja test personal report excel import requires expected columns."""
         self.client.force_login(self.storekeeper)
 
         workbook = Workbook()
@@ -373,6 +386,7 @@ class InventoryApiTests(TestCase):
         self.assertIn("Fecha, Dia y Actividades", response.json()["detail"])
 
     def test_personal_report_excel_import_supports_multiline_activities(self):
+        """Maneja test personal report excel import supports multiline activities."""
         self.client.force_login(self.storekeeper)
 
         workbook = Workbook()
@@ -413,6 +427,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(second.activities, "Actividad en la misma fila\nActividad extra")
 
     def test_personal_report_crud_allows_create_update_and_delete(self):
+        """Maneja test personal report crud allows create update and delete."""
         self.client.force_login(self.storekeeper)
 
         create_response = self.client.post(
@@ -454,6 +469,7 @@ class InventoryApiTests(TestCase):
         self.assertFalse(PersonalDailyReport.objects.filter(id=created_item["id"]).exists())
 
     def test_personal_report_bulk_delete_removes_selected_reports(self):
+        """Maneja test personal report bulk delete removes selected reports."""
         self.client.force_login(self.storekeeper)
 
         first = PersonalDailyReport.objects.create(
@@ -482,10 +498,12 @@ class InventoryApiTests(TestCase):
         self.assertFalse(PersonalDailyReport.objects.filter(id=second.id).exists())
 
     def test_stock_excel_export_requires_authentication(self):
+        """Maneja test stock excel export requires authentication."""
         response = self.client.get("/api/articles/export-excel/")
         self.assertEqual(response.status_code, 401)
 
     def test_stock_excel_export_returns_expected_workbook(self):
+        """Maneja test stock excel export returns expected workbook."""
         self.client.force_login(self.storekeeper)
         article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
         balance = InventoryBalance.objects.get(article=article, location=self.location)
@@ -565,6 +583,7 @@ class InventoryApiTests(TestCase):
         )
 
     def test_stock_excel_export_applies_filters_and_normalizes_queries(self):
+        """Maneja test stock excel export applies filters and normalizes queries."""
         self.client.force_login(self.storekeeper)
         article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
         balance = InventoryBalance.objects.get(article=article, location=self.location)
@@ -611,6 +630,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(sheet["J2"].value, "Sin stock")
 
     def test_stock_excel_export_returns_headers_when_no_articles_match(self):
+        """Maneja test stock excel export returns headers when no articles match."""
         self.client.force_login(self.storekeeper)
 
         response = self.client.get(
@@ -626,6 +646,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(sheet.max_column, 11)
 
     def test_minimum_stock_digest_config_can_be_saved(self):
+        """Maneja test minimum stock digest config can be saved."""
         self.client.force_login(self.storekeeper)
 
         response = self.client.post(
@@ -660,6 +681,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(config.notes, "Resumen semanal de articulos criticos.")
 
     def test_full_stock_report_config_can_be_saved(self):
+        """Maneja test full stock report config can be saved."""
         self.client.force_login(self.storekeeper)
 
         response = self.client.post(
@@ -693,6 +715,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(config.notes, "Reporte diario de stock completo.")
 
     def test_quantity_movement_updates_balance(self):
+        """Maneja test quantity movement updates balance."""
         self.client.force_login(self.storekeeper)
         article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
         balance = InventoryBalance.objects.filter(article=article, location=self.location).first()
@@ -716,6 +739,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(balance.on_hand, previous_stock + Decimal("5"))
 
     def test_checkout_and_return_updates_tracked_unit(self):
+        """Maneja test checkout and return updates tracked unit."""
         self.client.force_login(self.storekeeper)
         unit = TrackedUnit.objects.filter(status=TrackedUnit.UnitStatus.AVAILABLE).first()
 
@@ -753,6 +777,7 @@ class InventoryApiTests(TestCase):
         self.assertEqual(unit.current_location, self.location)
 
     def test_count_line_creates_discrepancy_and_supervisor_can_resolve_it(self):
+        """Maneja test count line creates discrepancy and supervisor can resolve it."""
         article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
         initial_balance = InventoryBalance.objects.get(article=article, location=self.location)
 
@@ -797,6 +822,7 @@ class InventoryApiTests(TestCase):
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_safety_alert_rule_sends_mail_when_article_is_already_below_minimum_stock(self):
+        """Maneja test safety alert rule sends mail when article is already below minimum stock."""
         self.client.force_login(self.storekeeper)
         article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
         balance = InventoryBalance.objects.get(article=article, location=self.location)
@@ -825,6 +851,7 @@ class InventoryApiTests(TestCase):
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_safety_alert_mail_is_not_resent_until_stock_recovers(self):
+        """Maneja test safety alert mail is not resent until stock recovers."""
         self.client.force_login(self.storekeeper)
         article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
         balance = InventoryBalance.objects.get(article=article, location=self.location)
@@ -913,19 +940,23 @@ class InventoryApiTests(TestCase):
 @override_settings(INVENTORY_AUTOMATION_ENABLED=False)
 class InventoryAutomationLeaseTests(TransactionTestCase):
     def setUp(self):
+        """Maneja setUp."""
         reset_inventory_automation_runner_for_tests()
         ensure_automation_task_state(TASK_KEY_SCHEDULER)
 
     def tearDown(self):
+        """Maneja tearDown."""
         reset_inventory_automation_runner_for_tests()
         super().tearDown()
 
     def test_try_acquire_lease_is_atomic_between_threads(self):
+        """Maneja test try acquire lease is atomic between threads."""
         barrier = threading.Barrier(2)
         results = []
         errors = []
 
         def worker(index):
+            """Maneja worker."""
             close_old_connections()
             try:
                 barrier.wait(timeout=5)
@@ -952,6 +983,7 @@ class InventoryAutomationLeaseTests(TransactionTestCase):
         self.assertEqual(sum(1 for item in results if item), 1)
 
     def test_expired_lease_can_be_taken_over(self):
+        """Maneja test expired lease can be taken over."""
         now = timezone.now()
         first_lease = try_acquire_lease(TASK_KEY_SCHEDULER, "owner-a", "owner-a", 90, now=now)
         self.assertTrue(first_lease.acquired)
@@ -974,6 +1006,7 @@ class InventoryAutomationLeaseTests(TransactionTestCase):
         self.assertEqual(task_state.owner_token, "owner-b")
 
     def test_renew_lease_updates_heartbeat(self):
+        """Maneja test renew lease updates heartbeat."""
         now = timezone.now()
         acquired = try_acquire_lease(TASK_KEY_SCHEDULER, "owner-a", "owner-a", 90, now=now)
         self.assertTrue(acquired.acquired)
@@ -992,6 +1025,7 @@ class InventoryAutomationLeaseTests(TransactionTestCase):
         self.assertGreater(task_state.heartbeat_at, old_heartbeat)
 
     def test_renew_lease_returns_false_after_takeover(self):
+        """Maneja test renew lease returns false after takeover."""
         now = timezone.now()
         acquired = try_acquire_lease(TASK_KEY_SCHEDULER, "owner-a", "owner-a", 90, now=now)
         self.assertTrue(acquired.acquired)
@@ -1019,6 +1053,7 @@ class InventoryAutomationLeaseTests(TransactionTestCase):
 @override_settings(INVENTORY_AUTOMATION_ENABLED=False)
 class InventoryAutomationBehaviorTests(TestCase):
     def setUp(self):
+        """Maneja setUp."""
         reset_inventory_automation_runner_for_tests()
         user_model = get_user_model()
         self.storekeeper = user_model.objects.create_user(
@@ -1042,10 +1077,12 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.unit = UnitOfMeasure.objects.get(code="UN")
 
     def tearDown(self):
+        """Maneja tearDown."""
         reset_inventory_automation_runner_for_tests()
         super().tearDown()
 
     def create_quantity_article(self, suffix, on_hand="4", minimum_stock="2"):
+        """Crea quantity article."""
         article = Article.objects.create(
             internal_code=f"AUTO-{suffix}",
             name=f"Articulo auto {suffix}",
@@ -1065,6 +1102,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         return article
 
     def create_digest_config(self, *, recipient_user=None, additional_emails="", **overrides):
+        """Crea digest config."""
         config = MinimumStockDigestConfig.objects.create(
             key="default",
             is_enabled=overrides.get("is_enabled", True),
@@ -1079,6 +1117,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         return config
 
     def create_full_stock_report_config(self, *, recipient_user=None, additional_emails="", **overrides):
+        """Crea full stock report config."""
         config = FullStockReportConfig.objects.create(
             key="default",
             is_enabled=overrides.get("is_enabled", True),
@@ -1093,6 +1132,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         return config
 
     def test_should_bootstrap_inventory_automation_skips_unwanted_commands(self):
+        """Maneja test should bootstrap inventory automation skips unwanted commands."""
         self.assertFalse(should_bootstrap_inventory_automation(argv=["manage.py", "test"]))
         self.assertFalse(
             should_bootstrap_inventory_automation(
@@ -1108,17 +1148,22 @@ class InventoryAutomationBehaviorTests(TestCase):
         )
 
     def test_maybe_start_inventory_automation_only_starts_once_per_process(self):
+        """Maneja test maybe start inventory automation only starts once per process."""
         class DummyRunner:
             def __init__(self):
+                """Inicializa la instancia."""
                 self.started = False
 
             def start(self):
+                """Maneja start."""
                 self.started = True
 
             def is_alive(self):
+                """Verifica si alive."""
                 return self.started
 
             def stop(self):
+                """Maneja stop."""
                 self.started = False
 
         with mock.patch("inventory.automation.should_bootstrap_inventory_automation", return_value=True):
@@ -1129,6 +1174,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertIs(first, second)
 
     def test_runner_cycle_skips_jobs_without_scheduler_lease(self):
+        """Maneja test runner cycle skips jobs without scheduler lease."""
         runner = InventoryAutomationRunner()
         with mock.patch.object(runner, "_ensure_scheduler_lease", return_value=False):
             with mock.patch.object(runner, "run_reconcile_job") as reconcile_mock:
@@ -1141,6 +1187,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         report_mock.assert_not_called()
 
     def test_digest_due_context_and_next_run_are_computed(self):
+        """Maneja test digest due context and next run are computed."""
         config = self.create_digest_config(
             recipient_user=self.supervisor,
             frequency=MinimumStockDigestConfig.Frequency.WEEKLY,
@@ -1156,6 +1203,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertEqual(timezone.localtime(due_context["next_run_at"]).date().isoformat(), "2026-04-14")
 
     def test_full_stock_report_due_context_and_next_run_are_computed(self):
+        """Maneja test full stock report due context and next run are computed."""
         config = self.create_full_stock_report_config(
             recipient_user=self.supervisor,
             frequency=FullStockReportConfig.Frequency.WEEKLY,
@@ -1171,6 +1219,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertEqual(timezone.localtime(due_context["next_run_at"]).date().isoformat(), "2026-04-14")
 
     def test_claim_minimum_stock_digest_period_supports_stale_takeover(self):
+        """Maneja test claim minimum stock digest period supports stale takeover."""
         config = self.create_digest_config(recipient_user=self.supervisor)
         due_key = "daily:2026-04-07"
         now = timezone.now()
@@ -1201,6 +1250,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertTrue(stale_takeover)
 
     def test_claim_full_stock_report_period_supports_stale_takeover(self):
+        """Maneja test claim full stock report period supports stale takeover."""
         config = self.create_full_stock_report_config(recipient_user=self.supervisor)
         due_key = "daily:2026-04-07"
         now = timezone.now()
@@ -1231,6 +1281,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertTrue(stale_takeover)
 
     def test_dispatch_digest_records_warning_when_all_recipients_are_discarded(self):
+        """Maneja test dispatch digest records warning when all recipients are discarded."""
         self.create_quantity_article("WARN", on_hand="1", minimum_stock="2")
         config = self.create_digest_config(recipient_user=self.supervisor)
         self.supervisor.email = ""
@@ -1251,6 +1302,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertTrue(any("digest_recipients_warning" in line for line in captured_logs.output))
 
     def test_dispatch_digest_records_real_send_error_separately(self):
+        """Maneja test dispatch digest records real send error separately."""
         self.create_quantity_article("ERR", on_hand="1", minimum_stock="2")
         config = self.create_digest_config(recipient_user=self.supervisor)
 
@@ -1271,6 +1323,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertTrue(any("digest_send_start" in line for line in info_logs.output))
 
     def test_dispatch_full_stock_report_records_warning_when_all_recipients_are_discarded(self):
+        """Maneja test dispatch full stock report records warning when all recipients are discarded."""
         self.create_quantity_article("WARN-REPORT", on_hand="1", minimum_stock="2")
         config = self.create_full_stock_report_config(recipient_user=self.supervisor)
         self.supervisor.email = ""
@@ -1293,6 +1346,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         )
 
     def test_dispatch_full_stock_report_sends_email_with_attachment(self):
+        """Maneja test dispatch full stock report sends email with attachment."""
         self.create_quantity_article("OK-REPORT", on_hand="5", minimum_stock="2")
         config = self.create_full_stock_report_config(recipient_user=self.supervisor)
 
@@ -1318,6 +1372,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         self.assertGreater(len(attachment_payload), 200)
 
     def test_dispatch_full_stock_report_records_real_send_error_separately(self):
+        """Maneja test dispatch full stock report records real send error separately."""
         self.create_quantity_article("ERR-REPORT", on_hand="1", minimum_stock="2")
         config = self.create_full_stock_report_config(recipient_user=self.supervisor)
 
@@ -1339,6 +1394,7 @@ class InventoryAutomationBehaviorTests(TestCase):
 
     @override_settings(INVENTORY_AUTOMATION_BATCH_SIZE=2)
     def test_reconcile_job_marks_warning_when_an_item_fails_mid_batch(self):
+        """Maneja test reconcile job marks warning when an item fails mid batch."""
         articles = [
             self.create_quantity_article("REC-1"),
             self.create_quantity_article("REC-2"),
@@ -1361,6 +1417,7 @@ class InventoryAutomationBehaviorTests(TestCase):
         processed_ids = []
 
         def fake_evaluate(article):
+            """Maneja fake evaluate."""
             processed_ids.append(article.id)
             if article.internal_code == "AUTO-REC-2":
                 raise RuntimeError("boom")
@@ -1382,6 +1439,7 @@ class InventoryAutomationBehaviorTests(TestCase):
 
 class DepositsApiTests(TestCase):
     def setUp(self):
+        """Maneja setUp."""
         user_model = get_user_model()
         self.storekeeper = user_model.objects.create_user(
             username="dep-storekeeper",
@@ -1467,6 +1525,7 @@ class DepositsApiTests(TestCase):
         )
 
     def balance_total(self, location):
+        """Maneja balance total."""
         return (
             InventoryBalance.objects.filter(article=self.article, location=location).aggregate(total=Sum("on_hand"))[
                 "total"
@@ -1475,6 +1534,7 @@ class DepositsApiTests(TestCase):
         )
 
     def register_pallet(self, quantity="5"):
+        """Maneja register pallet."""
         self.client.force_login(self.storekeeper)
         response = self.client.post(
             "/api/pallets/",
@@ -1493,6 +1553,7 @@ class DepositsApiTests(TestCase):
         return response.json()["item"]
 
     def test_deposit_endpoints_require_authentication(self):
+        """Maneja test deposit endpoints require authentication."""
         self.assertEqual(self.client.get("/api/deposits/overview/").status_code, 401)
         self.assertEqual(self.client.get("/api/pallets/").status_code, 401)
         self.assertEqual(
@@ -1505,6 +1566,7 @@ class DepositsApiTests(TestCase):
         )
 
     def test_operator_can_scan_but_cannot_create_manual_pallet(self):
+        """Maneja test operator can scan but cannot create manual pallet."""
         pallet = self.register_pallet()
 
         self.client.force_login(self.operator)
@@ -1537,6 +1599,7 @@ class DepositsApiTests(TestCase):
         self.assertEqual(manual_create.status_code, 403)
 
     def test_auditor_can_list_and_view_but_cannot_scan_or_register(self):
+        """Maneja test auditor can list and view but cannot scan or register."""
         pallet = self.register_pallet()
 
         self.client.force_login(self.auditor)
@@ -1576,6 +1639,7 @@ class DepositsApiTests(TestCase):
         self.assertEqual(register_response.status_code, 403)
 
     def test_manual_pallet_registration_creates_event_and_stock_adjustment(self):
+        """Maneja test manual pallet registration creates event and stock adjustment."""
         before_balance = self.balance_total(self.location)
 
         pallet = self.register_pallet(quantity="7")
@@ -1598,6 +1662,7 @@ class DepositsApiTests(TestCase):
         self.assertEqual(self.balance_total(self.location), before_balance + Decimal("7"))
 
     def test_internal_relocation_changes_position_without_moving_balance(self):
+        """Maneja test internal relocation changes position without moving balance."""
         pallet = self.register_pallet(quantity="3")
         before_balance = self.balance_total(self.location)
 
@@ -1628,6 +1693,7 @@ class DepositsApiTests(TestCase):
         )
 
     def test_cross_deposit_relocation_creates_transfer_and_updates_balances(self):
+        """Maneja test cross deposit relocation creates transfer and updates balances."""
         pallet = self.register_pallet(quantity="4")
         self.assertEqual(self.balance_total(self.location), Decimal("4"))
         self.assertEqual(self.balance_total(self.secondary_location), Decimal("0"))
@@ -1669,6 +1735,7 @@ class DepositsApiTests(TestCase):
         )
 
     def test_scan_register_generates_internal_pallet_code(self):
+        """Maneja test scan register generates internal pallet code."""
         self.client.force_login(self.storekeeper)
         response = self.client.post(
             "/api/pallets/scan/",
@@ -1696,6 +1763,7 @@ class DepositsApiTests(TestCase):
         self.assertEqual(event.raw_qr, "EXT-QR-999")
 
     def test_manual_create_rejects_non_deposit_location(self):
+        """Maneja test manual create rejects non deposit location."""
         self.client.force_login(self.storekeeper)
         response = self.client.post(
             "/api/pallets/",
@@ -1713,6 +1781,7 @@ class DepositsApiTests(TestCase):
         self.assertIn("not enabled as a deposit", response.json()["detail"])
 
     def test_overview_only_includes_deposit_location_types(self):
+        """Maneja test overview only includes deposit location types."""
         self.client.force_login(self.storekeeper)
         response = self.client.get("/api/deposits/overview/")
         self.assertEqual(response.status_code, 200)

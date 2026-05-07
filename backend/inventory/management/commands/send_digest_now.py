@@ -24,6 +24,7 @@ class Command(BaseCommand):
     help = "Fuerza el envío del digest de stock mínimo ahora"
 
     def handle(self, *args, **options):
+        """Maneja handle."""
         self.stdout.write(self.style.SUCCESS("🚀 Enviando digest de stock mínimo..."))
         
         try:

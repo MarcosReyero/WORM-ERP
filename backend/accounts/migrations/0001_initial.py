@@ -6,6 +6,7 @@ from django.db import migrations, models
 
 
 def seed_user_profiles(apps, schema_editor):
+    """Maneja seed user profiles."""
     Group = apps.get_model("auth", "Group")
     User = apps.get_model("auth", "User")
     UserProfile = apps.get_model("accounts", "UserProfile")

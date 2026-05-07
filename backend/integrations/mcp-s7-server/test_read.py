@@ -6,11 +6,13 @@ from policies import validate_read_allowed
 
 
 def load_tag_map(path: str) -> dict:
+    """Carga tag map."""
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def main() -> None:
+    """Maneja main."""
     tag_map = load_tag_map(settings.tag_map_path)
 
     plc = PLCClient(

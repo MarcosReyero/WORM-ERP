@@ -57,6 +57,7 @@ class ArticleCategory(AuditedModel):
         verbose_name_plural = "Categorias de articulos"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.name
 
 
@@ -75,6 +76,7 @@ class UnitOfMeasure(AuditedModel):
         verbose_name_plural = "Unidades de medida"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.name} ({self.code})"
 
 
@@ -92,6 +94,7 @@ class Sector(AuditedModel):
         ordering = ["name"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.name
 
 
@@ -125,6 +128,7 @@ class Person(AuditedModel):
         ordering = ["full_name"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.full_name
 
 
@@ -151,6 +155,7 @@ class Supplier(AuditedModel):
         ordering = ["name"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.name
 
 
@@ -192,6 +197,7 @@ class Location(AuditedModel):
         ordering = ["name"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.name} ({self.code})"
 
 
@@ -216,6 +222,7 @@ class StorageZone(AuditedModel):
         ]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.location.code} / {self.code}"
 
 
@@ -266,10 +273,12 @@ class StoragePosition(AuditedModel):
         ]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.zone.code} / {self.code}"
 
     @property
     def location(self):
+        """Maneja location."""
         return self.zone.location
 
 
@@ -400,9 +409,11 @@ class Article(AuditedModel):
         ordering = ["name"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.name} ({self.internal_code})"
 
     def clean(self):
+        """Maneja clean."""
         quantity_controlled = {
             self.ArticleType.CONSUMABLE,
             self.ArticleType.INPUT,
@@ -475,6 +486,7 @@ class SafetyStockAlertRule(AuditedModel):
         verbose_name_plural = "Alarmas por stock de seguridad"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"Alarma {self.article.internal_code}"
 
 
@@ -500,6 +512,7 @@ class MinimumStockAlarmConfig(AuditedModel):
         verbose_name_plural = "Alarmas globales por stock minimo"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"Config alarma stock minimo ({self.key})"
 
 
@@ -536,6 +549,7 @@ class MinimumStockAlarmState(AuditedModel):
         verbose_name_plural = "Estados alarmas stock minimo"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"Estado alarma {self.article.internal_code}"
 
 
@@ -593,6 +607,7 @@ class MinimumStockDigestConfig(AuditedModel):
         verbose_name_plural = "Resumenes periodicos de stock minimo"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return "Resumen periodico de stock minimo"
 
 
@@ -653,6 +668,7 @@ class FullStockReportConfig(AuditedModel):
         verbose_name_plural = "Reportes periodicos de stock completo"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return "Reporte periodico de stock completo"
 
 
@@ -700,6 +716,7 @@ class InventoryAutomationTaskState(AuditedModel):
         verbose_name_plural = "Estados de automatizacion de inventario"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.key
 
 
@@ -743,9 +760,11 @@ class InventoryBatch(AuditedModel):
         ]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.article.internal_code} / {self.lot_code}"
 
     def clean(self):
+        """Maneja clean."""
         if not self.article.requires_lot:
             raise ValidationError({"article": "El articulo seleccionado no usa lotes."})
         if self.article.requires_expiry and not self.expiry_date:
@@ -802,9 +821,11 @@ class Pallet(AuditedModel):
         ordering = ["-updated_at", "-id"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.pallet_code
 
     def clean(self):
+        """Maneja clean."""
         if self.pallet_lot:
             normalized_lot = self.pallet_lot.strip()
             if len(normalized_lot) != 4 or not normalized_lot.isdigit():
@@ -870,9 +891,11 @@ class PalletEvent(AuditedModel):
         ordering = ["-created_at", "-id"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.get_event_type_display()} / {self.pallet.pallet_code}"
 
     def clean(self):
+        """Maneja clean."""
         if (
             self.event_type == self.EventType.RELOCATED
             and not self.target_position
@@ -916,13 +939,16 @@ class InventoryBalance(AuditedModel):
         ]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.article.internal_code} @ {self.location.code}"
 
     @property
     def available(self):
+        """Maneja available."""
         return self.on_hand - self.reserved
 
     def clean(self):
+        """Maneja clean."""
         if self.article.tracking_mode != Article.TrackingMode.QUANTITY:
             raise ValidationError(
                 {"article": "Solo los articulos por cantidad usan balances de inventario."}
@@ -987,9 +1013,11 @@ class TrackedUnit(AuditedModel):
         ordering = ["internal_tag"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.internal_tag
 
     def clean(self):
+        """Maneja clean."""
         if self.article.tracking_mode != Article.TrackingMode.UNIT:
             raise ValidationError(
                 {"article": "Solo los articulos por unidad pueden tener unidades trazadas."}
@@ -1084,9 +1112,11 @@ class StockMovement(AuditedModel):
         ordering = ["-timestamp", "-id"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.get_movement_type_display()} - {self.article.internal_code}"
 
     def clean(self):
+        """Maneja clean."""
         sensitive_types = {
             self.MovementType.ADJUSTMENT_IN,
             self.MovementType.DAMAGE_OUT,
@@ -1186,9 +1216,11 @@ class AssetCheckout(AuditedModel):
         ordering = ["-checked_out_at"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.tracked_unit.internal_tag} - {self.get_status_display()}"
 
     def clean(self):
+        """Maneja clean."""
         if not self.receiver_person and not self.receiver_sector:
             raise ValidationError(
                 "El prestamo o asignacion debe tener al menos una persona o sector receptor."
@@ -1227,6 +1259,7 @@ class PhysicalCountSession(AuditedModel):
         ordering = ["-scheduled_for"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.get_count_type_display()} - {self.scope}"
 
 
@@ -1283,6 +1316,7 @@ class PhysicalCountLine(AuditedModel):
         ]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.session_id} - {self.article.internal_code}"
 
 
@@ -1352,9 +1386,11 @@ class StockDiscrepancy(AuditedModel):
         ordering = ["-detected_at"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.article.internal_code} - {self.difference_qty}"
 
     def clean(self):
+        """Maneja clean."""
         if self.difference_qty == 0:
             raise ValidationError(
                 {"difference_qty": "La diferencia debe ser distinta de cero."}
@@ -1402,6 +1438,7 @@ class InternalRequest(AuditedModel):
         ordering = ["-requested_at"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.request_number
 
 
@@ -1424,6 +1461,7 @@ class InternalRequestLine(AuditedModel):
         ordering = ["request", "article__name"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.request.request_number} - {self.article.internal_code}"
 
 
@@ -1447,4 +1485,5 @@ class PersonalDailyReport(AuditedModel):
         ]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.user_id} - {self.report_date.isoformat()}"

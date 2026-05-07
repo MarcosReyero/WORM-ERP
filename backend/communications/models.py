@@ -18,6 +18,7 @@ class Conversation(AuditedModel):
         ordering = ["-last_message_at", "-created_at"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.subject or f"{self.get_kind_display()} #{self.pk}"
 
 
@@ -45,6 +46,7 @@ class ConversationParticipant(models.Model):
         ]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.user.username} @ {self.conversation_id}"
 
 
@@ -87,6 +89,7 @@ class Message(AuditedModel):
         ordering = ["created_at", "id"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.conversation_id} - {self.get_message_kind_display()}"
 
 
@@ -105,6 +108,7 @@ class MessageAttachment(models.Model):
         ordering = ["id"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.original_name
 
 
@@ -150,4 +154,5 @@ class InventoryAlarm(AuditedModel):
         ordering = ["-created_at"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.title

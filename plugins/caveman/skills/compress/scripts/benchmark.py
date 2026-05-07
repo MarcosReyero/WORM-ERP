@@ -17,12 +17,14 @@ except ImportError:
 
 
 def count_tokens(text):
+    """Maneja count tokens."""
     if _enc is None:
         return len(text.split())  # fallback: word count
     return len(_enc.encode(text))
 
 
 def benchmark_pair(orig_path: Path, comp_path: Path):
+    """Maneja benchmark pair."""
     orig_text = orig_path.read_text()
     comp_text = comp_path.read_text()
 
@@ -35,6 +37,7 @@ def benchmark_pair(orig_path: Path, comp_path: Path):
 
 
 def print_table(rows):
+    """Maneja print table."""
     print("\n| File | Original | Compressed | Saved % | Valid |")
     print("|------|----------|------------|---------|-------|")
     for r in rows:
@@ -43,6 +46,7 @@ def print_table(rows):
 
 def main():
     # Direct file pair: python3 benchmark.py original.md compressed.md
+    """Maneja main."""
     if len(sys.argv) == 3:
         orig = Path(sys.argv[1]).resolve()
         comp = Path(sys.argv[2]).resolve()

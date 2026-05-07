@@ -144,8 +144,10 @@ def permission_required(module_code, action_code="view"):
     """
 
     def decorator(view_func):
+        """Maneja decorator."""
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
+            """Maneja wrapper."""
             if has_module_permission(request.user, module_code, action_code):
                 return view_func(request, *args, **kwargs)
 

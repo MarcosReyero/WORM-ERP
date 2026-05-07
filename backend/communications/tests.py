@@ -13,6 +13,7 @@ from .models import Conversation, InventoryAlarm, Message, MessageAttachment
 
 class CommunicationsApiTests(TestCase):
     def setUp(self):
+        """Maneja setUp."""
         user_model = get_user_model()
         self.sender = user_model.objects.create_user(
             username="sender",
@@ -50,6 +51,7 @@ class CommunicationsApiTests(TestCase):
         )
 
     def test_direct_messages_reuse_same_conversation(self):
+        """Maneja test direct messages reuse same conversation."""
         client = Client()
         client.force_login(self.sender)
 
@@ -78,6 +80,7 @@ class CommunicationsApiTests(TestCase):
         )
 
     def test_inventory_alarm_flows_through_messages(self):
+        """Maneja test inventory alarm flows through messages."""
         sender_client = Client()
         sender_client.force_login(self.sender)
 
@@ -117,6 +120,7 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(alarm.status, InventoryAlarm.AlarmStatus.CLOSED)
 
     def test_reply_accepts_attachments_without_text(self):
+        """Maneja test reply accepts attachments without text."""
         client = Client()
         client.force_login(self.sender)
 

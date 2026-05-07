@@ -10,6 +10,7 @@ from .models import UserProfile
 
 class AuthApiTests(TestCase):
     def setUp(self):
+        """Maneja setUp."""
         self.client = Client(enforce_csrf_checks=True)
         self.user = get_user_model().objects.create_user(
             username="tester",
@@ -17,6 +18,7 @@ class AuthApiTests(TestCase):
         )
 
     def test_login_creates_authenticated_session(self):
+        """Maneja test login creates authenticated session."""
         self.user.profile.role = UserProfile.Role.STOREKEEPER
         self.user.profile.save(update_fields=["role"])
 
@@ -47,6 +49,7 @@ class AuthApiTests(TestCase):
         self.assertIn("open_alarm_count", session_response.json()["user"])
 
     def test_inactive_profile_cannot_login(self):
+        """Maneja test inactive profile cannot login."""
         self.user.profile.status = UserProfile.Status.INACTIVE
         self.user.profile.save(update_fields=["status"])
 
@@ -69,6 +72,7 @@ class AuthApiTests(TestCase):
 
 class AdminProfileApiTests(TestCase):
     def setUp(self):
+        """Maneja setUp."""
         user_model = get_user_model()
         self.client = Client()
         self.admin = user_model.objects.create_user(
@@ -88,6 +92,7 @@ class AdminProfileApiTests(TestCase):
         )
 
     def test_admin_can_create_update_and_reset_profile(self):
+        """Maneja test admin can create update and reset profile."""
         self.client.force_login(self.admin)
 
         create_response = self.client.post(
@@ -127,6 +132,7 @@ class AdminProfileApiTests(TestCase):
         self.assertTrue(created_user.check_password("ResetPass123"))
 
     def test_non_admin_cannot_list_profiles(self):
+        """Maneja test non admin cannot list profiles."""
         self.client.force_login(self.operator)
         response = self.client.get("/api/auth/admin/profiles/")
         self.assertEqual(response.status_code, 403)

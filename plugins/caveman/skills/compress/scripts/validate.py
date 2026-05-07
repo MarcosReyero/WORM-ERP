@@ -14,19 +14,23 @@ PATH_REGEX = re.compile(r"(?:\./|\.\./|/|[A-Za-z]:\\)[\w\-/\\\.]+|[\w\-\.]+[/\\]
 
 class ValidationResult:
     def __init__(self):
+        """Inicializa la instancia."""
         self.is_valid = True
         self.errors = []
         self.warnings = []
 
     def add_error(self, msg):
+        """Maneja add error."""
         self.is_valid = False
         self.errors.append(msg)
 
     def add_warning(self, msg):
+        """Maneja add warning."""
         self.warnings.append(msg)
 
 
 def read_file(path: Path) -> str:
+    """Maneja read file."""
     return path.read_text(errors="ignore")
 
 
@@ -34,6 +38,7 @@ def read_file(path: Path) -> str:
 
 
 def extract_headings(text):
+    """Maneja extract headings."""
     return [(level, title.strip()) for level, title in HEADING_REGEX.findall(text)]
 
 
@@ -82,14 +87,17 @@ def extract_code_blocks(text):
 
 
 def extract_urls(text):
+    """Maneja extract urls."""
     return set(URL_REGEX.findall(text))
 
 
 def extract_paths(text):
+    """Maneja extract paths."""
     return set(PATH_REGEX.findall(text))
 
 
 def count_bullets(text):
+    """Maneja count bullets."""
     return len(BULLET_REGEX.findall(text))
 
 
@@ -97,6 +105,7 @@ def count_bullets(text):
 
 
 def validate_headings(orig, comp, result):
+    """Valida headings."""
     h1 = extract_headings(orig)
     h2 = extract_headings(comp)
 
@@ -108,6 +117,7 @@ def validate_headings(orig, comp, result):
 
 
 def validate_code_blocks(orig, comp, result):
+    """Valida code blocks."""
     c1 = extract_code_blocks(orig)
     c2 = extract_code_blocks(comp)
 
@@ -116,6 +126,7 @@ def validate_code_blocks(orig, comp, result):
 
 
 def validate_urls(orig, comp, result):
+    """Valida urls."""
     u1 = extract_urls(orig)
     u2 = extract_urls(comp)
 
@@ -124,6 +135,7 @@ def validate_urls(orig, comp, result):
 
 
 def validate_paths(orig, comp, result):
+    """Valida paths."""
     p1 = extract_paths(orig)
     p2 = extract_paths(comp)
 
@@ -132,6 +144,7 @@ def validate_paths(orig, comp, result):
 
 
 def validate_bullets(orig, comp, result):
+    """Valida bullets."""
     b1 = count_bullets(orig)
     b2 = count_bullets(comp)
 
@@ -148,6 +161,7 @@ def validate_bullets(orig, comp, result):
 
 
 def validate(original_path: Path, compressed_path: Path) -> ValidationResult:
+    """Maneja validate."""
     result = ValidationResult()
 
     orig = read_file(original_path)

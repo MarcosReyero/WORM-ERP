@@ -14,6 +14,7 @@ class Command(BaseCommand):
     help = "Atajo: ejecuta la automatización en modo desarrollo (equivalente a --dev)"
 
     def add_arguments(self, parser):
+        """Maneja add arguments."""
         super().add_arguments(parser)
         # El flag --dev viene del command base
         # Solo ajustamos defaults para modo dev
@@ -27,6 +28,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Asegurar que dev siempre es True
+        """Maneja handle."""
         options["dev"] = True
         
         # Opcional: imprimir mensaje amigable

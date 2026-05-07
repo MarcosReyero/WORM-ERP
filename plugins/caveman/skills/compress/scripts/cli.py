@@ -14,10 +14,12 @@ from .detect import detect_file_type, should_compress
 
 
 def print_usage():
+    """Maneja print usage."""
     print("Usage: caveman <filepath>")
 
 
 def main():
+    """Maneja main."""
     if len(sys.argv) != 2:
         print_usage()
         sys.exit(1)

@@ -62,6 +62,7 @@ class RolePermissionInlineForRole(admin.TabularInline):
     verbose_name_plural = "Permisos de módulos"
 
     def get_queryset(self, request):
+        """Devuelve queryset."""
         qs = super().get_queryset(request)
         return qs.prefetch_related("actions", "module")
 
@@ -100,6 +101,7 @@ class RolePermissionAdmin(admin.ModelAdmin):
     actions_display.short_description = "Acciones permitidas"
 
     def get_queryset(self, request):
+        """Devuelve queryset."""
         qs = super().get_queryset(request)
         return qs.prefetch_related("actions", "module")
 
@@ -118,6 +120,7 @@ class UserModulePermissionInline(admin.TabularInline):
     verbose_name_plural = "Permisos de módulos específicos"
 
     def get_queryset(self, request):
+        """Devuelve queryset."""
         qs = super().get_queryset(request)
         return qs.prefetch_related("actions", "module")
 
@@ -206,6 +209,7 @@ class UserPermissionAdmin(admin.ModelAdmin):
     num_sectors.short_description = "Sectores"
 
     def get_queryset(self, request):
+        """Devuelve queryset."""
         qs = super().get_queryset(request)
         return qs.prefetch_related(
             "module_permissions__actions",
@@ -259,6 +263,7 @@ class SectorPermissionAdmin(admin.ModelAdmin):
     permisos_display.short_description = "Permisos"
 
     def get_queryset(self, request):
+        """Devuelve queryset."""
         qs = super().get_queryset(request)
         return qs.select_related("user", "sector")
 
@@ -342,6 +347,7 @@ class UserProfileAdmin(admin.ModelAdmin):
         UserPermission.objects.get_or_create(user=obj.user)
 
     def get_queryset(self, request):
+        """Devuelve queryset."""
         qs = super().get_queryset(request)
         return qs.select_related("user", "sector_default")
 

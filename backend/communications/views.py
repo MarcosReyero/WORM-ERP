@@ -16,10 +16,12 @@ from .services import (
 
 
 def _unauthorized():
+    """Maneja unauthorized."""
     return JsonResponse({"detail": "Authentication required"}, status=401)
 
 
 def _parse_json(request):
+    """Maneja parse json."""
     if not request.body:
         return {}
 
@@ -30,6 +32,7 @@ def _parse_json(request):
 
 
 def _request_payload(request):
+    """Maneja request payload."""
     content_type = request.headers.get("Content-Type", "")
     if "application/json" in content_type:
         return _parse_json(request)
@@ -37,6 +40,7 @@ def _request_payload(request):
 
 
 def _handle_call(callback):
+    """Maneja handle call."""
     try:
         return callback()
     except CommunicationsApiError as exc:
@@ -45,6 +49,7 @@ def _handle_call(callback):
 
 @require_GET
 def messages_overview(request):
+    """Maneja messages overview."""
     if not request.user.is_authenticated:
         return _unauthorized()
     return _handle_call(lambda: JsonResponse(build_messages_overview(request.user)))
@@ -52,6 +57,7 @@ def messages_overview(request):
 
 @require_http_methods(["GET", "POST"])
 def conversations(request):
+    """Maneja conversations."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -62,6 +68,7 @@ def conversations(request):
         )
 
     def handler():
+        """Maneja handler."""
         item = start_direct_conversation(
             request.user,
             _request_payload(request),
@@ -74,6 +81,7 @@ def conversations(request):
 
 @require_GET
 def conversation_detail(request, conversation_id):
+    """Maneja conversation detail."""
     if not request.user.is_authenticated:
         return _unauthorized()
     return _handle_call(
@@ -83,10 +91,12 @@ def conversation_detail(request, conversation_id):
 
 @require_POST
 def conversation_messages(request, conversation_id):
+    """Maneja conversation messages."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         item = send_conversation_reply(
             request.user,
             conversation_id,
@@ -100,6 +110,7 @@ def conversation_messages(request, conversation_id):
 
 @require_POST
 def conversation_read(request, conversation_id):
+    """Maneja conversation read."""
     if not request.user.is_authenticated:
         return _unauthorized()
     return _handle_call(
@@ -114,6 +125,7 @@ def conversation_read(request, conversation_id):
 
 @require_POST
 def alarm_close(request, alarm_id):
+    """Maneja alarm close."""
     if not request.user.is_authenticated:
         return _unauthorized()
     return _handle_call(

@@ -9,6 +9,7 @@ from django.db import migrations, models
 
 
 def detect_article_type(name, category_name, Article):
+    """Maneja detect article type."""
     normalized = (name or "").lower()
     category_name = (category_name or "").lower()
 
@@ -24,6 +25,7 @@ def detect_article_type(name, category_name, Article):
 
 
 def migrate_legacy_inventory(apps, schema_editor):
+    """Maneja migrate legacy inventory."""
     User = apps.get_model("auth", "User")
     LegacyCategory = apps.get_model("inventory", "InventoryCategory")
     LegacyItem = apps.get_model("inventory", "InventoryItem")
@@ -39,6 +41,7 @@ def migrate_legacy_inventory(apps, schema_editor):
     admin_user = User.objects.filter(username="admin").first() or User.objects.order_by("id").first()
 
     def audit_defaults():
+        """Maneja audit defaults."""
         return {"created_by": admin_user, "updated_by": admin_user}
 
     deposit_sector, _ = Sector.objects.get_or_create(

@@ -73,6 +73,7 @@ MAX_RETRIES = 2
 
 
 def call_claude(prompt: str) -> str:
+    """Maneja call claude."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if api_key:
         try:
@@ -102,6 +103,7 @@ def call_claude(prompt: str) -> str:
 
 
 def build_compress_prompt(original: str) -> str:
+    """Construye compress prompt."""
     return f"""
 Compress this markdown into caveman format.
 
@@ -121,6 +123,7 @@ TEXT:
 
 
 def build_fix_prompt(original: str, compressed: str, errors: List[str]) -> str:
+    """Construye fix prompt."""
     errors_str = "\n".join(f"- {e}" for e in errors)
     return f"""You are fixing a caveman-compressed markdown file. Specific validation errors were found.
 
@@ -154,6 +157,7 @@ Return ONLY the fixed compressed file. No explanation.
 
 def compress_file(filepath: Path) -> bool:
     # Resolve and validate path
+    """Maneja compress file."""
     filepath = filepath.resolve()
     MAX_FILE_SIZE = 500_000  # 500KB
     if not filepath.exists():

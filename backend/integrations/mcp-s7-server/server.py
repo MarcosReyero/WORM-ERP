@@ -9,11 +9,13 @@ mcp = FastMCP("mcp-s7-server")
 
 
 def load_tag_map(path: str) -> dict:
+    """Carga tag map."""
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def get_plc() -> PLCClient:
+    """Devuelve plc."""
     return PLCClient(
         host=settings.plc_host,
         rack=settings.plc_rack,
@@ -24,6 +26,7 @@ def get_plc() -> PLCClient:
 
 @mcp.tool()
 def plc_ping() -> dict:
+    """Maneja plc ping."""
     plc = get_plc()
     try:
         plc.connect()
@@ -47,12 +50,14 @@ def plc_ping() -> dict:
 
 @mcp.tool()
 def plc_list_tags() -> dict:
+    """Maneja plc list tags."""
     tag_map = load_tag_map(settings.tag_map_path)
     return tag_map
 
 
 @mcp.tool()
 def plc_read_tag(tag_name: str) -> dict:
+    """Maneja plc read tag."""
     plc = get_plc()
     try:
         tag_map = load_tag_map(settings.tag_map_path)
@@ -80,6 +85,7 @@ def plc_read_tag(tag_name: str) -> dict:
 
 @mcp.tool()
 def plc_read_tags(tag_names: list[str]) -> dict:
+    """Maneja plc read tags."""
     results = {}
 
     plc = get_plc()
@@ -108,6 +114,7 @@ def plc_read_tags(tag_names: list[str]) -> dict:
 
 @mcp.tool()
 def plc_write_tag(tag_name: str, value: bool | int | float) -> dict:
+    """Maneja plc write tag."""
     plc = get_plc()
     try:
         tag_map = load_tag_map(settings.tag_map_path)

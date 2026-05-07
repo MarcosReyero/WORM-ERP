@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def _env_bool(name: str, default: bool) -> bool:
+    """Maneja env bool."""
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -18,6 +19,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 def _env_csv(name: str, default=None):
+    """Maneja env csv."""
     raw = os.getenv(name)
     if raw is None:
         return default if default is not None else []

@@ -7,6 +7,7 @@ from django.db import migrations, models
 
 
 def seed_default_storage_layouts(apps, schema_editor):
+    """Maneja seed default storage layouts."""
     Location = apps.get_model("inventory", "Location")
     StorageZone = apps.get_model("inventory", "StorageZone")
     StoragePosition = apps.get_model("inventory", "StoragePosition")

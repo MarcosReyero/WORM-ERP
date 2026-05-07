@@ -62,6 +62,7 @@ class UserProfile(models.Model):
         ordering = ["user__username"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.user.username} ({self.get_role_display()})"
 
 
@@ -103,6 +104,7 @@ class PermissionModule(models.Model):
         verbose_name_plural = "Módulos de Permisos"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.name
 
 
@@ -132,6 +134,7 @@ class PermissionAction(models.Model):
         verbose_name_plural = "Acciones de Permisos"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return self.name
 
 
@@ -162,9 +165,11 @@ class RolePermission(models.Model):
         ordering = ["role", "module"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.get_role_display()} - {self.module.name}"
 
     def get_role_display(self):
+        """Devuelve role display."""
         return dict(UserProfile.Role.choices).get(self.role, self.role)
 
 
@@ -189,6 +194,7 @@ class UserPermission(models.Model):
         verbose_name_plural = "Permisos de Usuarios"
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"Permisos de {self.user.username}"
 
 
@@ -225,6 +231,7 @@ class UserModulePermission(models.Model):
         ordering = ["user_permission", "module"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         action = "Permite" if self.allow else "Deniega"
         return f"{self.user_permission.user.username} - {self.module.name} - {action}"
 
@@ -255,4 +262,5 @@ class SectorPermission(models.Model):
         ordering = ["user", "sector"]
 
     def __str__(self):
+        """Devuelve una representaci?n legible del objeto."""
         return f"{self.user.username} - {self.sector.name}"

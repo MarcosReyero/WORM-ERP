@@ -8,6 +8,7 @@ from django.db import migrations
 
 
 def seed_demo_data(apps, schema_editor):
+    """Maneja seed demo data."""
     User = apps.get_model("auth", "User")
     InventoryCategory = apps.get_model("inventory", "InventoryCategory")
     InventoryItem = apps.get_model("inventory", "InventoryItem")
@@ -130,6 +131,7 @@ def seed_demo_data(apps, schema_editor):
 
 
 def remove_demo_data(apps, schema_editor):
+    """Maneja remove demo data."""
     User = apps.get_model("auth", "User")
     InventoryCategory = apps.get_model("inventory", "InventoryCategory")
     InventoryItem = apps.get_model("inventory", "InventoryItem")

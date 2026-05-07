@@ -4,6 +4,7 @@ from django.db import migrations, models
 
 
 def seed_deposit_permissions(apps, schema_editor):
+    """Maneja seed deposit permissions."""
     PermissionAction = apps.get_model("accounts", "PermissionAction")
     PermissionModule = apps.get_model("accounts", "PermissionModule")
     RolePermission = apps.get_model("accounts", "RolePermission")

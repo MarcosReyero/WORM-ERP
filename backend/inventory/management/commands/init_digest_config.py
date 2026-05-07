@@ -11,6 +11,7 @@ class Command(BaseCommand):
     help = "Inicializa la configuración default del digest"
 
     def handle(self, *args, **options):
+        """Maneja handle."""
         User = get_user_model()
 
         # Crear la configuración default si no existe

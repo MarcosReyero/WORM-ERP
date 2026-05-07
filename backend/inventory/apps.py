@@ -9,6 +9,7 @@ class InventoryConfig(AppConfig):
     name = "inventory"
 
     def ready(self):
+        """Maneja ready."""
         from .automation import maybe_start_inventory_automation
         
         # En modo dev, mostrar mensaje de que se va a iniciar el worker

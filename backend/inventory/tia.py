@@ -81,24 +81,29 @@ MAX_LOG_ITEMS = 180
 
 
 def _runtime_dir():
+    """Maneja runtime dir."""
     path = Path(getattr(settings, "TIA_MCP_RUNTIME_DIR", settings.BASE_DIR / "runtime" / "tia"))
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def _runtime_config_path():
+    """Maneja runtime config path."""
     return _runtime_dir() / RUNTIME_CONFIG_FILENAME
 
 
 def _runtime_log_path():
+    """Maneja runtime log path."""
     return _runtime_dir() / RUNTIME_LOG_FILENAME
 
 
 def _now_iso():
+    """Maneja now iso."""
     return timezone.localtime(timezone.now()).isoformat()
 
 
 def _tag_address(tag):
+    """Maneja tag address."""
     address = f"DB{tag['db']}.DBX{tag['byte']}"
     if tag.get("type") == "bool":
         return f"{address}.{tag.get('bit', 0)}"
@@ -110,6 +115,7 @@ def _tag_address(tag):
 
 
 def _format_value(value, tag):
+    """Maneja format value."""
     if value is None:
         return "-"
     if tag["type"] == "bool":
@@ -120,6 +126,7 @@ def _format_value(value, tag):
 
 
 def _mock_value(tag, now):
+    """Maneja mock value."""
     seconds = now.second
     if tag["name"] == "marcha_motor":
         return seconds % 45 < 34
@@ -133,6 +140,7 @@ def _mock_value(tag, now):
 
 
 def _coerce_value(value, tag):
+    """Maneja coerce value."""
     if value is None:
         return None
     if tag["type"] == "bool":
@@ -147,6 +155,7 @@ def _coerce_value(value, tag):
 
 
 def _tag_health(tag, value):
+    """Maneja tag health."""
     if value is None:
         return {
             "state": "unknown",
@@ -177,6 +186,7 @@ def _tag_health(tag, value):
 
 
 def _load_json_file(path, fallback):
+    """Maneja load json file."""
     if not path.exists():
         return fallback
     try:
@@ -187,12 +197,14 @@ def _load_json_file(path, fallback):
 
 
 def _write_json_file(path, payload):
+    """Maneja write json file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as file:
         json.dump(payload, file, ensure_ascii=False, indent=2)
 
 
 def append_tia_log(level, event, detail, config=None, extra=None):
+    """Maneja append tia log."""
     item = {
         "timestamp": _now_iso(),
         "level": level,
@@ -218,11 +230,13 @@ def append_tia_log(level, event, detail, config=None, extra=None):
 
 
 def list_tia_logs(limit=80):
+    """Lista tia logs."""
     logs = _load_json_file(_runtime_log_path(), [])
     return logs[:limit]
 
 
 def _default_tia_mcp_config():
+    """Maneja default tia mcp config."""
     server_path = str(getattr(settings, "TIA_MCP_SERVER_PATH", ""))
     return {
         "enabled": bool(getattr(settings, "TIA_MCP_ENABLED", False)),
@@ -249,6 +263,7 @@ def _default_tia_mcp_config():
 
 
 def _merge_runtime_config(default_config, runtime_config):
+    """Maneja merge runtime config."""
     if not isinstance(runtime_config, dict):
         return default_config
 
@@ -275,6 +290,7 @@ def _merge_runtime_config(default_config, runtime_config):
 
 
 def _validate_tia_config_payload(payload):
+    """Maneja validate tia config payload."""
     if not isinstance(payload, dict):
         raise TiaMcpError("Payload de configuracion invalido.")
 
@@ -286,6 +302,7 @@ def _validate_tia_config_payload(payload):
         raise TiaMcpError("La IP del PLC no es valida.") from exc
 
     def parse_int(name, minimum, maximum):
+        """Parsea int."""
         try:
             value = int(plc_payload.get(name))
         except (TypeError, ValueError) as exc:
@@ -316,6 +333,7 @@ def _validate_tia_config_payload(payload):
 
 
 def save_tia_mcp_config(payload):
+    """Guarda tia mcp config."""
     config = _validate_tia_config_payload(payload)
     _write_json_file(_runtime_config_path(), config)
     merged = get_tia_mcp_config()
@@ -329,6 +347,7 @@ def save_tia_mcp_config(payload):
 
 
 def get_tia_mcp_config():
+    """Devuelve tia mcp config."""
     default_config = _default_tia_mcp_config()
     runtime_config = _load_json_file(_runtime_config_path(), {})
     config = _merge_runtime_config(default_config, runtime_config)
@@ -338,6 +357,7 @@ def get_tia_mcp_config():
 
 
 def test_tia_mcp_connection():
+    """Maneja test tia mcp connection."""
     config = get_tia_mcp_config()
     now = timezone.now()
     result = _read_tag_values(config, now, allow_mock=False)
@@ -366,9 +386,11 @@ def test_tia_mcp_connection():
 
 class S7McpReadOnlyClient:
     def __init__(self, config):
+        """Inicializa la instancia."""
         self.config = config
 
     def read_tags(self, tag_names):
+        """Maneja read tags."""
         if not self.config["enabled"]:
             raise TiaMcpError("MCP S7 deshabilitado por configuracion.")
         if not self.config["read_only"]:
@@ -379,6 +401,7 @@ class S7McpReadOnlyClient:
         return self._read_tags_stdio(tag_names)
 
     def _read_tags_stdio(self, tag_names):
+        """Maneja read tags stdio."""
         command = self._resolve_command(self.config["command"])
         if not command:
             raise TiaMcpError("TIA_MCP_COMMAND no esta configurado.")
@@ -406,6 +429,7 @@ class S7McpReadOnlyClient:
             raise TiaMcpError(f"No se pudo iniciar servidor MCP S7: {exc}") from exc
 
     async def _call_mcp_tool(self, command, env, server_path, tag_names):
+        """Maneja call mcp tool."""
         from mcp import ClientSession
         from mcp.client.stdio import StdioServerParameters, stdio_client
 
@@ -450,6 +474,7 @@ class S7McpReadOnlyClient:
 
     @staticmethod
     def _tool_result_text(result):
+        """Maneja tool result text."""
         fragments = []
         for item in result.content or []:
             text = getattr(item, "text", None)
@@ -459,6 +484,7 @@ class S7McpReadOnlyClient:
 
     @staticmethod
     def _read_errlog(errlog):
+        """Maneja read errlog."""
         try:
             errlog.seek(0)
             return errlog.read().strip()
@@ -467,6 +493,7 @@ class S7McpReadOnlyClient:
 
     @staticmethod
     def _format_mcp_exception(exc, stderr_text):
+        """Maneja format mcp exception."""
         parts = []
         if stderr_text:
             parts.append(stderr_text)
@@ -475,6 +502,7 @@ class S7McpReadOnlyClient:
 
     @classmethod
     def _tool_result_payload(cls, result):
+        """Maneja tool result payload."""
         text = cls._tool_result_text(result)
         if not text:
             return {}
@@ -485,6 +513,7 @@ class S7McpReadOnlyClient:
 
     @staticmethod
     def _resolve_command(command_text):
+        """Maneja resolve command."""
         command = shlex.split(command_text, posix=False)
         if not command:
             return command
@@ -496,6 +525,7 @@ class S7McpReadOnlyClient:
 
 
 def _read_tag_values(config, now, allow_mock=True):
+    """Maneja read tag values."""
     started = time.perf_counter()
     diagnostics = []
     source = "mock"
@@ -588,6 +618,7 @@ def _read_tag_values(config, now, allow_mock=True):
 
 
 def build_tia_overview(user=None):
+    """Construye tia overview."""
     config = get_tia_mcp_config()
     now = timezone.now()
     read_result = _read_tag_values(config, now)
@@ -666,6 +697,7 @@ def build_tia_overview(user=None):
 
 
 def build_tia_ai_reports(user=None):
+    """Construye tia ai reports."""
     overview = build_tia_overview(user)
     tags = overview["tags"]
     now = timezone.localtime(timezone.now())

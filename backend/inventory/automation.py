@@ -52,10 +52,12 @@ class LeaseAcquireResult:
 
 
 def _runner_owner_label(thread_name):
+    """Maneja runner owner label."""
     return f"{socket.gethostname()}:{os.getpid()}:{thread_name}"
 
 
 def ensure_automation_task_state(task_key):
+    """Maneja ensure automation task state."""
     defaults = {
         "runtime_state": InventoryAutomationTaskState.RuntimeState.IDLE,
     }
@@ -70,6 +72,7 @@ def ensure_automation_task_state(task_key):
 
 
 def ensure_automation_task_states():
+    """Maneja ensure automation task states."""
     return {
         task_key: ensure_automation_task_state(task_key)
         for task_key in AUTOMATION_TASK_KEYS
@@ -77,10 +80,12 @@ def ensure_automation_task_states():
 
 
 def get_automation_task_state(task_key):
+    """Devuelve automation task state."""
     return InventoryAutomationTaskState.objects.filter(key=task_key).first()
 
 
 def is_task_state_stale(task_state, now=None):
+    """Verifica si task state stale."""
     if not task_state or not task_state.lease_expires_at:
         return False
     now = now or timezone.now()
@@ -88,6 +93,7 @@ def is_task_state_stale(task_state, now=None):
 
 
 def try_acquire_lease(task_key, owner_token, owner_label, ttl_seconds, now=None):
+    """Maneja try acquire lease."""
     now = now or timezone.now()
     lease_expires_at = now + timedelta(seconds=ttl_seconds)
     task_state = ensure_automation_task_state(task_key)
@@ -152,6 +158,7 @@ def try_acquire_lease(task_key, owner_token, owner_label, ttl_seconds, now=None)
 
 
 def renew_lease(task_key, owner_token, ttl_seconds, now=None):
+    """Maneja renew lease."""
     now = now or timezone.now()
     lease_expires_at = now + timedelta(seconds=ttl_seconds)
     updated = (
@@ -194,6 +201,7 @@ def finish_task_run(
     warning_message="",
     error_message="",
 ):
+    """Maneja finish task run."""
     now = now or timezone.now()
     update_kwargs = {
         "runtime_state": InventoryAutomationTaskState.RuntimeState.IDLE,
@@ -228,6 +236,7 @@ def finish_task_run(
 
 
 def serialize_automation_task_state(task_state, now=None):
+    """Maneja serialize automation task state."""
     now = now or timezone.now()
     if not task_state:
         return {
@@ -287,12 +296,14 @@ def serialize_automation_task_state(task_state, now=None):
 
 
 def _localize_schedule(dt_value):
+    """Maneja localize schedule."""
     if timezone.is_naive(dt_value):
         return timezone.make_aware(dt_value, timezone.get_current_timezone())
     return timezone.localtime(dt_value)
 
 
 def get_minimum_stock_digest_due_context(config, now=None):
+    """Devuelve minimum stock digest due context."""
     now = timezone.localtime(now or timezone.now())
     run_at = config.run_at
 
@@ -321,6 +332,7 @@ def get_minimum_stock_digest_due_context(config, now=None):
 
 
 def get_full_stock_report_due_context(config, now=None):
+    """Devuelve full stock report due context."""
     now = timezone.localtime(now or timezone.now())
     run_at = config.run_at
 
@@ -349,6 +361,7 @@ def get_full_stock_report_due_context(config, now=None):
 
 
 def is_reconcile_due(now=None):
+    """Verifica si reconcile due."""
     now = now or timezone.now()
     task_state = ensure_automation_task_state(TASK_KEY_MINIMUM_STOCK_RECONCILE)
     if task_state.runtime_state == InventoryAutomationTaskState.RuntimeState.RUNNING and not is_task_state_stale(
@@ -363,6 +376,7 @@ def is_reconcile_due(now=None):
 
 
 def claim_minimum_stock_digest_period(config, due_key, now=None):
+    """Maneja claim minimum stock digest period."""
     now = now or timezone.now()
     claim_timeout = timedelta(
         seconds=getattr(settings, "INVENTORY_AUTOMATION_DIGEST_LEASE_SECONDS", 300)
@@ -420,6 +434,7 @@ def mark_minimum_stock_digest_result(
     recipient_warning="",
     consume_period=False,
 ):
+    """Maneja mark minimum stock digest result."""
     now = now or timezone.now()
     update_kwargs = {
         "last_delivery_status": delivery_status,
@@ -437,6 +452,7 @@ def mark_minimum_stock_digest_result(
 
 
 def claim_full_stock_report_period(config, due_key, now=None):
+    """Maneja claim full stock report period."""
     now = now or timezone.now()
     claim_timeout = timedelta(
         seconds=getattr(settings, "INVENTORY_AUTOMATION_DIGEST_LEASE_SECONDS", 300)
@@ -494,6 +510,7 @@ def mark_full_stock_report_result(
     recipient_warning="",
     consume_period=False,
 ):
+    """Maneja mark full stock report result."""
     now = now or timezone.now()
     update_kwargs = {
         "last_delivery_status": delivery_status,
@@ -511,12 +528,14 @@ def mark_full_stock_report_result(
 
 
 def _detect_management_command(argv):
+    """Maneja detect management command."""
     if len(argv) < 2:
         return ""
     return argv[1].casefold()
 
 
 def should_bootstrap_inventory_automation(argv=None, environ=None):
+    """Maneja should bootstrap inventory automation."""
     argv = argv or sys.argv
     environ = environ or os.environ
     if not getattr(settings, "INVENTORY_AUTOMATION_ENABLED", True):
@@ -552,6 +571,7 @@ def should_bootstrap_inventory_automation(argv=None, environ=None):
 
 class InventoryAutomationRunner(threading.Thread):
     def __init__(self):
+        """Inicializa la instancia."""
         super().__init__(name="inventory-automation-runner", daemon=True)
         self.stop_event = threading.Event()
         self.owner_token = f"scheduler-{uuid.uuid4().hex}"
@@ -591,6 +611,7 @@ class InventoryAutomationRunner(threading.Thread):
             return False
 
     def _busy_log_allowed(self, task_key):
+        """Maneja busy log allowed."""
         last_logged = self._last_busy_log_at.get(task_key)
         now = time.monotonic()
         if last_logged is None or now - last_logged >= getattr(
@@ -603,6 +624,7 @@ class InventoryAutomationRunner(threading.Thread):
         return False
 
     def _ensure_scheduler_lease(self):
+        """Maneja ensure scheduler lease."""
         now = timezone.now()
         ttl_seconds = getattr(settings, "INVENTORY_AUTOMATION_SCHEDULER_LEASE_SECONDS", 90)
         if self._scheduler_has_lease:
@@ -639,6 +661,7 @@ class InventoryAutomationRunner(threading.Thread):
         return lease.acquired
 
     def run(self):
+        """Maneja run."""
         BOOTSTRAP_LOGGER.info(
             "bootstrap_started",
             extra={
@@ -664,6 +687,7 @@ class InventoryAutomationRunner(threading.Thread):
             self.stop_event.wait(getattr(settings, "INVENTORY_AUTOMATION_POLL_SECONDS", 60))
 
     def run_cycle(self):
+        """Ejecuta cycle."""
         if not self._ensure_scheduler_lease():
             return
 
@@ -673,6 +697,7 @@ class InventoryAutomationRunner(threading.Thread):
         self.run_full_stock_report_job_if_due()
 
     def run_reconcile_job(self):
+        """Ejecuta reconcile job."""
         now = timezone.now()
         job_owner_token = f"{TASK_KEY_MINIMUM_STOCK_RECONCILE}-{uuid.uuid4().hex}"
         job_owner_label = _runner_owner_label(f"{self.name}:{TASK_KEY_MINIMUM_STOCK_RECONCILE}")
@@ -846,6 +871,7 @@ class InventoryAutomationRunner(threading.Thread):
             )
 
     def run_digest_job_if_due(self):
+        """Ejecuta digest job if due."""
         config = MinimumStockDigestConfig.objects.filter(key="default").first()
         if not config or not config.is_enabled:
             return
@@ -997,6 +1023,7 @@ class InventoryAutomationRunner(threading.Thread):
 
 
     def run_full_stock_report_job_if_due(self):
+        """Ejecuta full stock report job if due."""
         config = FullStockReportConfig.objects.filter(key="default").first()
         if not config or not config.is_enabled:
             return
@@ -1148,6 +1175,7 @@ class InventoryAutomationRunner(threading.Thread):
 
 
 def maybe_start_inventory_automation():
+    """Maneja maybe start inventory automation."""
     global _RUNNER_INSTANCE
 
     BOOTSTRAP_LOGGER.info(
@@ -1184,6 +1212,7 @@ def maybe_start_inventory_automation():
 
 
 def reset_inventory_automation_runner_for_tests():
+    """Maneja reset inventory automation runner for tests."""
     global _RUNNER_INSTANCE
     with _RUNNER_LOCK:
         if _RUNNER_INSTANCE and _RUNNER_INSTANCE.is_alive():

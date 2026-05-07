@@ -2,15 +2,14 @@ from django.contrib.auth import get_user_model
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-
 from accounts.models import UserProfile
 from inventory.models import Article
-
 from .models import Conversation, ConversationParticipant, InventoryAlarm, Message, MessageAttachment
 
 
 class CommunicationsApiError(Exception):
     def __init__(self, detail, status=400):
+        """Inicializa la instancia."""
         super().__init__(detail)
         self.detail = detail
         self.status = status
@@ -25,6 +24,7 @@ ALARM_ROLES = {
 
 
 def get_profile(user):
+    """Devuelve profile."""
     defaults = {
         "role": UserProfile.Role.ADMINISTRATOR if user.is_superuser else UserProfile.Role.OPERATOR,
     }
@@ -32,6 +32,7 @@ def get_profile(user):
 
 
 def require_active_user(user):
+    """Maneja require active user."""
     if not user or not user.is_authenticated:
         raise CommunicationsApiError("Authentication required", status=401)
     profile = get_profile(user)
@@ -41,6 +42,7 @@ def require_active_user(user):
 
 
 def require_alarm_role(user):
+    """Maneja require alarm role."""
     profile = require_active_user(user)
     if user.is_superuser or profile.role in ALARM_ROLES:
         return profile
@@ -48,14 +50,17 @@ def require_alarm_role(user):
 
 
 def clean_string(value):
+    """Maneja clean string."""
     return str(value or "").strip()
 
 
 def contact_full_name(user):
+    """Maneja contact full name."""
     return user.get_full_name() or user.username
 
 
 def serialize_contact(user):
+    """Maneja serialize contact."""
     profile = get_profile(user)
     return {
         "id": user.id,
@@ -72,6 +77,7 @@ def serialize_contact(user):
 
 
 def active_message_contacts(current_user, include_current=False):
+    """Maneja active message contacts."""
     require_active_user(current_user)
     user_model = get_user_model()
     queryset = user_model.objects.select_related("profile__sector_default").filter(
@@ -86,6 +92,7 @@ def active_message_contacts(current_user, include_current=False):
 
 
 def conversation_queryset_for(user):
+    """Maneja conversation queryset for."""
     require_active_user(user)
     attachment_prefetch = Prefetch(
         "attachments",
@@ -112,6 +119,7 @@ def conversation_queryset_for(user):
 
 
 def participant_for_user(conversation, user):
+    """Maneja participant for user."""
     participants = getattr(conversation, "prefetched_participants", None)
     if participants is None:
         participants = list(
@@ -124,6 +132,7 @@ def participant_for_user(conversation, user):
 
 
 def latest_message(conversation):
+    """Maneja latest message."""
     prefetched = getattr(conversation, "prefetched_messages", None)
     if prefetched is not None:
         return prefetched[0] if prefetched else None
@@ -136,6 +145,7 @@ def latest_message(conversation):
 
 
 def is_conversation_unread(conversation, user):
+    """Verifica si conversation unread."""
     participant = participant_for_user(conversation, user)
     if not participant or not conversation.last_message_at:
         return False
@@ -145,6 +155,7 @@ def is_conversation_unread(conversation, user):
 
 
 def serialize_alarm(alarm):
+    """Maneja serialize alarm."""
     return {
         "id": alarm.id,
         "title": alarm.title,
@@ -166,6 +177,7 @@ def serialize_alarm(alarm):
 
 
 def serialize_message_attachment(attachment):
+    """Maneja serialize message attachment."""
     return {
         "id": attachment.id,
         "name": attachment.original_name,
@@ -176,6 +188,7 @@ def serialize_message_attachment(attachment):
 
 
 def serialize_message(message, current_user=None):
+    """Maneja serialize message."""
     attachments = getattr(message, "prefetched_attachments", None)
     if attachments is None:
         attachments = list(message.attachments.all())
@@ -196,6 +209,7 @@ def serialize_message(message, current_user=None):
 
 
 def conversation_title_for_user(conversation, user):
+    """Maneja conversation title for user."""
     if conversation.kind == Conversation.ConversationKind.ALARM and hasattr(conversation, "inventory_alarm"):
         return conversation.inventory_alarm.title
 
@@ -211,6 +225,7 @@ def conversation_title_for_user(conversation, user):
 
 
 def serialize_conversation_summary(conversation, user):
+    """Maneja serialize conversation summary."""
     last_message = latest_message(conversation)
     alarm = getattr(conversation, "inventory_alarm", None)
     participants = getattr(conversation, "prefetched_participants", None)
@@ -244,6 +259,7 @@ def serialize_conversation_summary(conversation, user):
 
 
 def user_unread_message_count(user):
+    """Maneja user unread message count."""
     if not user or not user.is_authenticated:
         return 0
     if get_profile(user).status != UserProfile.Status.ACTIVE:
@@ -253,6 +269,7 @@ def user_unread_message_count(user):
 
 
 def user_open_alarm_count(user):
+    """Maneja user open alarm count."""
     if not user or not user.is_authenticated:
         return 0
     if get_profile(user).status != UserProfile.Status.ACTIVE:
@@ -261,6 +278,7 @@ def user_open_alarm_count(user):
 
 
 def build_messages_overview(user):
+    """Construye messages overview."""
     require_active_user(user)
     conversations = conversation_queryset_for(user)[:12]
     return {
@@ -275,6 +293,7 @@ def build_messages_overview(user):
 
 
 def list_conversations(user, filter_key="inbox"):
+    """Lista conversations."""
     require_active_user(user)
     conversations = list(conversation_queryset_for(user))
     if filter_key == "unread":
@@ -285,6 +304,7 @@ def list_conversations(user, filter_key="inbox"):
 
 
 def get_conversation_detail(user, conversation_id):
+    """Devuelve conversation detail."""
     require_active_user(user)
     conversation = get_object_or_404(conversation_queryset_for(user), pk=conversation_id)
     messages = [
@@ -300,6 +320,7 @@ def get_conversation_detail(user, conversation_id):
 
 
 def ensure_active_target(target_user):
+    """Maneja ensure active target."""
     if not target_user:
         raise CommunicationsApiError("target_user is required")
     target_profile = get_profile(target_user)
@@ -309,6 +330,7 @@ def ensure_active_target(target_user):
 
 
 def ensure_direct_conversation(sender, recipient, subject=""):
+    """Maneja ensure direct conversation."""
     conversation = (
         Conversation.objects.filter(kind=Conversation.ConversationKind.DIRECT, participants__user=sender)
         .filter(participants__user=recipient)
@@ -341,6 +363,7 @@ def append_message(
     priority=Message.Priority.NORMAL,
     attachments=None,
 ):
+    """Maneja append message."""
     cleaned_body = clean_string(body)
     attachments = attachments or []
     if not cleaned_body and not attachments:
@@ -378,6 +401,7 @@ def append_message(
 
 
 def start_direct_conversation(user, payload, attachments=None):
+    """Maneja start direct conversation."""
     require_active_user(user)
     recipient_id = payload.get("recipient_user_id")
     if not recipient_id:
@@ -404,6 +428,7 @@ def start_direct_conversation(user, payload, attachments=None):
 
 
 def send_conversation_reply(user, conversation_id, payload, attachments=None):
+    """Env?a conversation reply."""
     require_active_user(user)
     conversation = get_object_or_404(conversation_queryset_for(user), pk=conversation_id)
     append_message(
@@ -418,6 +443,7 @@ def send_conversation_reply(user, conversation_id, payload, attachments=None):
 
 
 def mark_conversation_read(user, conversation_id):
+    """Maneja mark conversation read."""
     require_active_user(user)
     conversation = get_object_or_404(conversation_queryset_for(user), pk=conversation_id)
     timestamp = conversation.last_message_at or timezone.now()
@@ -434,6 +460,7 @@ def mark_conversation_read(user, conversation_id):
 
 
 def close_alarm(user, alarm_id):
+    """Maneja close alarm."""
     profile = require_active_user(user)
     alarm = get_object_or_404(
         InventoryAlarm.objects.select_related("conversation", "target_user", "created_by", "article"),
@@ -458,6 +485,7 @@ def close_alarm(user, alarm_id):
 
 
 def serialize_inventory_alarm_list_item(alarm):
+    """Maneja serialize inventory alarm list item."""
     return {
         **serialize_alarm(alarm),
         "conversation_id": alarm.conversation_id,
@@ -465,6 +493,7 @@ def serialize_inventory_alarm_list_item(alarm):
 
 
 def list_inventory_alarms(user):
+    """Lista inventory alarms."""
     profile = require_active_user(user)
     queryset = InventoryAlarm.objects.select_related(
         "conversation",
@@ -480,6 +509,7 @@ def list_inventory_alarms(user):
 
 
 def create_inventory_alarm(user, payload):
+    """Crea inventory alarm."""
     require_alarm_role(user)
     target_user_id = payload.get("target_user_id")
     title = clean_string(payload.get("title"))

@@ -43,6 +43,7 @@ class runner_lifecycle_Tests(TestCase):
     """Tests para lifecycle del runner con métodos controlables."""
 
     def setUp(self):
+        """Maneja setUp."""
         ensure_automation_task_states()
 
     def test_runner_is_running_when_initiated(self):
@@ -107,6 +108,7 @@ class lease_Atomicity_Tests(TransactionTestCase):
     """Tests para atomicidad del protocolo de lease."""
 
     def setUp(self):
+        """Maneja setUp."""
         ensure_automation_task_states()
 
     def test_try_acquire_lease_is_atomic_with_race_condition(self):
@@ -114,6 +116,7 @@ class lease_Atomicity_Tests(TransactionTestCase):
         results = []
 
         def acquire_competitor(runner_id):
+            """Maneja acquire competitor."""
             now = timezone.now()
             result = try_acquire_lease(
                 TASK_KEY_SCHEDULER,
@@ -179,6 +182,7 @@ class safety_alert_Idempotence_Tests(TestCase):
     """Tests para idempotencia de evaluación puntual de alertas."""
 
     def setUp(self):
+        """Maneja setUp."""
         self.sector = Sector.objects.create(name="Sector Test", code="SECT-01")
         self.unit = UnitOfMeasure.objects.create(code="UN", name="Unidad")
         self.article = Article.objects.create(
@@ -229,6 +233,7 @@ class reconcile_Batching_Tests(TestCase):
     """Tests para reconciliación por lotes."""
 
     def setUp(self):
+        """Maneja setUp."""
         ensure_automation_task_states()
         self.sector = Sector.objects.create(name="Sector", code="SEC")
         self.unit = UnitOfMeasure.objects.create(code="UN", name="Unit")
@@ -258,6 +263,7 @@ class reconcile_Batching_Tests(TestCase):
         evaluated_ids = []
 
         def mock_evaluate(article):
+            """Maneja mock evaluate."""
             evaluated_ids.append(article.id)
             return None
 
@@ -265,6 +271,7 @@ class reconcile_Batching_Tests(TestCase):
             with mock.patch("inventory.automation.getattr") as mock_getattr:
                 # Mock settings para batch_size=100
                 def getattr_side_effect(obj, key, default=None):
+                    """Maneja getattr side effect."""
                     if key == "INVENTORY_AUTOMATION_BATCH_SIZE":
                         return 100
                     return default if default is not None else object.__getattribute__(obj, key)
@@ -281,6 +288,7 @@ class digest_Period_Claim_Tests(TestCase):
     """Tests para claiming de período del digest."""
 
     def setUp(self):
+        """Maneja setUp."""
         ensure_automation_task_states()
         self.config = MinimumStockDigestConfig.objects.get_or_create(
             key="default",

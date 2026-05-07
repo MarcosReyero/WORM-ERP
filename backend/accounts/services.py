@@ -158,12 +158,14 @@ DEFAULT_PERMISSION_ACTIONS = [
 
 class AccountsApiError(Exception):
     def __init__(self, detail, status=400):
+        """Inicializa la instancia."""
         super().__init__(detail)
         self.detail = detail
         self.status = status
 
 
 def get_or_create_profile(user):
+    """Devuelve or create profile."""
     defaults = {
         "role": UserProfile.Role.ADMINISTRATOR if user.is_superuser else UserProfile.Role.OPERATOR,
     }
@@ -171,6 +173,7 @@ def get_or_create_profile(user):
 
 
 def require_admin(user):
+    """Maneja require admin."""
     from .permissions import has_module_permission
 
     profile = get_or_create_profile(user)
@@ -184,6 +187,7 @@ def require_admin(user):
 
 
 def parse_boolean(value):
+    """Parsea boolean."""
     if isinstance(value, bool):
         return value
     if value in (None, ""):
@@ -192,6 +196,7 @@ def parse_boolean(value):
 
 
 def profile_payload_value(payload, key, default=""):
+    """Maneja profile payload value."""
     if hasattr(payload, "get"):
         value = payload.get(key, default)
         return default if value is None else value
@@ -199,10 +204,12 @@ def profile_payload_value(payload, key, default=""):
 
 
 def clean_string(value):
+    """Maneja clean string."""
     return str(value or "").strip()
 
 
 def serialize_user_profile(user):
+    """Maneja serialize user profile."""
     from .permissions import has_module_permission
 
     profile = get_or_create_profile(user)
@@ -232,6 +239,7 @@ def serialize_user_profile(user):
 
 
 def list_profiles_for_admin(user):
+    """Lista profiles for admin."""
     require_admin(user)
     user_model = get_user_model()
     queryset = user_model.objects.select_related("profile__sector_default").order_by("username")
@@ -239,6 +247,7 @@ def list_profiles_for_admin(user):
 
 
 def get_profile_for_admin(user, profile_user_id):
+    """Devuelve profile for admin."""
     require_admin(user)
     user_model = get_user_model()
     target_user = get_object_or_404(user_model.objects.select_related("profile__sector_default"), pk=profile_user_id)
@@ -246,6 +255,7 @@ def get_profile_for_admin(user, profile_user_id):
 
 
 def _save_validated(instance):
+    """Maneja save validated."""
     try:
         instance.full_clean()
     except ValidationError as exc:
@@ -255,6 +265,7 @@ def _save_validated(instance):
 
 
 def update_own_profile(user, payload, files=None):
+    """Actualiza own profile."""
     profile = get_or_create_profile(user)
     user.first_name = clean_string(profile_payload_value(payload, "first_name", user.first_name))
     user.last_name = clean_string(profile_payload_value(payload, "last_name", user.last_name))
@@ -281,6 +292,7 @@ def update_own_profile(user, payload, files=None):
 
 
 def create_profile_for_admin(user, payload, files=None):
+    """Crea profile for admin."""
     require_admin(user)
     user_model = get_user_model()
     username = clean_string(profile_payload_value(payload, "username"))
@@ -318,6 +330,7 @@ def create_profile_for_admin(user, payload, files=None):
 
 
 def update_profile_for_admin(user, profile_user_id, payload, files=None):
+    """Actualiza profile for admin."""
     require_admin(user)
     user_model = get_user_model()
     target_user = get_object_or_404(user_model.objects.select_related("profile"), pk=profile_user_id)
@@ -367,6 +380,7 @@ def update_profile_for_admin(user, profile_user_id, payload, files=None):
 
 
 def reset_profile_password_for_admin(user, profile_user_id, payload):
+    """Maneja reset profile password for admin."""
     require_admin(user)
     user_model = get_user_model()
     target_user = get_object_or_404(user_model, pk=profile_user_id)
@@ -379,6 +393,7 @@ def reset_profile_password_for_admin(user, profile_user_id, payload):
 
 
 def ensure_permission_catalog():
+    """Maneja ensure permission catalog."""
     for action_data in DEFAULT_PERMISSION_ACTIONS:
         PermissionAction.objects.get_or_create(
             code=action_data["code"],
@@ -403,6 +418,7 @@ def ensure_permission_catalog():
 
 
 def _seed_default_role_permissions():
+    """Maneja seed default role permissions."""
     role_permissions_config = {
         UserProfile.Role.ADMINISTRATOR: {
             "inventory_overview": ["view"],
@@ -509,6 +525,7 @@ def _seed_default_role_permissions():
 
 
 def _serialize_permission_module(module):
+    """Maneja serialize permission module."""
     return {
         "code": module.code,
         "name": module.name,
@@ -517,6 +534,7 @@ def _serialize_permission_module(module):
 
 
 def _serialize_permission_action(action):
+    """Maneja serialize permission action."""
     return {
         "code": action.code,
         "name": action.name,
@@ -524,6 +542,7 @@ def _serialize_permission_action(action):
 
 
 def permissions_meta_for_admin(user):
+    """Maneja permissions meta for admin."""
     require_admin(user)
     ensure_permission_catalog()
     modules = list(PermissionModule.objects.order_by("order", "name"))
@@ -542,6 +561,7 @@ def permissions_meta_for_admin(user):
 
 
 def role_permissions_for_admin(user, role):
+    """Maneja role permissions for admin."""
     require_admin(user)
     ensure_permission_catalog()
     if role not in {value for value, _ in UserProfile.Role.choices}:
@@ -566,6 +586,7 @@ def role_permissions_for_admin(user, role):
 
 
 def save_role_permissions_for_admin(user, role, payload):
+    """Guarda role permissions for admin."""
     require_admin(user)
     ensure_permission_catalog()
     if role not in {value for value, _ in UserProfile.Role.choices}:
@@ -615,6 +636,7 @@ def save_role_permissions_for_admin(user, role, payload):
 
 
 def user_permissions_for_admin(user, profile_user_id):
+    """Maneja user permissions for admin."""
     require_admin(user)
     ensure_permission_catalog()
     user_model = get_user_model()
@@ -661,6 +683,7 @@ def user_permissions_for_admin(user, profile_user_id):
 
 
 def save_user_permissions_for_admin(user, profile_user_id, payload):
+    """Guarda user permissions for admin."""
     require_admin(user)
     ensure_permission_catalog()
     user_model = get_user_model()

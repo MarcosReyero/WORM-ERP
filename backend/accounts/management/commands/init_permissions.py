@@ -9,6 +9,7 @@ class Command(BaseCommand):
     help = "Inicializa los módulos y acciones de permisos base del sistema"
 
     def handle(self, *args, **options):
+        """Maneja handle."""
         self.stdout.write(self.style.SUCCESS("Inicializando módulos de permisos..."))
 
         # Crear módulos si no existen

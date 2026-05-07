@@ -14,6 +14,7 @@ class Command(BaseCommand):
     help = "Crea usuarios de demostración con diferentes configuraciones de permisos"
 
     def handle(self, *args, **options):
+        """Maneja handle."""
         self.stdout.write(self.style.SUCCESS("Creando usuarios de demostración..."))
 
         # Datos de usuarios demo

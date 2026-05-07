@@ -35,6 +35,7 @@ class Command(BaseCommand):
     help = "Ejecuta el scheduler de automatización de alarmas de stock mínimo."
 
     def add_arguments(self, parser):
+        """Maneja add arguments."""
         parser.add_argument(
             "--poll-seconds",
             type=int,
@@ -211,6 +212,7 @@ class Command(BaseCommand):
 
         # Configura handlers de señales para graceful shutdown
         def handle_signal(signum, frame):
+            """Maneja signal."""
             logger.info(
                 "automation_shutdown_signal",
                 extra={"signum": signum},

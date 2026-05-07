@@ -78,6 +78,7 @@ FULL_STOCK_REPORT_AUTOMATION_LOGGER = logging.getLogger("inventory.automation.fu
 
 class InventoryApiError(Exception):
     def __init__(self, detail, status=400):
+        """Inicializa la instancia."""
         super().__init__(detail)
         self.detail = detail
         self.status = status
@@ -142,6 +143,7 @@ ARTICLE_TYPE_ALIASES = {
 
 
 def parse_json(request):
+    """Parsea json."""
     if not request.body:
         return {}
 
@@ -152,20 +154,24 @@ def parse_json(request):
 
 
 def serialize_datetime(value):
+    """Maneja serialize datetime."""
     return value.isoformat() if value else None
 
 
 def serialize_date(value):
+    """Maneja serialize date."""
     return value.isoformat() if value else None
 
 
 def serialize_decimal(value):
+    """Maneja serialize decimal."""
     if value is None:
         return None
     return float(value)
 
 
 def serialize_internal_request_line(line):
+    """Maneja serialize internal request line."""
     return {
         "id": line.id,
         "article_id": line.article_id,
@@ -178,6 +184,7 @@ def serialize_internal_request_line(line):
 
 
 def serialize_internal_request(request_item):
+    """Maneja serialize internal request."""
     lines = list(request_item.lines.select_related("article").all())
     return {
         "id": request_item.id,
@@ -204,6 +211,7 @@ def serialize_internal_request(request_item):
 
 
 def list_internal_requests(filters=None):
+    """Lista internal requests."""
     filters = filters or {}
     query = clean_casefold(filters.get("q") or "")
     status_filter = clean_casefold(filters.get("status") or "all")
@@ -228,6 +236,7 @@ def list_internal_requests(filters=None):
 
 
 def create_internal_request(payload):
+    """Crea internal request."""
     if not isinstance(payload, dict):
         raise InventoryApiError("Invalid payload")
 
@@ -286,6 +295,7 @@ def create_internal_request(payload):
 
 
 def get_profile(user):
+    """Devuelve profile."""
     defaults = {
         "role": UserProfile.Role.ADMINISTRATOR
         if user.is_superuser
@@ -295,6 +305,7 @@ def get_profile(user):
 
 
 def require_role(user, allowed_roles):
+    """Maneja require role."""
     profile = get_profile(user)
     if profile.status != UserProfile.Status.ACTIVE:
         raise InventoryApiError("User profile is inactive", status=403)
@@ -304,6 +315,7 @@ def require_role(user, allowed_roles):
 
 
 def parse_decimal(value, field_name):
+    """Parsea decimal."""
     try:
         return Decimal(str(value))
     except (InvalidOperation, TypeError):
@@ -311,12 +323,14 @@ def parse_decimal(value, field_name):
 
 
 def parse_optional_decimal(value):
+    """Parsea optional decimal."""
     if value in (None, "", []):
         return None
     return parse_decimal(value, "decimal")
 
 
 def parse_optional_int(value, field_name):
+    """Parsea optional int."""
     if value in (None, "", []):
         return None
 
@@ -327,6 +341,7 @@ def parse_optional_int(value, field_name):
 
 
 def parse_boolean(value):
+    """Parsea boolean."""
     if isinstance(value, bool):
         return value
     if value in (None, ""):
@@ -337,6 +352,7 @@ def parse_boolean(value):
 
 
 def resolve_instance(model, value, label, required=True):
+    """Maneja resolve instance."""
     if value in (None, "", []):
         if required:
             raise InventoryApiError(f"{label} is required")
@@ -345,6 +361,7 @@ def resolve_instance(model, value, label, required=True):
 
 
 def update_audit(instance, user, is_new=False):
+    """Actualiza audit."""
     if hasattr(instance, "updated_by"):
         instance.updated_by = user
     if is_new and hasattr(instance, "created_by") and not instance.created_by_id:
@@ -352,6 +369,7 @@ def update_audit(instance, user, is_new=False):
 
 
 def save_validated(instance):
+    """Guarda validated."""
     try:
         instance.full_clean()
     except ValidationError as exc:
@@ -361,10 +379,12 @@ def save_validated(instance):
 
 
 def get_default_location():
+    """Devuelve default location."""
     return Location.objects.filter(code="DEP-PRINCIPAL").first() or Location.objects.order_by("id").first()
 
 
 def choose_tracking_mode(article_type, payload_tracking_mode):
+    """Maneja choose tracking mode."""
     if payload_tracking_mode:
         return payload_tracking_mode
     if article_type == Article.ArticleType.TOOL:
@@ -373,6 +393,7 @@ def choose_tracking_mode(article_type, payload_tracking_mode):
 
 
 def should_require_minimum(article_type, is_critical):
+    """Maneja should require minimum."""
     return article_type in {
         Article.ArticleType.CONSUMABLE,
         Article.ArticleType.INPUT,
@@ -380,24 +401,29 @@ def should_require_minimum(article_type, is_critical):
 
 
 def clean_string(value):
+    """Maneja clean string."""
     return (value or "").strip()
 
 
 def clean_casefold(value):
+    """Maneja clean casefold."""
     return clean_string(value).casefold()
 
 
 def normalize_search_text(value):
+    """Maneja normalize search text."""
     normalized = unicodedata.normalize("NFD", str(value or ""))
     ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
     return re.sub(r"\s+", " ", ascii_only).casefold().strip()
 
 
 def build_search_target(values):
+    """Construye search target."""
     return normalize_search_text(" ".join(str(value) for value in values if value))
 
 
 def matches_normalized_query(target, query):
+    """Maneja matches normalized query."""
     normalized_query = normalize_search_text(query)
     if not normalized_query:
         return True
@@ -405,6 +431,7 @@ def matches_normalized_query(target, query):
 
 
 def parse_email_list(value):
+    """Parsea email list."""
     raw_value = str(value or "")
     if not raw_value.strip():
         return []
@@ -427,6 +454,7 @@ def parse_email_list(value):
 
 
 def split_email_list(value):
+    """Maneja split email list."""
     raw_value = str(value or "")
     if not raw_value.strip():
         return [], []
@@ -451,6 +479,7 @@ def split_email_list(value):
 
 
 def parse_time_or_error(value, field_name, default=None):
+    """Parsea time or error."""
     raw_value = clean_string(value)
     if not raw_value:
         return default
@@ -461,6 +490,7 @@ def parse_time_or_error(value, field_name, default=None):
 
 
 def parse_weekday_or_error(value, field_name="run_weekday", default=0):
+    """Parsea weekday or error."""
     if value in (None, "", []):
         return default
     weekday = parse_optional_int(value, field_name)
@@ -470,10 +500,12 @@ def parse_weekday_or_error(value, field_name="run_weekday", default=0):
 
 
 def article_code_prefix(article_type):
+    """Maneja article code prefix."""
     return ARTICLE_CODE_PREFIXES.get(article_type, "ART")
 
 
 def generate_article_code(article_type):
+    """Maneja generate article code."""
     prefix = article_code_prefix(article_type)
     pattern = re.compile(rf"^{re.escape(prefix)}-(\d+)$")
     max_number = 0
@@ -494,6 +526,7 @@ def generate_article_code(article_type):
 
 
 def resolve_article_type(value):
+    """Maneja resolve article type."""
     normalized = clean_casefold(value)
     if not normalized:
         raise InventoryApiError("article_type is required")
@@ -509,6 +542,7 @@ def resolve_article_type(value):
 
 
 def resolve_choice_value(value, choices, label, default=None):
+    """Maneja resolve choice value."""
     raw_value = clean_string(value)
     if not raw_value:
         return default
@@ -522,6 +556,7 @@ def resolve_choice_value(value, choices, label, default=None):
 
 
 def resolve_catalog_by_name_or_code(queryset, value, label):
+    """Maneja resolve catalog by name or code."""
     raw_value = clean_string(value)
     if not raw_value:
         raise InventoryApiError(f"{label} is required")
@@ -537,6 +572,7 @@ def resolve_catalog_by_name_or_code(queryset, value, label):
 
 
 def resolve_optional_catalog_by_name_or_code(queryset, value):
+    """Maneja resolve optional catalog by name or code."""
     raw_value = clean_string(value)
     if not raw_value:
         return None
@@ -552,6 +588,7 @@ def resolve_optional_catalog_by_name_or_code(queryset, value):
 
 
 def get_or_create_category_by_name(name, user, parent=None):
+    """Devuelve or create category by name."""
     raw_name = clean_string(name)
     if not raw_name:
         return None
@@ -567,6 +604,7 @@ def get_or_create_category_by_name(name, user, parent=None):
 
 
 def article_payload_value(payload, key, default=None):
+    """Maneja article payload value."""
     if hasattr(payload, "get"):
         value = payload.get(key, default)
         if value is None:
@@ -576,12 +614,14 @@ def article_payload_value(payload, key, default=None):
 
 
 def normalize_excel_header(value):
+    """Maneja normalize excel header."""
     normalized = unicodedata.normalize("NFKD", str(value or ""))
     ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9]+", "_", ascii_only.strip().lower()).strip("_")
 
 
 def get_or_create_balance(article, location, user, batch=None):
+    """Devuelve or create balance."""
     balance, created = InventoryBalance.objects.get_or_create(
         article=article,
         location=location,
@@ -597,6 +637,7 @@ def get_or_create_balance(article, location, user, batch=None):
 
 
 def apply_balance_delta(article, location, quantity_delta, user, batch=None):
+    """Maneja apply balance delta."""
     balance = get_or_create_balance(article, location, user, batch=batch)
     new_value = balance.on_hand + quantity_delta
     if new_value < 0:
@@ -610,10 +651,12 @@ def apply_balance_delta(article, location, quantity_delta, user, batch=None):
 
 
 def next_unit_tag(article, index):
+    """Maneja next unit tag."""
     return f"{article.internal_code}-{index:03d}"
 
 
 def create_tracked_units(article, quantity, user, location=None, sector=None, notes="", status=None):
+    """Crea tracked units."""
     if quantity <= 0:
         return []
 
@@ -635,6 +678,7 @@ def create_tracked_units(article, quantity, user, location=None, sector=None, no
 
 
 def current_stock_maps():
+    """Maneja current stock maps."""
     quantity_map = {
         row["article"]: row["total"] or Decimal("0")
         for row in InventoryBalance.objects.values("article").annotate(total=Sum("on_hand"))
@@ -664,18 +708,21 @@ def current_stock_maps():
 
 
 def article_current_stock(article, quantity_map, unit_total_map):
+    """Maneja article current stock."""
     if article.tracking_mode == Article.TrackingMode.UNIT:
         return Decimal(unit_total_map.get(article.id, 0))
     return quantity_map.get(article.id, Decimal("0"))
 
 
 def article_available_stock(article, available_quantity_map, unit_available_map):
+    """Maneja article available stock."""
     if article.tracking_mode == Article.TrackingMode.UNIT:
         return Decimal(unit_available_map.get(article.id, 0))
     return available_quantity_map.get(article.id, Decimal("0"))
 
 
 def serialize_article(article, quantity_map, available_quantity_map, unit_total_map, unit_available_map):
+    """Maneja serialize article."""
     current_stock = article_current_stock(article, quantity_map, unit_total_map)
     available_stock = article_available_stock(article, available_quantity_map, unit_available_map)
     low_stock = article.minimum_stock is not None and current_stock <= article.minimum_stock
@@ -736,6 +783,7 @@ def serialize_article(article, quantity_map, available_quantity_map, unit_total_
 
 
 def active_alarm_recipients(user):
+    """Maneja active alarm recipients."""
     current_user = user if user and user.is_authenticated else None
     if not current_user:
         return []
@@ -743,6 +791,7 @@ def active_alarm_recipients(user):
 
 
 def current_stock_for_article(article):
+    """Maneja current stock for article."""
     quantity_map, _available_quantity_map, unit_total_map, _unit_available_map = current_stock_maps()
     return article_current_stock(article, quantity_map, unit_total_map)
 
@@ -766,6 +815,7 @@ def _system_person():
 
 
 def _purchase_quantity_for_minimum(article, current_stock):
+    """Maneja purchase quantity for minimum."""
     candidates = [
         article.suggested_purchase_qty,
         (article.max_stock - current_stock) if article.max_stock is not None else None,
@@ -895,6 +945,7 @@ def maybe_create_purchase_request_for_minimum_stock(
     return request_item
 
 def safety_alert_email_addresses(alert):
+    """Maneja safety alert email addresses."""
     recipient_emails = []
     seen = set()
     recipient_users = list(alert.recipients.select_related("profile__sector_default").all())
@@ -920,6 +971,7 @@ def safety_alert_email_addresses(alert):
 
 
 def serialize_safety_alert_rule(alert, quantity_map=None, unit_total_map=None):
+    """Maneja serialize safety alert rule."""
     recipients = list(alert.recipients.select_related("profile__sector_default").order_by("first_name", "last_name", "username"))
     if quantity_map is None or unit_total_map is None:
         quantity_map, _available_quantity_map, unit_total_map, _unit_available_map = current_stock_maps()
@@ -954,6 +1006,7 @@ def serialize_safety_alert_rule(alert, quantity_map=None, unit_total_map=None):
 
 
 def serialize_minimum_stock_alarm_config(config):
+    """Maneja serialize minimum stock alarm config."""
     recipients = list(
         config.recipients.select_related("profile__sector_default").order_by(
             "first_name",
@@ -978,12 +1031,14 @@ def serialize_minimum_stock_alarm_config(config):
 
 
 def get_purchasing_minimum_stock_alarm_config(user):
+    """Devuelve purchasing minimum stock alarm config."""
     require_role(user, ALARM_ROLES)
     config, _created = MinimumStockAlarmConfig.objects.get_or_create(key="purchasing_default")
     return serialize_minimum_stock_alarm_config(config)
 
 
 def save_purchasing_minimum_stock_alarm_config(user, payload):
+    """Guarda purchasing minimum stock alarm config."""
     require_role(user, ALARM_ROLES)
     if not isinstance(payload, dict):
         raise InventoryApiError("Invalid payload")
@@ -1038,6 +1093,7 @@ def save_purchasing_minimum_stock_alarm_config(user, payload):
 
 
 def low_stock_articles_snapshot(serialized_articles=None):
+    """Maneja low stock articles snapshot."""
     articles = serialized_articles if serialized_articles is not None else list_articles()
     return [article for article in articles if article.get("low_stock")]
 
@@ -1054,12 +1110,14 @@ WEEKDAY_LABELS = {
 
 
 def serialize_digest_run_time(value):
+    """Maneja serialize digest run time."""
     if not value:
         return "08:00"
     return value.strftime("%H:%M")
 
 
 def resolve_digest_delivery_tone(status):
+    """Maneja resolve digest delivery tone."""
     if status == MinimumStockDigestConfig.DeliveryStatus.SUCCESS:
         return "ok"
     if status == MinimumStockDigestConfig.DeliveryStatus.WARNING:
@@ -1072,6 +1130,7 @@ def resolve_digest_delivery_tone(status):
 
 
 def serialize_inventory_automation_status():
+    """Maneja serialize inventory automation status."""
     ensure_automation_task_states()
     return {
         "scheduler": serialize_automation_task_state(get_automation_task_state(TASK_KEY_SCHEDULER)),
@@ -1088,6 +1147,7 @@ def serialize_inventory_automation_status():
 
 
 def serialize_minimum_stock_digest_config(config=None, serialized_articles=None, save_warning=""):
+    """Maneja serialize minimum stock digest config."""
     low_stock_articles = low_stock_articles_snapshot(serialized_articles)
     recipients = []
     next_run_at = None
@@ -1152,10 +1212,12 @@ def serialize_minimum_stock_digest_config(config=None, serialized_articles=None,
 
 
 def full_stock_articles_snapshot(serialized_articles=None):
+    """Maneja full stock articles snapshot."""
     return serialized_articles if serialized_articles is not None else list_articles()
 
 
 def serialize_full_stock_report_config(config=None, serialized_articles=None, save_warning=""):
+    """Maneja serialize full stock report config."""
     articles = full_stock_articles_snapshot(serialized_articles)
     recipients = []
     next_run_at = None
@@ -1221,6 +1283,7 @@ def serialize_full_stock_report_config(config=None, serialized_articles=None, sa
 
 
 def resolve_digest_frequency(value):
+    """Maneja resolve digest frequency."""
     raw_value = clean_casefold(value or MinimumStockDigestConfig.Frequency.DAILY)
     for option, _label in MinimumStockDigestConfig.Frequency.choices:
         if clean_casefold(option) == raw_value:
@@ -1229,6 +1292,7 @@ def resolve_digest_frequency(value):
 
 
 def resolve_digest_recipients(config):
+    """Maneja resolve digest recipients."""
     recipient_emails = []
     discarded = []
     seen = set()
@@ -1281,6 +1345,7 @@ def resolve_digest_recipients(config):
 
 
 def build_minimum_stock_digest_message(config, low_stock_articles):
+    """Construye minimum stock digest message."""
     subject = f"[Inventario] Resumen de stock minimo ({len(low_stock_articles)} articulos)"
     lines = [
         "Resumen automatico de articulos en o por debajo del stock minimo.",
@@ -1313,6 +1378,7 @@ def build_minimum_stock_digest_message(config, low_stock_articles):
 
 
 def send_minimum_stock_digest_email(config, recipient_emails, low_stock_articles):
+    """Env?a minimum stock digest email."""
     if not getattr(settings, "INVENTORY_ALARM_EMAILS_ENABLED", True):
         return False, "El envio por mail esta desactivado en la configuracion."
 
@@ -1334,6 +1400,7 @@ def send_minimum_stock_digest_email(config, recipient_emails, low_stock_articles
 
 
 def serialize_movement(movement):
+    """Maneja serialize movement."""
     return {
         "id": movement.id,
         "timestamp": serialize_datetime(movement.timestamp),
@@ -1356,6 +1423,7 @@ def serialize_movement(movement):
 
 
 def serialize_checkout(checkout):
+    """Maneja serialize checkout."""
     return {
         "id": checkout.id,
         "tracked_unit": checkout.tracked_unit.internal_tag,
@@ -1375,6 +1443,7 @@ def serialize_checkout(checkout):
 
 
 def serialize_count_session(session):
+    """Maneja serialize count session."""
     return {
         "id": session.id,
         "count_type": session.count_type,
@@ -1390,6 +1459,7 @@ def serialize_count_session(session):
 
 
 def serialize_discrepancy(discrepancy):
+    """Maneja serialize discrepancy."""
     return {
         "id": discrepancy.id,
         "article": discrepancy.article.name,
@@ -1410,6 +1480,7 @@ def serialize_discrepancy(discrepancy):
 
 
 def serialize_tracked_unit(unit):
+    """Maneja serialize tracked unit."""
     return {
         "id": unit.id,
         "internal_tag": unit.internal_tag,
@@ -1429,6 +1500,7 @@ def serialize_tracked_unit(unit):
 
 
 def serialize_balance(balance):
+    """Maneja serialize balance."""
     return {
         "id": balance.id,
         "article": balance.article.name,
@@ -1443,6 +1515,7 @@ def serialize_balance(balance):
 
 
 def serialize_batch(batch):
+    """Maneja serialize batch."""
     return {
         "id": batch.id,
         "article": batch.article.name,
@@ -1459,6 +1532,7 @@ def serialize_batch(batch):
 
 
 def serialize_person(person):
+    """Maneja serialize person."""
     return {
         "id": person.id,
         "full_name": person.full_name,
@@ -1469,6 +1543,7 @@ def serialize_person(person):
 
 
 def serialize_catalogs():
+    """Maneja serialize catalogs."""
     return {
         "article_types": [{"value": value, "label": label} for value, label in Article.ArticleType.choices],
         "tracking_modes": [{"value": value, "label": label} for value, label in Article.TrackingMode.choices],
@@ -1487,6 +1562,7 @@ def serialize_catalogs():
 
 
 def validate_alarm_rule_recipients(user_ids, *, require_email=True, require_telegram=False):
+    """Valida alarm rule recipients."""
     if not user_ids:
         return []
 
@@ -1526,6 +1602,7 @@ def validate_alarm_rule_recipients(user_ids, *, require_email=True, require_tele
 
 
 def send_safety_stock_alert_email(alert):
+    """Env?a safety stock alert email."""
     recipients = safety_alert_email_addresses(alert)
     if not recipients:
         alert.last_email_error = "No hay destinatarios con email valido para esta regla."
@@ -1583,6 +1660,7 @@ def send_safety_stock_alert_email(alert):
 
 
 def send_safety_stock_alert_telegram(alert):
+    """Env?a safety stock alert telegram."""
     if not getattr(settings, "INVENTORY_ALARM_TELEGRAM_ENABLED", True):
         alert.last_telegram_error = "El envio por Telegram esta desactivado en la configuracion."
         save_validated(alert)
@@ -1675,6 +1753,7 @@ def send_safety_stock_alert_telegram(alert):
 
 
 def minimum_stock_alarm_email_addresses(config):
+    """Maneja minimum stock alarm email addresses."""
     recipients = list(config.recipients.select_related("profile").all())
     recipient_emails = []
     seen = set()
@@ -1696,6 +1775,7 @@ def minimum_stock_alarm_email_addresses(config):
 
 
 def send_minimum_stock_alarm_email(config, article, current_stock=None):
+    """Env?a minimum stock alarm email."""
     recipients = minimum_stock_alarm_email_addresses(config)
     if not recipients:
         config.last_email_error = "No hay destinatarios con email valido para esta regla."
@@ -1752,6 +1832,7 @@ def send_minimum_stock_alarm_email(config, article, current_stock=None):
 
 
 def send_minimum_stock_alarm_telegram(config, article, current_stock=None):
+    """Env?a minimum stock alarm telegram."""
     if not getattr(settings, "INVENTORY_ALARM_TELEGRAM_ENABLED", True):
         config.last_telegram_error = "El envio por Telegram esta desactivado en la configuracion."
         save_validated(config)
@@ -1839,6 +1920,7 @@ def send_minimum_stock_alarm_telegram(config, article, current_stock=None):
 
 
 def evaluate_purchasing_minimum_stock_alarm(article):
+    """Maneja evaluate purchasing minimum stock alarm."""
     try:
         with transaction.atomic():
             config = (
@@ -2019,6 +2101,7 @@ def evaluate_safety_stock_alert(article):
 
 
 def list_safety_stock_alerts(user):
+    """Lista safety stock alerts."""
     require_role(user, ALARM_ROLES)
     quantity_map, _available_quantity_map, unit_total_map, _unit_available_map = current_stock_maps()
     alerts = list(
@@ -2039,6 +2122,7 @@ def list_safety_stock_alerts(user):
 
 
 def save_safety_stock_alert_rule(user, payload):
+    """Guarda safety stock alert rule."""
     require_role(user, ALARM_ROLES)
     article = resolve_instance(Article, payload.get("article_id"), "article")
     if article.minimum_stock is None:
@@ -2097,6 +2181,7 @@ def save_safety_stock_alert_rule(user, payload):
 
 
 def get_minimum_stock_digest_config(user, serialized_articles=None):
+    """Devuelve minimum stock digest config."""
     require_role(user, ALARM_ROLES)
     config = (
         MinimumStockDigestConfig.objects.prefetch_related("recipients__profile__sector_default")
@@ -2107,6 +2192,7 @@ def get_minimum_stock_digest_config(user, serialized_articles=None):
 
 
 def get_full_stock_report_config(user, serialized_articles=None):
+    """Devuelve full stock report config."""
     require_role(user, ALARM_ROLES)
     config = (
         FullStockReportConfig.objects.prefetch_related("recipients__profile__sector_default")
@@ -2117,6 +2203,7 @@ def get_full_stock_report_config(user, serialized_articles=None):
 
 
 def save_minimum_stock_digest_config(user, payload):
+    """Guarda minimum stock digest config."""
     require_role(user, ALARM_ROLES)
 
     recipient_ids = payload.get("recipient_user_ids") or []
@@ -2167,6 +2254,7 @@ def save_minimum_stock_digest_config(user, payload):
 
 
 def save_full_stock_report_config(user, payload):
+    """Guarda full stock report config."""
     require_role(user, ALARM_ROLES)
 
     recipient_ids = payload.get("recipient_user_ids") or []
@@ -2217,6 +2305,7 @@ def save_full_stock_report_config(user, payload):
 
 
 def dispatch_minimum_stock_digest(config_id, due_key):
+    """Maneja dispatch minimum stock digest."""
     config = (
         MinimumStockDigestConfig.objects.prefetch_related("recipients__profile__sector_default")
         .filter(pk=config_id)
@@ -2379,6 +2468,7 @@ def dispatch_minimum_stock_digest(config_id, due_key):
 
 
 def build_full_stock_report_message(config, article_count, report_filename, due_key=""):
+    """Construye full stock report message."""
     report_label = ""
     if due_key and ":" in str(due_key):
         report_label = due_key.split(":", 1)[1]
@@ -2405,6 +2495,7 @@ def build_full_stock_report_message(config, article_count, report_filename, due_
 
 
 def send_full_stock_report_email(config, recipient_emails, report_filename, report_payload, article_count, due_key=""):
+    """Env?a full stock report email."""
     if not getattr(settings, "INVENTORY_ALARM_EMAILS_ENABLED", True):
         return False, "El envio por mail esta desactivado en la configuracion."
 
@@ -2436,6 +2527,7 @@ def send_full_stock_report_email(config, recipient_emails, report_filename, repo
 
 
 def dispatch_full_stock_report(config_id, due_key):
+    """Maneja dispatch full stock report."""
     config = (
         FullStockReportConfig.objects.prefetch_related("recipients__profile__sector_default")
         .filter(pk=config_id)
@@ -2581,6 +2673,7 @@ def dispatch_full_stock_report(config_id, due_key):
 
 
 def build_dashboard(user=None):
+    """Construye dashboard."""
     from .deposits import resolve_deposit_permissions
     from accounts.permissions import has_module_permission
     from accounts.services import ensure_permission_catalog
@@ -2728,6 +2821,7 @@ def build_dashboard(user=None):
 
 
 def build_inventory_overview(user):
+    """Construye inventory overview."""
     profile = get_profile(user)
     from accounts.permissions import has_module_permission
     from accounts.services import ensure_permission_catalog
@@ -2881,6 +2975,7 @@ def build_inventory_overview(user):
 
 
 def get_article_detail(article_id):
+    """Devuelve article detail."""
     quantity_map, available_quantity_map, unit_total_map, unit_available_map = current_stock_maps()
     article = get_object_or_404(
         Article.objects.select_related(
@@ -2938,6 +3033,7 @@ def get_article_detail(article_id):
 
 
 def create_or_update_batch(article, payload, user):
+    """Crea or update batch."""
     batch_id = payload.get("batch_id")
     lot_code = (payload.get("lot_code") or "").strip()
 
@@ -2998,6 +3094,7 @@ def create_or_update_batch(article, payload, user):
 
 
 def _assign_article_fields(article, payload, user, files=None, is_new=False):
+    """Maneja assign article fields."""
     article_type = resolve_article_type(payload.get("article_type") or article.article_type)
     is_critical = parse_boolean(payload.get("is_critical")) if "is_critical" in payload else article.is_critical
     if "tracking_mode" in payload and clean_string(payload.get("tracking_mode")):
@@ -3135,6 +3232,7 @@ def _assign_article_fields(article, payload, user, files=None, is_new=False):
 
 
 def create_article(user, payload, files=None):
+    """Crea article."""
     require_role(user, MASTER_ROLES)
 
     with transaction.atomic():
@@ -3170,6 +3268,7 @@ def create_article(user, payload, files=None):
 
 
 def update_article(user, article_id, payload, files=None):
+    """Actualiza article."""
     require_role(user, MASTER_ROLES)
 
     with transaction.atomic():
@@ -3180,6 +3279,7 @@ def update_article(user, article_id, payload, files=None):
 
 
 def _resolve_quantity_article_movement(article, movement, payload, user):
+    """Maneja resolve quantity article movement."""
     batch = create_or_update_batch(article, payload, user)
     source_location = movement.source_location or article.primary_location or get_default_location()
     target_location = movement.target_location or article.primary_location or get_default_location()
@@ -3220,6 +3320,7 @@ def _resolve_quantity_article_movement(article, movement, payload, user):
 
 
 def _resolve_unit_article_movement(article, movement, payload, user):
+    """Maneja resolve unit article movement."""
     unit_id = payload.get("tracked_unit_id")
     source_location = movement.source_location or article.primary_location or get_default_location()
     target_location = movement.target_location or article.primary_location or get_default_location()
@@ -3284,6 +3385,7 @@ def _resolve_unit_article_movement(article, movement, payload, user):
 
 
 def create_movement(user, payload, allow_initial_load=False, bypass_role_check=False):
+    """Crea movement."""
     profile = get_profile(user) if bypass_role_check else require_role(user, MOVEMENT_ROLES)
 
     movement_type = payload.get("movement_type")
@@ -3365,6 +3467,7 @@ def create_movement(user, payload, allow_initial_load=False, bypass_role_check=F
 
 
 def create_checkout(user, payload):
+    """Crea checkout."""
     require_role(user, CHECKOUT_ROLES)
 
     with transaction.atomic():
@@ -3447,6 +3550,7 @@ def create_checkout(user, payload):
 
 
 def return_checkout(user, checkout_id, payload):
+    """Maneja return checkout."""
     require_role(user, CHECKOUT_ROLES)
 
     with transaction.atomic():
@@ -3515,6 +3619,7 @@ def return_checkout(user, checkout_id, payload):
 
 
 def create_count_session(user, payload):
+    """Crea count session."""
     require_role(user, COUNT_ROLES)
 
     session = PhysicalCountSession(
@@ -3531,6 +3636,7 @@ def create_count_session(user, payload):
 
 
 def system_quantity_for(article, location):
+    """Maneja system quantity for."""
     if article.tracking_mode == Article.TrackingMode.UNIT:
         return Decimal(
             TrackedUnit.objects.filter(
@@ -3550,6 +3656,7 @@ def system_quantity_for(article, location):
 
 
 def add_count_line(user, session_id, payload):
+    """Maneja add count line."""
     require_role(user, COUNT_ROLES)
 
     from .models import PhysicalCountLine
@@ -3598,6 +3705,7 @@ def add_count_line(user, session_id, payload):
 
 
 def create_discrepancy(user, payload):
+    """Crea discrepancy."""
     require_role(user, COUNT_ROLES)
 
     discrepancy = StockDiscrepancy(
@@ -3616,6 +3724,7 @@ def create_discrepancy(user, payload):
 
 
 def resolve_discrepancy(user, discrepancy_id, payload):
+    """Maneja resolve discrepancy."""
     require_role(user, APPROVER_ROLES)
 
     with transaction.atomic():
@@ -3753,16 +3862,19 @@ EXCEL_IMPORT_SIMPLE_HEADERS = {"nombre", "articulo", "producto", "descripcion"}
 
 
 def _import_text(value):
+    """Maneja import text."""
     if value in (None, ""):
         return ""
     return str(value).strip()
 
 
 def _import_is_blank(value):
+    """Maneja import is blank."""
     return value is None or (isinstance(value, str) and not value.strip())
 
 
 def _normalize_import_key(value):
+    """Maneja normalize import key."""
     collapsed = re.sub(r"\s+", " ", _import_text(value))
     normalized = unicodedata.normalize("NFKD", collapsed)
     ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
@@ -3770,6 +3882,7 @@ def _normalize_import_key(value):
 
 
 def _import_error_detail(exc):
+    """Maneja import error detail."""
     detail = exc.detail if isinstance(exc, InventoryApiError) else str(exc)
     if isinstance(detail, dict):
         return "; ".join(
@@ -3782,6 +3895,7 @@ def _import_error_detail(exc):
 
 
 def _map_excel_columns(headers, required_columns=None):
+    """Maneja map excel columns."""
     column_map = {}
     for index, header in enumerate(headers):
         normalized = normalize_excel_header(header)
@@ -3802,6 +3916,7 @@ def _map_excel_columns(headers, required_columns=None):
 
 
 def _excel_cell(row, column_map, key):
+    """Maneja excel cell."""
     index = column_map.get(key)
     if index is None or index >= len(row):
         return ""
@@ -3809,6 +3924,7 @@ def _excel_cell(row, column_map, key):
 
 
 def _sheet_row_values(worksheet, row_number, max_columns=EXCEL_IMPORT_MAX_COLUMNS):
+    """Maneja sheet row values."""
     values = [worksheet.cell(row=row_number, column=column).value for column in range(1, max_columns + 1)]
     while values and _import_is_blank(values[-1]):
         values.pop()
@@ -3816,6 +3932,7 @@ def _sheet_row_values(worksheet, row_number, max_columns=EXCEL_IMPORT_MAX_COLUMN
 
 
 def _iter_sheet_rows(worksheet, start_row=1, max_columns=EXCEL_IMPORT_MAX_COLUMNS):
+    """Maneja iter sheet rows."""
     for row_number in range(start_row, worksheet.max_row + 1):
         values = _sheet_row_values(worksheet, row_number, max_columns=max_columns)
         if any(not _import_is_blank(value) for value in values):
@@ -3823,6 +3940,7 @@ def _iter_sheet_rows(worksheet, start_row=1, max_columns=EXCEL_IMPORT_MAX_COLUMN
 
 
 def _build_import_context():
+    """Maneja build import context."""
     units = list(UnitOfMeasure.objects.all())
     sectors = list(Sector.objects.all())
     locations = list(Location.objects.all())
@@ -3852,6 +3970,7 @@ def _build_import_context():
 
 
 def _structured_header_match(worksheet):
+    """Maneja structured header match."""
     for row_number in range(1, min(worksheet.max_row, EXCEL_IMPORT_HEADER_SCAN_ROWS) + 1):
         values = _sheet_row_values(worksheet, row_number)
         if not values:
@@ -3863,6 +3982,7 @@ def _structured_header_match(worksheet):
 
 
 def _simple_list_header_row(worksheet):
+    """Maneja simple list header row."""
     for row_number in range(1, min(worksheet.max_row, EXCEL_IMPORT_HEADER_SCAN_ROWS) + 1):
         values = _sheet_row_values(worksheet, row_number)
         if not values:
@@ -3875,6 +3995,7 @@ def _simple_list_header_row(worksheet):
 
 
 def _default_sector_for_simple_row(context, sheet_name, category_name):
+    """Maneja default sector for simple row."""
     text = _normalize_import_key(f"{sheet_name} {category_name}")
     if "mantenimiento" in text or "motor" in text:
         return (
@@ -3890,6 +4011,7 @@ def _default_sector_for_simple_row(context, sheet_name, category_name):
 
 
 def _default_unit_for_simple_row(context, name):
+    """Maneja default unit for simple row."""
     text = _normalize_import_key(name)
     if any(token in text for token in {" par", "(par)", "pares", " par)"}):
         return resolve_optional_catalog_by_name_or_code(context["units"], "Par") or context["default_unit"]
@@ -3906,6 +4028,7 @@ def _default_unit_for_simple_row(context, name):
 
 
 def _infer_simple_article_type(sheet_name, category_name):
+    """Maneja infer simple article type."""
     text = _normalize_import_key(f"{sheet_name} {category_name}")
     if "proteccion personal" in text or normalize_excel_header(sheet_name) == "epp":
         return Article.ArticleType.PPE
@@ -3928,6 +4051,7 @@ def _build_import_candidate(
     subcategory_name="",
     source_mode,
 ):
+    """Maneja build import candidate."""
     article_type = payload["article_type"]
     return {
         "row": row_number,
@@ -3956,6 +4080,7 @@ def _build_import_candidate(
 
 
 def _build_structured_import_candidate(row_number, sheet_name, row, column_map, context):
+    """Maneja build structured import candidate."""
     article_type = resolve_article_type(_excel_cell(row, column_map, "article_type"))
     unit = resolve_catalog_by_name_or_code(context["units"], _excel_cell(row, column_map, "unit"), "unit")
     sector = resolve_catalog_by_name_or_code(
@@ -4030,6 +4155,7 @@ def _build_structured_import_candidate(row_number, sheet_name, row, column_map, 
 
 
 def _build_simple_import_candidate(row_number, sheet_name, name, category_name, context):
+    """Maneja build simple import candidate."""
     article_type = _infer_simple_article_type(sheet_name, category_name)
     unit = _default_unit_for_simple_row(context, name)
     sector = _default_sector_for_simple_row(context, sheet_name, category_name)
@@ -4077,6 +4203,7 @@ def _build_simple_import_candidate(row_number, sheet_name, name, category_name, 
 
 
 def _parse_structured_sheet(worksheet, context, header_row, column_map):
+    """Maneja parse structured sheet."""
     candidates = []
     for row_number in range(header_row + 1, worksheet.max_row + 1):
         row = _sheet_row_values(worksheet, row_number)
@@ -4120,6 +4247,7 @@ def _parse_structured_sheet(worksheet, context, header_row, column_map):
 
 
 def _parse_simple_sheet(worksheet, context, header_row):
+    """Maneja parse simple sheet."""
     candidates = []
     current_category = ""
     for row_number in range(header_row + 1, worksheet.max_row + 1):
@@ -4170,6 +4298,7 @@ def _parse_simple_sheet(worksheet, context, header_row):
 
 
 def _collect_excel_import_candidates(workbook):
+    """Maneja collect excel import candidates."""
     context = _build_import_context()
     candidates = []
     sheet_summaries = []
@@ -4210,6 +4339,7 @@ def _collect_excel_import_candidates(workbook):
 
 
 def _classify_import_candidates(candidates):
+    """Maneja classify import candidates."""
     existing_name_keys = {
         _normalize_import_key(name): True for name in Article.objects.values_list("name", flat=True)
     }
@@ -4258,11 +4388,13 @@ def _classify_import_candidates(candidates):
 
 
 def _candidate_category_id(category_name, user):
+    """Maneja candidate category id."""
     category = get_or_create_category_by_name(category_name, user)
     return category.id if category else ""
 
 
 def _create_article_from_import_candidate(user, candidate):
+    """Maneja create article from import candidate."""
     payload = dict(candidate["payload"])
     payload["category_id"] = _candidate_category_id(payload.pop("category_name", ""), user)
     payload["subcategory_id"] = _candidate_category_id(payload.pop("subcategory_name", ""), user)
@@ -4270,6 +4402,7 @@ def _create_article_from_import_candidate(user, candidate):
 
 
 def _serialize_import_candidate(candidate):
+    """Maneja serialize import candidate."""
     return {
         "row": candidate["row"],
         "sheet_name": candidate["sheet_name"],
@@ -4293,6 +4426,7 @@ def _serialize_import_candidate(candidate):
 
 
 def _summarize_import_candidates(candidates, sheet_summaries, mode):
+    """Maneja summarize import candidates."""
     items = [_serialize_import_candidate(candidate) for candidate in candidates]
     return {
         "mode": mode,
@@ -4305,6 +4439,7 @@ def _summarize_import_candidates(candidates, sheet_summaries, mode):
 
 
 def import_articles_from_excel(user, excel_file, mode="preview"):
+    """Maneja import articles from excel."""
     require_role(user, MASTER_ROLES)
 
     if not excel_file:
@@ -4404,10 +4539,12 @@ SPANISH_WEEKDAY_LABELS = (
 
 
 def _personal_report_weekday_label(report_date):
+    """Maneja personal report weekday label."""
     return SPANISH_WEEKDAY_LABELS[report_date.weekday()]
 
 
 def _parse_personal_report_date(value):
+    """Maneja parse personal report date."""
     if value in (None, ""):
         return None
 
@@ -4441,6 +4578,7 @@ def _parse_personal_report_date(value):
 
 
 def _map_personal_report_columns(headers):
+    """Maneja map personal report columns."""
     column_map = {}
     for index, header in enumerate(headers):
         normalized = normalize_excel_header(header)
@@ -4458,6 +4596,7 @@ def _map_personal_report_columns(headers):
 
 
 def serialize_personal_daily_report(report):
+    """Maneja serialize personal daily report."""
     return {
         "id": report.id,
         "report_date": report.report_date.isoformat(),
@@ -4467,11 +4606,13 @@ def serialize_personal_daily_report(report):
 
 
 def list_personal_daily_reports(user, limit=120):
+    """Lista personal daily reports."""
     items = PersonalDailyReport.objects.filter(user=user).order_by("-report_date")[:limit]
     return [serialize_personal_daily_report(item) for item in items]
 
 
 def _get_personal_daily_report(user, report_id):
+    """Maneja get personal daily report."""
     report = PersonalDailyReport.objects.filter(id=report_id, user=user).first()
     if not report:
         raise InventoryApiError("Informe no encontrado.", status=404)
@@ -4479,6 +4620,7 @@ def _get_personal_daily_report(user, report_id):
 
 
 def create_personal_daily_report(user, payload):
+    """Crea personal daily report."""
     report_date = _parse_personal_report_date(payload.get("report_date") or payload.get("fecha"))
     if not report_date:
         raise InventoryApiError("La fecha es requerida.")
@@ -4506,6 +4648,7 @@ def create_personal_daily_report(user, payload):
 
 
 def update_personal_daily_report(user, report_id, payload):
+    """Actualiza personal daily report."""
     report = _get_personal_daily_report(user, report_id)
 
     next_report_date = payload.get("report_date") or payload.get("fecha")
@@ -4539,12 +4682,14 @@ def update_personal_daily_report(user, report_id, payload):
 
 
 def delete_personal_daily_report(user, report_id):
+    """Elimina personal daily report."""
     report = _get_personal_daily_report(user, report_id)
     report.delete()
     return True
 
 
 def bulk_delete_personal_daily_reports(user, report_ids=None, delete_all=False):
+    """Maneja bulk delete personal daily reports."""
     queryset = PersonalDailyReport.objects.filter(user=user)
 
     if delete_all:
@@ -4576,6 +4721,7 @@ def bulk_delete_personal_daily_reports(user, report_ids=None, delete_all=False):
 
 
 def import_personal_daily_reports_from_excel(user, excel_file):
+    """Maneja import personal daily reports from excel."""
     if not excel_file:
         raise InventoryApiError("Excel file is required")
 
@@ -4619,12 +4765,14 @@ def import_personal_daily_reports_from_excel(user, excel_file):
     current_activities = []
 
     def resolve_value(row_values, key):
+        """Maneja resolve value."""
         index = column_map.get(key)
         if index is None or index >= len(row_values):
             return None
         return row_values[index]
 
     def finalize_current_report():
+        """Maneja finalize current report."""
         nonlocal current_report, current_activities
 
         if not current_report:
@@ -4792,6 +4940,7 @@ def import_personal_daily_reports_from_excel(user, excel_file):
 
 
 def _excel_safe_text(value):
+    """Maneja excel safe text."""
     text = "" if value in (None, "") else str(value)
     if text and text[0] in ("=", "+", "-", "@"):
         return f"'{text}"
@@ -4799,6 +4948,7 @@ def _excel_safe_text(value):
 
 
 def _parse_personal_report_export_ids(filters):
+    """Maneja parse personal report export ids."""
     if not filters:
         return None
 
@@ -4843,6 +4993,7 @@ def _parse_personal_report_export_ids(filters):
 
 
 def build_personal_daily_reports_export_excel(user, filters=None):
+    """Construye personal daily reports export excel."""
     report_ids = _parse_personal_report_export_ids(filters)
 
     queryset = PersonalDailyReport.objects.filter(user=user)
@@ -4887,6 +5038,7 @@ def build_personal_daily_reports_export_excel(user, filters=None):
 
 
 def list_articles():
+    """Lista articles."""
     quantity_map, available_quantity_map, unit_total_map, unit_available_map = current_stock_maps()
     articles = Article.objects.select_related(
         "unit_of_measure",
@@ -4909,6 +5061,7 @@ def list_articles():
 
 
 def article_matches_stock_query(article, query):
+    """Maneja article matches stock query."""
     target = build_search_target(
         [
             article.get("name"),
@@ -4925,6 +5078,7 @@ def article_matches_stock_query(article, query):
 
 
 def article_matches_stock_alert(article, alert_filter):
+    """Maneja article matches stock alert."""
     normalized_filter = clean_casefold(alert_filter or "all")
     current_stock = article.get("current_stock") or 0
 
@@ -4938,6 +5092,7 @@ def article_matches_stock_alert(article, alert_filter):
 
 
 def filter_articles_for_stock_view(articles, filters=None):
+    """Maneja filter articles for stock view."""
     filters = filters or {}
     global_query = filters.get("global_query", "")
     stock_query = filters.get("stock_query", "")
@@ -4957,6 +5112,7 @@ def filter_articles_for_stock_view(articles, filters=None):
 
 
 def get_article_stock_label(article):
+    """Devuelve article stock label."""
     if article.get("minimum_stock") is None:
         return "Sin minimo"
     if (article.get("current_stock") or 0) <= 0:
@@ -4982,11 +5138,13 @@ STOCK_EXPORT_COLUMNS = (
 
 
 def build_stock_export_excel(filters=None):
+    """Construye stock export excel."""
     articles = filter_articles_for_stock_view(list_articles(), filters=filters)
     return build_stock_export_excel_from_articles(articles)
 
 
 def build_stock_export_excel_from_articles(articles):
+    """Construye stock export excel from articles."""
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Stock"

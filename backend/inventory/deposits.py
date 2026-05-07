@@ -68,6 +68,7 @@ DEPOSIT_LOCATION_TYPES = {
 
 
 def get_deposit_profile(user):
+    """Devuelve deposit profile."""
     defaults = {
         "role": UserProfile.Role.ADMINISTRATOR if user.is_superuser else UserProfile.Role.OPERATOR,
     }
@@ -75,10 +76,12 @@ def get_deposit_profile(user):
 
 
 def _can(user, module_code, action_code):
+    """Maneja can."""
     return user.is_superuser or has_module_permission(user, module_code, action_code)
 
 
 def resolve_deposit_permissions(user):
+    """Maneja resolve deposit permissions."""
     can_view_registry = _can(user, DEPOSIT_MODULE_CODES["registry"], "view")
     can_manage_registry = (
         _can(user, DEPOSIT_MODULE_CODES["registry"], "create")
@@ -111,6 +114,7 @@ def resolve_deposit_permissions(user):
 
 
 def require_deposit_access(user):
+    """Maneja require deposit access."""
     permissions = resolve_deposit_permissions(user)
     if get_deposit_profile(user).status != UserProfile.Status.ACTIVE:
         raise InventoryApiError("User profile is inactive", status=403)
@@ -120,6 +124,7 @@ def require_deposit_access(user):
 
 
 def require_registry_view(user):
+    """Maneja require registry view."""
     permissions = require_deposit_access(user)
     if not permissions["can_view_registry"]:
         raise InventoryApiError("You do not have permission to view pallet registry", status=403)
@@ -127,6 +132,7 @@ def require_registry_view(user):
 
 
 def require_registry_manage(user):
+    """Maneja require registry manage."""
     permissions = require_registry_view(user)
     if not permissions["can_manage_registry"]:
         raise InventoryApiError("You do not have permission to manage pallets", status=403)
@@ -134,6 +140,7 @@ def require_registry_manage(user):
 
 
 def require_layout_view(user):
+    """Maneja require layout view."""
     permissions = require_deposit_access(user)
     if not permissions["can_view_layout"]:
         raise InventoryApiError("You do not have permission to view deposit layout", status=403)
@@ -141,6 +148,7 @@ def require_layout_view(user):
 
 
 def require_scan_access(user):
+    """Maneja require scan access."""
     permissions = require_deposit_access(user)
     if not permissions["can_scan"]:
         raise InventoryApiError("You do not have permission to scan pallets", status=403)
@@ -148,6 +156,7 @@ def require_scan_access(user):
 
 
 def deposit_locations_queryset():
+    """Maneja deposit locations queryset."""
     return Location.objects.filter(
         status="active",
         location_type__in=DEPOSIT_LOCATION_TYPES,
@@ -155,11 +164,13 @@ def deposit_locations_queryset():
 
 
 def ensure_deposit_location(location):
+    """Maneja ensure deposit location."""
     if location.location_type not in DEPOSIT_LOCATION_TYPES:
         raise InventoryApiError("The selected location is not enabled as a deposit", status=400)
 
 
 def _next_pallet_code():
+    """Maneja next pallet code."""
     pattern = re.compile(rf"^{PALLET_CODE_PREFIX}-(\d+)$")
     max_number = 0
     for code in Pallet.objects.filter(pallet_code__startswith=f"{PALLET_CODE_PREFIX}-").values_list(
@@ -173,6 +184,7 @@ def _next_pallet_code():
 
 
 def serialize_article_option(article):
+    """Maneja serialize article option."""
     return {
         "id": article.id,
         "name": article.name,
@@ -181,6 +193,7 @@ def serialize_article_option(article):
 
 
 def serialize_location_option(location):
+    """Maneja serialize location option."""
     return {
         "id": location.id,
         "code": location.code,
@@ -191,6 +204,7 @@ def serialize_location_option(location):
 
 
 def serialize_position_option(position):
+    """Maneja serialize position option."""
     return {
         "id": position.id,
         "code": position.code,
@@ -205,6 +219,7 @@ def serialize_position_option(position):
 
 
 def serialize_pallet(pallet):
+    """Maneja serialize pallet."""
     return {
         "id": pallet.id,
         "pallet_code": pallet.pallet_code,
@@ -232,6 +247,7 @@ def serialize_pallet(pallet):
 
 
 def serialize_pallet_event(event):
+    """Maneja serialize pallet event."""
     return {
         "id": event.id,
         "created_at": serialize_datetime(event.created_at),
@@ -256,6 +272,7 @@ def serialize_pallet_event(event):
 
 
 def _active_pallets_for_position(position_id, exclude_pallet_id=None):
+    """Maneja active pallets for position."""
     queryset = Pallet.objects.filter(position_id=position_id).exclude(status=Pallet.PalletStatus.ARCHIVED)
     if exclude_pallet_id:
         queryset = queryset.exclude(pk=exclude_pallet_id)
@@ -263,6 +280,7 @@ def _active_pallets_for_position(position_id, exclude_pallet_id=None):
 
 
 def ensure_position_available(position, exclude_pallet_id=None):
+    """Maneja ensure position available."""
     if position.status == StoragePosition.PositionStatus.BLOCKED:
         raise InventoryApiError("The target position is blocked", status=400)
 
@@ -272,6 +290,7 @@ def ensure_position_available(position, exclude_pallet_id=None):
 
 
 def normalize_registry_pallet_code(value):
+    """Maneja normalize registry pallet code."""
     raw = clean_string(value)
     match = PALLET_REGISTRY_CODE_PATTERN.match(raw)
     if not match:
@@ -281,6 +300,7 @@ def normalize_registry_pallet_code(value):
 
 
 def normalize_registry_lot(value):
+    """Maneja normalize registry lot."""
     raw = clean_string(value)
     if not PALLET_LOT_PATTERN.match(raw):
         raise InventoryApiError("Invalid lot format. Expected 4 digits (e.g. 2605)", status=400)
@@ -288,6 +308,7 @@ def normalize_registry_lot(value):
 
 
 def choose_available_position(location):
+    """Maneja choose available position."""
     positions = (
         StoragePosition.objects.select_related("zone", "zone__location")
         .filter(zone__location=location)
@@ -304,6 +325,7 @@ def choose_available_position(location):
 
 
 def sync_position_statuses(position_ids):
+    """Maneja sync position statuses."""
     normalized_ids = [position_id for position_id in dict.fromkeys(position_ids) if position_id]
     if not normalized_ids:
         return
@@ -325,6 +347,7 @@ def sync_position_statuses(position_ids):
 
 
 def resolve_existing_batch(article, payload):
+    """Maneja resolve existing batch."""
     batch_id = parse_optional_int(payload.get("batch_id"), "batch_id")
     if batch_id is None:
         return None
@@ -335,6 +358,7 @@ def resolve_existing_batch(article, payload):
 
 
 def resolve_pallet_by_qr(qr_value):
+    """Maneja resolve pallet by qr."""
     normalized_qr = clean_string(qr_value)
     if not normalized_qr:
         raise InventoryApiError("qr_value is required")
@@ -389,6 +413,7 @@ def record_pallet_event(
     raw_qr="",
     notes="",
 ):
+    """Maneja record pallet event."""
     event = PalletEvent(
         pallet=pallet,
         event_type=event_type,
@@ -405,6 +430,7 @@ def record_pallet_event(
 
 
 def _touch_pallet_scan(pallet, user):
+    """Maneja touch pallet scan."""
     pallet.last_scanned_at = timezone.now()
     update_audit(pallet, user)
     save_validated(pallet)
@@ -412,6 +438,7 @@ def _touch_pallet_scan(pallet, user):
 
 
 def list_pallets(user, query_params=None):
+    """Lista pallets."""
     require_registry_view(user)
     query_params = query_params or {}
 
@@ -448,6 +475,7 @@ def list_pallets(user, query_params=None):
 
 
 def get_pallet_detail(user, pallet_id):
+    """Devuelve pallet detail."""
     require_registry_view(user)
     pallet = get_object_or_404(
         Pallet.objects.select_related("article", "batch", "location", "position__zone"),
@@ -469,6 +497,7 @@ def get_pallet_detail(user, pallet_id):
 
 
 def create_pallet(user, payload, *, input_method=PalletEvent.InputMethod.MANUAL, scanned_qr=""):
+    """Crea pallet."""
     require_registry_manage(user)
 
     raw_qr = clean_string(scanned_qr or payload.get("qr_value"))
@@ -594,6 +623,7 @@ def create_pallet(user, payload, *, input_method=PalletEvent.InputMethod.MANUAL,
 
 
 def update_pallet(user, pallet_id, payload):
+    """Actualiza pallet."""
     require_registry_manage(user)
     pallet = get_object_or_404(
         Pallet.objects.select_related("article", "batch", "location", "position__zone"),
@@ -614,6 +644,7 @@ def update_pallet(user, pallet_id, payload):
 
 
 def relocate_pallet(user, pallet, target_position, *, input_method, raw_qr="", notes=""):
+    """Maneja relocate pallet."""
     if pallet.status == Pallet.PalletStatus.ARCHIVED:
         raise InventoryApiError("Archived pallets cannot be relocated", status=400)
 
@@ -670,6 +701,7 @@ def relocate_pallet(user, pallet, target_position, *, input_method, raw_qr="", n
 
 
 def scan_pallet(user, payload):
+    """Maneja scan pallet."""
     permissions = require_scan_access(user)
 
     action = clean_string(payload.get("action")).lower()
@@ -742,6 +774,7 @@ def scan_pallet(user, payload):
 
 
 def serialize_position_layout(position, active_pallets_by_position):
+    """Maneja serialize position layout."""
     pallets = active_pallets_by_position.get(position.id, [])
     current_pallet = pallets[0] if pallets else None
     return {
@@ -769,6 +802,7 @@ def serialize_position_layout(position, active_pallets_by_position):
 
 
 def build_deposit_layout(user, location_id):
+    """Construye deposit layout."""
     permissions = require_layout_view(user)
     location = get_object_or_404(deposit_locations_queryset(), pk=location_id)
     zones = list(
@@ -819,6 +853,7 @@ def build_deposit_layout(user, location_id):
 
 
 def build_deposits_overview(user):
+    """Construye deposits overview."""
     permissions = require_deposit_access(user)
     locations = list(deposit_locations_queryset())
     location_ids = [location.id for location in locations]

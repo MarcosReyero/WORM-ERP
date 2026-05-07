@@ -71,10 +71,12 @@ from .services import (
 
 
 def _unauthorized():
+    """Maneja unauthorized."""
     return JsonResponse({"detail": "Authentication required"}, status=401)
 
 
 def _forbidden():
+    """Maneja forbidden."""
     return JsonResponse(
         {"detail": "No tienes permiso para acceder a esta sección", "code": "PERMISSION_DENIED"},
         status=403,
@@ -82,6 +84,7 @@ def _forbidden():
 
 
 def _require_permission(request, module_code, action_code="view"):
+    """Maneja require permission."""
     ensure_permission_catalog()
     if not has_module_permission(request.user, module_code, action_code):
         return _forbidden()
@@ -89,6 +92,7 @@ def _require_permission(request, module_code, action_code="view"):
 
 
 def _handle_inventory_call(callback):
+    """Maneja handle inventory call."""
     try:
         return callback()
     except InventoryApiError as exc:
@@ -116,6 +120,7 @@ def _handle_inventory_call(callback):
 
 
 def _request_payload(request):
+    """Maneja request payload."""
     content_type = request.headers.get("Content-Type", "")
     if "application/json" in content_type:
         return parse_json(request)
@@ -124,6 +129,7 @@ def _request_payload(request):
 
 @require_GET
 def dashboard(request):
+    """Maneja dashboard."""
     if not request.user.is_authenticated:
         return _unauthorized()
     return JsonResponse(build_dashboard(request.user))
@@ -131,6 +137,7 @@ def dashboard(request):
 
 @require_GET
 def inventory_overview(request):
+    """Maneja inventory overview."""
     if not request.user.is_authenticated:
         return _unauthorized()
     denied = _require_permission(request, "inventory_overview", "view")
@@ -138,6 +145,7 @@ def inventory_overview(request):
         return denied
 
     def handler():
+        """Maneja handler."""
         return JsonResponse(build_inventory_overview(request.user))
 
     return _handle_inventory_call(handler)
@@ -145,6 +153,7 @@ def inventory_overview(request):
 
 @require_GET
 def catalogs(request):
+    """Maneja catalogs."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -167,6 +176,7 @@ def catalogs(request):
 
 @require_http_methods(["GET", "POST"])
 def articles(request):
+    """Maneja articles."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -177,6 +187,7 @@ def articles(request):
         return JsonResponse({"items": list_articles()})
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "stock_management", "create")
         if denied:
             return denied
@@ -191,6 +202,7 @@ def articles(request):
 
 @require_http_methods(["GET", "POST"])
 def article_detail(request, article_id):
+    """Maneja article detail."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -201,6 +213,7 @@ def article_detail(request, article_id):
         return JsonResponse(get_article_detail(article_id))
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "stock_management", "change")
         if denied:
             return denied
@@ -217,10 +230,12 @@ def article_detail(request, article_id):
 
 @require_http_methods(["POST"])
 def article_import_excel(request):
+    """Maneja article import excel."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "stock_management", "create")
         if denied:
             return denied
@@ -236,10 +251,12 @@ def article_import_excel(request):
 
 @require_GET
 def article_export_excel(request):
+    """Maneja article export excel."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "stock_management", "export")
         if denied:
             return denied
@@ -256,6 +273,7 @@ def article_export_excel(request):
 
 @require_http_methods(["GET", "POST"])
 def personal_daily_reports(request):
+    """Maneja personal daily reports."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -267,6 +285,7 @@ def personal_daily_reports(request):
         return JsonResponse({"items": items})
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "personal", "create")
         if denied:
             return denied
@@ -281,10 +300,12 @@ def personal_daily_reports(request):
 
 @require_http_methods(["POST"])
 def personal_daily_report_detail(request, report_id):
+    """Maneja personal daily report detail."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "personal", "change")
         if denied:
             return denied
@@ -296,10 +317,12 @@ def personal_daily_report_detail(request, report_id):
 
 @require_http_methods(["POST"])
 def personal_daily_report_delete(request, report_id):
+    """Maneja personal daily report delete."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "personal", "delete")
         if denied:
             return denied
@@ -311,10 +334,12 @@ def personal_daily_report_delete(request, report_id):
 
 @require_http_methods(["POST"])
 def personal_daily_report_bulk_delete(request):
+    """Maneja personal daily report bulk delete."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "personal", "delete")
         if denied:
             return denied
@@ -332,10 +357,12 @@ def personal_daily_report_bulk_delete(request):
 
 @require_http_methods(["POST"])
 def personal_daily_report_import_excel(request):
+    """Maneja personal daily report import excel."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "personal", "create")
         if denied:
             return denied
@@ -347,10 +374,12 @@ def personal_daily_report_import_excel(request):
 
 @require_GET
 def personal_daily_report_export_excel(request):
+    """Maneja personal daily report export excel."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "personal", "export")
         if denied:
             return denied
@@ -367,6 +396,7 @@ def personal_daily_report_export_excel(request):
 
 @require_GET
 def balances(request):
+    """Maneja balances."""
     if not request.user.is_authenticated:
         return _unauthorized()
     denied = _require_permission(request, "stock_management", "view")
@@ -382,6 +412,7 @@ def balances(request):
 
 @require_GET
 def batches(request):
+    """Maneja batches."""
     if not request.user.is_authenticated:
         return _unauthorized()
     denied = _require_permission(request, "stock_management", "view")
@@ -397,6 +428,7 @@ def batches(request):
 
 @require_GET
 def tracked_units(request):
+    """Maneja tracked units."""
     if not request.user.is_authenticated:
         return _unauthorized()
     denied = _require_permission(request, "stock_management", "view")
@@ -416,6 +448,7 @@ def tracked_units(request):
 
 @require_http_methods(["GET", "POST"])
 def movements(request):
+    """Maneja movements."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -439,6 +472,7 @@ def movements(request):
         return JsonResponse({"items": items})
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "movements", "create")
         if denied:
             return denied
@@ -453,6 +487,7 @@ def movements(request):
 
 @require_http_methods(["GET", "POST"])
 def checkouts(request):
+    """Maneja checkouts."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -472,6 +507,7 @@ def checkouts(request):
         return JsonResponse({"items": items})
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "checkouts", "create")
         if denied:
             return denied
@@ -486,10 +522,12 @@ def checkouts(request):
 
 @require_http_methods(["POST"])
 def checkout_return(request, checkout_id):
+    """Maneja checkout return."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "checkouts", "change")
         if denied:
             return denied
@@ -501,6 +539,7 @@ def checkout_return(request, checkout_id):
 
 @require_http_methods(["GET", "POST"])
 def count_sessions(request):
+    """Maneja count sessions."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -516,6 +555,7 @@ def count_sessions(request):
         return JsonResponse({"items": items})
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "counts", "create")
         if denied:
             return denied
@@ -530,10 +570,12 @@ def count_sessions(request):
 
 @require_http_methods(["POST"])
 def count_session_lines(request, session_id):
+    """Maneja count session lines."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "counts", "create")
         if denied:
             return denied
@@ -555,6 +597,7 @@ def count_session_lines(request, session_id):
 
 @require_http_methods(["GET", "POST"])
 def discrepancies(request):
+    """Maneja discrepancies."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -574,6 +617,7 @@ def discrepancies(request):
         return JsonResponse({"items": items})
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "discrepancies", "create")
         if denied:
             return denied
@@ -588,10 +632,12 @@ def discrepancies(request):
 
 @require_http_methods(["POST"])
 def discrepancy_resolve(request, discrepancy_id):
+    """Maneja discrepancy resolve."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "discrepancies", "approve")
         if denied:
             return denied
@@ -605,6 +651,7 @@ def discrepancy_resolve(request, discrepancy_id):
 
 @require_http_methods(["GET", "POST"])
 def inventory_alarms(request):
+    """Maneja inventory alarms."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -617,6 +664,7 @@ def inventory_alarms(request):
         )
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "alarms", "create")
         if denied:
             return denied
@@ -628,6 +676,7 @@ def inventory_alarms(request):
 
 @require_http_methods(["GET", "POST"])
 def inventory_safety_alerts(request):
+    """Maneja inventory safety alerts."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -640,6 +689,7 @@ def inventory_safety_alerts(request):
         )
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "alarms", "change")
         if denied:
             return denied
@@ -651,6 +701,7 @@ def inventory_safety_alerts(request):
 
 @require_http_methods(["GET", "POST"])
 def inventory_minimum_stock_digest(request):
+    """Maneja inventory minimum stock digest."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -663,6 +714,7 @@ def inventory_minimum_stock_digest(request):
         )
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "alarms", "change")
         if denied:
             return denied
@@ -674,6 +726,7 @@ def inventory_minimum_stock_digest(request):
 
 @require_http_methods(["GET", "POST"])
 def inventory_full_stock_report(request):
+    """Maneja inventory full stock report."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -686,6 +739,7 @@ def inventory_full_stock_report(request):
         )
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "reports", "change")
         if denied:
             return denied
@@ -697,6 +751,7 @@ def inventory_full_stock_report(request):
 
 @require_http_methods(["GET", "POST"])
 def internal_requests(request):
+    """Maneja internal requests."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -707,6 +762,7 @@ def internal_requests(request):
         return _handle_inventory_call(lambda: JsonResponse({"items": list_internal_requests(request.GET)}))
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "purchasing", "create")
         if denied:
             return denied
@@ -718,6 +774,7 @@ def internal_requests(request):
 
 @require_http_methods(["GET", "POST"])
 def purchasing_alarms(request):
+    """Maneja purchasing alarms."""
     if not request.user.is_authenticated:
         return _unauthorized()
 
@@ -727,6 +784,7 @@ def purchasing_alarms(request):
             return denied
 
         def handler():
+            """Maneja handler."""
             eligible_articles = [
                 {"id": item.id, "label": f"{item.name} ({item.internal_code})"}
                 for item in Article.objects.filter(
@@ -748,6 +806,7 @@ def purchasing_alarms(request):
         return _handle_inventory_call(handler)
 
     def handler():
+        """Maneja handler."""
         denied = _require_permission(request, "purchasing", "change")
         if denied:
             return denied

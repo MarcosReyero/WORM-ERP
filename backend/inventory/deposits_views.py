@@ -16,10 +16,12 @@ from .services import InventoryApiError, parse_json
 
 
 def _unauthorized():
+    """Maneja unauthorized."""
     return JsonResponse({"detail": "Authentication required"}, status=401)
 
 
 def _request_payload(request):
+    """Maneja request payload."""
     content_type = request.headers.get("Content-Type", "")
     if "application/json" in content_type:
         return parse_json(request)
@@ -27,6 +29,7 @@ def _request_payload(request):
 
 
 def _handle_deposits_call(callback):
+    """Maneja handle deposits call."""
     try:
         return callback()
     except InventoryApiError as exc:
@@ -35,6 +38,7 @@ def _handle_deposits_call(callback):
 
 @require_GET
 def deposits_overview(request):
+    """Maneja deposits overview."""
     if not request.user.is_authenticated:
         return _unauthorized()
     ensure_permission_catalog()
@@ -43,6 +47,7 @@ def deposits_overview(request):
 
 @require_GET
 def deposits_layout(request, location_id):
+    """Maneja deposits layout."""
     if not request.user.is_authenticated:
         return _unauthorized()
     ensure_permission_catalog()
@@ -51,6 +56,7 @@ def deposits_layout(request, location_id):
 
 @require_http_methods(["GET", "POST"])
 def pallets(request):
+    """Maneja pallets."""
     if not request.user.is_authenticated:
         return _unauthorized()
     ensure_permission_catalog()
@@ -76,6 +82,7 @@ def pallets(request):
 
 @require_http_methods(["GET", "POST"])
 def pallet_detail(request, pallet_id):
+    """Maneja pallet detail."""
     if not request.user.is_authenticated:
         return _unauthorized()
     ensure_permission_catalog()
@@ -98,6 +105,7 @@ def pallet_detail(request, pallet_id):
 
 @require_http_methods(["POST"])
 def pallet_scan(request):
+    """Maneja pallet scan."""
     if not request.user.is_authenticated:
         return _unauthorized()
     ensure_permission_catalog()
