@@ -1,11 +1,21 @@
-const SHELL_CACHE = 'inventary-shell-v1'
+const SHELL_CACHE = 'worm-erp-shell-v2'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil(
+    (async () => {
+      const cacheNames = await caches.keys()
+      await Promise.all(
+        cacheNames
+          .filter((name) => name.startsWith('worm-erp-shell-') && name !== SHELL_CACHE)
+          .map((name) => caches.delete(name)),
+      )
+      await self.clients.claim()
+    })(),
+  )
 })
 
 function isSameOrigin(requestUrl) {
