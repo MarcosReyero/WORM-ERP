@@ -634,7 +634,7 @@ export function DepositsScanPage() {
               </div>
 
               {scanForm.action === 'register' ? (
-                <div className="deposits-mobile-scan-form-row">
+                <div className="deposits-mobile-scan-form-row deposits-mobile-scan-form-row--register">
                   <label>
                     <span>Tipo</span>
                     <input
@@ -662,8 +662,8 @@ export function DepositsScanPage() {
                       }
                       placeholder="0000"
                       type="text"
-                      value={scanForm.palletLot}
-                    />
+                    value={scanForm.palletLot}
+                  />
                   </label>
 
                   <label>

@@ -6832,13 +6832,12 @@ a {
 
 /* Deposits scan (mobile scanner layout) */
 .deposits-mobile-scan {
-  height: 100svh;
-  min-height: 100svh;
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
-  gap: 10px;
-  padding: calc(12px + env(safe-area-inset-top, 0px)) 12px
-    calc(14px + env(safe-area-inset-bottom, 0px));
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 10px calc(10px + env(safe-area-inset-bottom, 0px));
   border-radius: 14px;
   overflow: hidden;
   background:
@@ -6900,8 +6899,8 @@ a {
   width: min(100%, 380px);
   justify-self: center;
   aspect-ratio: 1 / 1;
-  max-height: 40svh;
-  min-height: 180px;
+  max-height: 34svh;
+  min-height: 150px;
   border-radius: 22px;
   overflow: hidden;
   background: #050b13;
@@ -7067,13 +7066,13 @@ a {
 .deposits-mobile-scan-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .deposits-mobile-scan-main-button {
   width: 100%;
-  min-height: 44px;
-  border-radius: 12px;
+  min-height: 40px;
+  border-radius: 10px;
 }
 
 .deposits-mobile-scan-gallery {
@@ -7081,8 +7080,8 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  border-radius: 12px;
+  min-height: 40px;
+  border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
   background: color-mix(in srgb, var(--deposits-erp-surface-alt) 18%, transparent);
   color: var(--deposits-erp-text);
@@ -7156,29 +7155,32 @@ a {
 }
 
 .deposits-mobile-scan-form-fields {
-  padding: 8px 12px 6px;
+  padding: 6px 10px 4px;
   display: grid;
-  gap: 8px;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  gap: 6px;
+  overflow: hidden;
   min-height: 0;
 }
 
 .deposits-mobile-scan-form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
+}
+
+.deposits-mobile-scan-form-row--register {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
 }
 
 .deposits-mobile-scan-form-row label,
 .deposits-mobile-scan-form-notes {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .deposits-mobile-scan-form-row label span,
 .deposits-mobile-scan-form-notes span {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--deposits-erp-text) 78%, transparent);
@@ -7188,12 +7190,12 @@ a {
 .deposits-mobile-scan-form-row select,
 .deposits-mobile-scan-form-notes textarea {
   width: 100%;
-  min-height: 36px;
-  border-radius: 12px;
+  min-height: 32px;
+  border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
   background: color-mix(in srgb, var(--deposits-erp-surface-bg) 90%, transparent);
   color: var(--deposits-erp-text);
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .deposits-mobile-scan-form-notes {
@@ -7203,8 +7205,8 @@ a {
 
 .deposits-mobile-scan-notes-toggle {
   width: 100%;
-  min-height: 34px;
-  border-radius: 12px;
+  min-height: 30px;
+  border-radius: 10px;
   border: 1px dashed color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
   background: color-mix(in srgb, var(--deposits-erp-surface-alt) 16%, transparent);
   color: var(--deposits-erp-text);
@@ -7224,8 +7226,8 @@ a {
 .deposits-mobile-scan-form-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  gap: 8px;
+  padding: 6px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid color-mix(in srgb, var(--deposits-erp-border) 55%, transparent);
   background: color-mix(in srgb, var(--deposits-erp-surface-bg) 94%, transparent);
 }
@@ -7233,8 +7235,8 @@ a {
 .deposits-mobile-scan-form-actions .primary-button,
 .deposits-mobile-scan-form-actions .secondary-button {
   width: 100%;
-  min-height: 44px;
-  border-radius: 12px;
+  min-height: 40px;
+  border-radius: 10px;
 }
 
 @media (min-width: 721px) {
@@ -7256,8 +7258,9 @@ a {
   }
 }
 
-@media (max-width: 720px) {
-  .deposits-mobile-scan-form-row {
+@media (max-width: 380px) {
+  .deposits-mobile-scan-form-row,
+  .deposits-mobile-scan-form-row--register {
     grid-template-columns: 1fr;
   }
 }
