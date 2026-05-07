@@ -67,6 +67,7 @@ export function DepositsScanPage() {
   const [isMobile, setIsMobile] = useState(getIsMobileViewport)
   const [galleryBusy, setGalleryBusy] = useState(false)
   const [scanOverlay, setScanOverlay] = useState('')
+  const [mobileNotesOpen, setMobileNotesOpen] = useState(false)
   const [scanForm, setScanForm] = useState({
     action: 'register',
     qrValue: '',
@@ -447,6 +448,7 @@ export function DepositsScanPage() {
         error: '',
         success: response.detail || 'Escaneo procesado.',
       })
+      setMobileNotesOpen(false)
       if (refreshDepositsModule) {
         await refreshDepositsModule().catch(() => null)
       }
@@ -584,10 +586,12 @@ export function DepositsScanPage() {
           </label>
         </div>
 
-        {cameraState.error ? <p className="deposits-mobile-scan-note is-error">{cameraState.error}</p> : null}
-        {cameraState.notice ? <p className="deposits-mobile-scan-note">{cameraState.notice}</p> : null}
-        {feedback.error ? <p className="deposits-mobile-scan-note is-error">{feedback.error}</p> : null}
-        {feedback.success ? <p className="deposits-mobile-scan-note is-success">{feedback.success}</p> : null}
+        <div className="deposits-mobile-scan-messages" aria-live="polite">
+          {cameraState.error ? <p className="deposits-mobile-scan-note is-error">{cameraState.error}</p> : null}
+          {cameraState.notice ? <p className="deposits-mobile-scan-note">{cameraState.notice}</p> : null}
+          {feedback.error ? <p className="deposits-mobile-scan-note is-error">{feedback.error}</p> : null}
+          {feedback.success ? <p className="deposits-mobile-scan-note is-success">{feedback.success}</p> : null}
+        </div>
 
         <section className="deposits-mobile-scan-sheet is-open">
           <form className="deposits-mobile-scan-form" onSubmit={handleScanSubmit}>
@@ -725,19 +729,30 @@ export function DepositsScanPage() {
                 </div>
               ) : null}
 
-              <label className="deposits-mobile-scan-form-notes">
-                <span>Notas</span>
-                <textarea
-                  onChange={(event) =>
-                    setScanForm((current) => ({
-                      ...current,
-                      notes: event.target.value,
-                    }))
-                  }
-                  rows="2"
-                  value={scanForm.notes}
-                />
-              </label>
+              <div className="deposits-mobile-scan-form-notes">
+                <button
+                  className="deposits-mobile-scan-notes-toggle"
+                  onClick={() => setMobileNotesOpen((current) => !current)}
+                  type="button"
+                >
+                  {mobileNotesOpen ? 'Ocultar notas' : 'Agregar notas (opcional)'}
+                </button>
+                {mobileNotesOpen ? (
+                  <label>
+                    <span>Notas</span>
+                    <textarea
+                      onChange={(event) =>
+                        setScanForm((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                      rows="2"
+                      value={scanForm.notes}
+                    />
+                  </label>
+                ) : null}
+              </div>
             </div>
 
             <div className="deposits-mobile-scan-form-actions">
