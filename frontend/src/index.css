@@ -6832,8 +6832,8 @@ a {
 
 /* Deposits scan (mobile scanner layout) */
 .deposits-mobile-scan {
-  height: 100%;
-  min-height: 0;
+  height: 100svh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -7120,12 +7120,16 @@ a {
   background: color-mix(in srgb, var(--deposits-erp-surface-bg) 82%, transparent);
   box-shadow: 0 14px 48px rgba(0, 0, 0, 0.24);
   overflow: hidden;
-  max-height: 54svh;
+  display: flex;
+  flex-direction: column;
+  height: min(54dvh, 54svh);
+  max-height: min(54dvh, 54svh);
   flex: 0 0 auto;
   transition: max-height 0.22s ease;
 }
 
 .deposits-mobile-scan-sheet:not(.is-open) {
+  height: 66px;
   max-height: 66px;
 }
 
@@ -7148,7 +7152,8 @@ a {
 .deposits-mobile-scan-form {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  max-height: calc(54svh - 40px);
+  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
 }
 
