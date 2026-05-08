@@ -109,15 +109,6 @@ export function DepositsScanPage() {
   )
 
   const scanLocationId = scanForm.locationId || String(locations[0]?.id || '')
-  const scanArticleId = scanForm.articleId || String(articles[0]?.id || '')
-  const scanFilteredBatches = useMemo(
-    () => batches.filter((batch) => String(batch.article_id) === scanArticleId),
-    [batches, scanArticleId],
-  )
-  const scanBatchId =
-    scanForm.batchId && scanFilteredBatches.some((batch) => String(batch.id) === scanForm.batchId)
-      ? scanForm.batchId
-      : ''
   const scanFilteredPositions = useMemo(
     () => positions.filter((position) => String(position.location_id) === String(scanLocationId)),
     [positions, scanLocationId],
@@ -396,7 +387,6 @@ export function DepositsScanPage() {
         error: '',
         success: 'QR leido desde galeria. Revisa accion y confirma.',
       })
-      setMobileSheetOpen(true)
     } catch (error) {
       setFeedback({
         error: error?.message || 'No se pudo leer el QR desde la imagen.',

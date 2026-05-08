@@ -26,6 +26,14 @@ function isApiRequest(requestUrl) {
   return isSameOrigin(requestUrl) && requestUrl.pathname.startsWith('/api/')
 }
 
+function isAdminRequest(requestUrl) {
+  return isSameOrigin(requestUrl) && requestUrl.pathname.startsWith('/admin/')
+}
+
+function isMediaRequest(requestUrl) {
+  return isSameOrigin(requestUrl) && requestUrl.pathname.startsWith('/media/')
+}
+
 async function networkFirst(request) {
   try {
     const response = await fetch(request)
@@ -74,6 +82,16 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isApiRequest(requestUrl)) {
+    event.respondWith(fetch(request))
+    return
+  }
+
+  if (isAdminRequest(requestUrl)) {
+    event.respondWith(fetch(request))
+    return
+  }
+
+  if (isMediaRequest(requestUrl)) {
     event.respondWith(fetch(request))
     return
   }
