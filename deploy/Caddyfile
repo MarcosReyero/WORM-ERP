@@ -1,8 +1,4 @@
-{
-  email {$ACME_EMAIL}
-}
-
-{$PUBLIC_DOMAIN} {
+http://{$PUBLIC_DOMAIN} {
   encode gzip
 
   request_body {
