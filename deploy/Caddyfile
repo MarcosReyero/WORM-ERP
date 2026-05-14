@@ -1,12 +1,14 @@
+{
+  email {$ACME_EMAIL}
+}
+
 {$PUBLIC_DOMAIN} {
   encode gzip
 
-  # Aumenta límite de uploads si usás importaciones
   request_body {
     max_size 20MB
   }
 
-  # Proxy al nginx interno (sirve SPA + /api + /admin + /static + /media)
   reverse_proxy nginx:80
 }
 
