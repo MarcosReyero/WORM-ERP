@@ -3987,8 +3987,6 @@ def _simple_list_header_row(worksheet):
         values = _sheet_row_values(worksheet, row_number)
         if not values:
             continue
-        if len(values) != 1:
-            continue
         if normalize_excel_header(values[0]) in EXCEL_IMPORT_SIMPLE_HEADERS:
             return row_number
     return None
