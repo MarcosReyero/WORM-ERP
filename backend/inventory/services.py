@@ -876,7 +876,7 @@ def maybe_create_purchase_request_for_minimum_stock(
 
     with transaction.atomic():
         locked_article = (
-            Article.objects.select_for_update()
+            Article.objects.select_for_update(of=("self",))
             .select_related("sector_responsible")
             .get(pk=article.pk)
         )
@@ -1924,7 +1924,7 @@ def evaluate_purchasing_minimum_stock_alarm(article):
     try:
         with transaction.atomic():
             config = (
-                MinimumStockAlarmConfig.objects.select_for_update()
+                MinimumStockAlarmConfig.objects.select_for_update(of=("self",))
                 .prefetch_related("recipients__profile")
                 .filter(key="purchasing_default", is_enabled=True)
                 .first()
