@@ -2029,7 +2029,7 @@ a {
   background:
     var(--dashboard-custom-bg, none),
     radial-gradient(circle at top, rgba(255, 255, 255, 0.18), transparent 34%),
-    linear-gradient(180deg, var(--workspace-bg) 0%, var(--workspace-canvas) 100%);
+    linear-gradient(180deg, var(--dashboard-base-start, var(--workspace-bg)) 0%, var(--dashboard-base-end, var(--workspace-canvas)) 100%);
   background-position: center, top left, top left;
   background-repeat: no-repeat, no-repeat, no-repeat;
   background-size: cover, auto, auto;
@@ -2175,6 +2175,145 @@ a {
 
 .dashboard-background-input {
   display: none;
+}
+
+/* ── Preset: Aurora ─────────────────────────────────────────────────── */
+
+.dashboard-preset--aurora {
+  --dashboard-base-start: #f0ebff;
+  --dashboard-base-end: #e0f6ff;
+  --dashboard-custom-bg: linear-gradient(
+    148deg,
+    rgba(139, 92, 246, 0.22) 0%,
+    rgba(6, 182, 212, 0.16) 55%,
+    rgba(236, 72, 153, 0.12) 100%
+  );
+  --dashboard-orb-a: rgba(109, 40, 217, 0.30);
+  --dashboard-orb-b: rgba(0, 188, 212, 0.26);
+  --dashboard-orb-c: rgba(219, 39, 119, 0.24);
+  --dashboard-spotlight: rgba(167, 139, 250, 0.55);
+  --dashboard-grid-major: rgba(109, 40, 217, 0.13);
+  --dashboard-grid-minor: rgba(109, 40, 217, 0.06);
+  --dashboard-particle-core: rgba(139, 92, 246, 0.35);
+  --dashboard-particle-border: rgba(196, 181, 253, 0.58);
+}
+
+.workspace-shell[data-theme='dark'] .dashboard-preset--aurora {
+  --dashboard-base-start: #0d0a1e;
+  --dashboard-base-end: #050d1a;
+  --dashboard-custom-bg: linear-gradient(
+    148deg,
+    rgba(109, 40, 217, 0.42) 0%,
+    rgba(8, 145, 178, 0.32) 55%,
+    rgba(16, 185, 129, 0.20) 100%
+  );
+  --dashboard-orb-a: rgba(167, 93, 255, 0.42);
+  --dashboard-orb-b: rgba(0, 210, 200, 0.34);
+  --dashboard-orb-c: rgba(16, 185, 129, 0.28);
+  --dashboard-spotlight: rgba(139, 80, 255, 0.22);
+  --dashboard-grid-major: rgba(139, 92, 246, 0.20);
+  --dashboard-grid-minor: rgba(139, 92, 246, 0.10);
+  --dashboard-particle-core: rgba(167, 93, 255, 0.42);
+  --dashboard-particle-border: rgba(196, 181, 253, 0.44);
+}
+
+.dashboard-background-menu-presets {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.dashboard-background-preset-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.34);
+  color: var(--workspace-heading);
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.dashboard-background-preset-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.dashboard-background-preset-btn.is-active {
+  border-color: rgba(139, 92, 246, 0.55);
+  background: rgba(139, 92, 246, 0.10);
+}
+
+.workspace-shell[data-theme='dark'] .dashboard-background-preset-btn {
+  border-color: rgba(107, 133, 170, 0.24);
+  background: rgba(34, 48, 65, 0.62);
+}
+
+.workspace-shell[data-theme='dark'] .dashboard-background-preset-btn:hover {
+  background: rgba(34, 48, 65, 0.74);
+}
+
+.workspace-shell[data-theme='dark'] .dashboard-background-preset-btn.is-active {
+  border-color: rgba(139, 92, 246, 0.45);
+  background: rgba(139, 92, 246, 0.16);
+}
+
+.dashboard-background-preset-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.dashboard-background-preset-swatch--aurora {
+  background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 55%, #ec4899 100%);
+}
+
+/* ── Preset: Grafito ─────────────────────────────────────────────────── */
+
+.dashboard-preset--grafito {
+  --dashboard-base-start: #f8fafc;
+  --dashboard-base-end: #f1f5f9;
+  --dashboard-custom-bg: linear-gradient(
+    180deg,
+    rgba(203, 213, 225, 0.20) 0%,
+    rgba(148, 163, 184, 0.08) 100%
+  );
+  --dashboard-orb-a: rgba(100, 116, 139, 0.12);
+  --dashboard-orb-b: rgba(71, 85, 105, 0.10);
+  --dashboard-orb-c: rgba(100, 116, 139, 0.08);
+  --dashboard-spotlight: rgba(226, 232, 240, 0.60);
+  --dashboard-grid-major: rgba(71, 85, 105, 0.22);
+  --dashboard-grid-minor: rgba(71, 85, 105, 0.11);
+  --dashboard-particle-core: rgba(100, 116, 139, 0.20);
+  --dashboard-particle-border: rgba(148, 163, 184, 0.35);
+}
+
+.workspace-shell[data-theme='dark'] .dashboard-preset--grafito {
+  --dashboard-base-start: #0f172a;
+  --dashboard-base-end: #020617;
+  --dashboard-custom-bg: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.60) 0%,
+    rgba(2, 6, 23, 0.40) 100%
+  );
+  --dashboard-orb-a: rgba(51, 65, 85, 0.45);
+  --dashboard-orb-b: rgba(30, 41, 59, 0.38);
+  --dashboard-orb-c: rgba(51, 65, 85, 0.30);
+  --dashboard-spotlight: rgba(30, 58, 95, 0.18);
+  --dashboard-grid-major: rgba(148, 163, 184, 0.18);
+  --dashboard-grid-minor: rgba(148, 163, 184, 0.09);
+  --dashboard-particle-core: rgba(148, 163, 184, 0.18);
+  --dashboard-particle-border: rgba(203, 213, 225, 0.22);
+}
+
+.dashboard-background-preset-swatch--grafito {
+  background: linear-gradient(135deg, #475569 0%, #64748b 50%, #94a3b8 100%);
 }
 
 .dashboard-particle {
