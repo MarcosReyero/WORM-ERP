@@ -41,6 +41,7 @@ from .services import (
     create_movement,
     create_checkout,
     import_articles_from_excel,
+    import_stock_from_excel,
     import_personal_daily_reports_from_excel,
     bulk_delete_personal_daily_reports,
     delete_personal_daily_report,
@@ -244,6 +245,42 @@ def article_import_excel(request):
         result = import_articles_from_excel(request.user, request.FILES.get("file"), mode=mode)
         status = 201 if result["mode"] == "confirm" else 200
         detail = "Excel imported" if result["mode"] == "confirm" else "Excel analyzed"
+        return JsonResponse({"detail": detail, "item": result}, status=status)
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["POST"])
+def balance_import_excel(request):
+    """Maneja balance import excel."""
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    def handler():
+        """Maneja handler."""
+        denied = _require_permission(request, "stock_management", "change")
+        if denied:
+            return denied
+
+        payload = _request_payload(request)
+        mode = payload.get("mode") or "preview"
+        options = {
+            "sheet_name": payload.get("sheet_name"),
+            "location_id": payload.get("location_id"),
+            "missing_policy": payload.get("missing_policy"),
+            "unmatched_policy": payload.get("unmatched_policy"),
+            "allow_unit_conversion": payload.get("allow_unit_conversion"),
+            "collapse_batches": payload.get("collapse_batches"),
+        }
+
+        result = import_stock_from_excel(
+            request.user,
+            request.FILES.get("file"),
+            mode=mode,
+            options=options,
+        )
+        status = 201 if result["mode"] == "confirm" else 200
+        detail = "Stock importado" if result["mode"] == "confirm" else "Stock analizado"
         return JsonResponse({"detail": detail, "item": result}, status=status)
 
     return _handle_inventory_call(handler)

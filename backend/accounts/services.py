@@ -413,8 +413,32 @@ def ensure_permission_catalog():
             },
         )
 
-    if not RolePermission.objects.exists():
+    if _permission_bootstrap_required():
         _seed_default_role_permissions()
+
+
+def _permission_bootstrap_required():
+    """Determina si faltan permisos base por rol."""
+    if not RolePermission.objects.exists():
+        return True
+
+    required_pairs = (
+        (UserProfile.Role.ADMINISTRATOR, PermissionModule.Module.INVENTORY_OVERVIEW),
+        (UserProfile.Role.ADMINISTRATOR, PermissionModule.Module.STOCK_MANAGEMENT),
+        (UserProfile.Role.STOREKEEPER, PermissionModule.Module.STOCK_MANAGEMENT),
+    )
+    for role, module_code in required_pairs:
+        if not RolePermission.objects.filter(role=role, module_id=module_code).exists():
+            return True
+
+    if not RolePermission.objects.filter(
+        role=UserProfile.Role.STOREKEEPER,
+        module_id=PermissionModule.Module.STOCK_MANAGEMENT,
+        actions__code=PermissionAction.Action.EXPORT,
+    ).exists():
+        return True
+
+    return False
 
 
 def _seed_default_role_permissions():
@@ -441,7 +465,7 @@ def _seed_default_role_permissions():
         },
         UserProfile.Role.STOREKEEPER: {
             "inventory_overview": ["view"],
-            "stock_management": ["view", "change"],
+            "stock_management": ["view", "change", "export"],
             "movements": ["view", "create"],
             "checkouts": ["view", "create"],
             "alarms": ["view"],
@@ -521,7 +545,9 @@ def _seed_default_role_permissions():
             if not module:
                 continue
             role_perm, _ = RolePermission.objects.get_or_create(role=role, module=module)
-            role_perm.actions.set([actions[action_code] for action_code in action_codes if action_code in actions])
+            desired_actions = [actions[action_code] for action_code in action_codes if action_code in actions]
+            if desired_actions:
+                role_perm.actions.add(*desired_actions)
 
 
 def _serialize_permission_module(module):

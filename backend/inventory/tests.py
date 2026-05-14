@@ -251,6 +251,168 @@ class InventoryApiTests(TestCase):
         self.assertEqual(payload["created_count"], 1)
         self.assertTrue(Article.objects.filter(name="Lubricante cadena").exists())
 
+    def test_stock_excel_import_requires_preview_then_confirm(self):
+        """Maneja test stock excel import requires preview then confirm."""
+        self.client.force_login(self.storekeeper)
+
+        unit = UnitOfMeasure.objects.first()
+        sector = Sector.objects.first()
+        article = Article.objects.create(
+            internal_code="TEST-STOCK-001",
+            name="Guantes moteados test",
+            article_type=Article.ArticleType.PPE,
+            unit_of_measure=unit,
+            sector_responsible=sector,
+            tracking_mode=Article.TrackingMode.QUANTITY,
+        )
+        InventoryBalance.objects.create(article=article, location=self.location, on_hand=Decimal("10"))
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "MAYO 26"
+        sheet.append(["DETALLE", "STK ACTUAL"])
+        sheet.append(["Guantes moteados test", 5])
+
+        preview_response = self.client.post(
+            "/api/balances/import-excel/",
+            data={
+                "mode": "preview",
+                "location_id": self.location.id,
+                "file": self.build_excel_upload(workbook, name="stock.xlsx"),
+            },
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        preview_payload = preview_response.json()["item"]
+        self.assertEqual(preview_payload["mode"], "preview")
+        self.assertEqual(preview_payload["ready_count"], 1)
+        self.assertEqual(preview_payload["error_count"], 0)
+        self.assertEqual(preview_payload["unmatched_count"], 0)
+
+        item = preview_payload["items"][0]
+        self.assertEqual(item["article_id"], article.id)
+        self.assertEqual(Decimal(item["current_stock"]), Decimal("10"))
+        self.assertEqual(Decimal(item["excel_stock"]), Decimal("5"))
+        self.assertEqual(Decimal(item["delta"]), Decimal("-5"))
+
+        confirm_response = self.client.post(
+            "/api/balances/import-excel/",
+            data={
+                "mode": "confirm",
+                "location_id": self.location.id,
+                "file": self.build_excel_upload(workbook, name="stock.xlsx"),
+            },
+        )
+
+        self.assertEqual(confirm_response.status_code, 201)
+        confirm_payload = confirm_response.json()["item"]
+        self.assertEqual(confirm_payload["mode"], "confirm")
+        self.assertEqual(confirm_payload["updated_count"], 1)
+
+        balance = InventoryBalance.objects.get(article=article, location=self.location, batch__isnull=True)
+        self.assertEqual(balance.on_hand, Decimal("5"))
+
+    def test_stock_excel_import_can_zero_missing_items(self):
+        """Maneja test stock excel import can zero missing items."""
+        self.client.force_login(self.storekeeper)
+        InventoryBalance.objects.filter(location=self.location).delete()
+
+        unit = UnitOfMeasure.objects.first()
+        sector = Sector.objects.first()
+        first = Article.objects.create(
+            internal_code="TEST-STOCK-010",
+            name="Articulo importado",
+            article_type=Article.ArticleType.PPE,
+            unit_of_measure=unit,
+            sector_responsible=sector,
+            tracking_mode=Article.TrackingMode.QUANTITY,
+        )
+        second = Article.objects.create(
+            internal_code="TEST-STOCK-011",
+            name="Articulo faltante",
+            article_type=Article.ArticleType.PPE,
+            unit_of_measure=unit,
+            sector_responsible=sector,
+            tracking_mode=Article.TrackingMode.QUANTITY,
+        )
+        InventoryBalance.objects.create(article=first, location=self.location, on_hand=Decimal("1"))
+        InventoryBalance.objects.create(article=second, location=self.location, on_hand=Decimal("3"))
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "MAYO 26"
+        sheet.append(["DETALLE", "STK ACTUAL"])
+        sheet.append(["Articulo importado", 2])
+
+        confirm_response = self.client.post(
+            "/api/balances/import-excel/",
+            data={
+                "mode": "confirm",
+                "missing_policy": "zero",
+                "location_id": self.location.id,
+                "file": self.build_excel_upload(workbook, name="stock.xlsx"),
+            },
+        )
+
+        self.assertEqual(confirm_response.status_code, 201)
+        payload = confirm_response.json()["item"]
+        self.assertEqual(payload["mode"], "confirm")
+        self.assertEqual(payload["updated_count"], 1)
+        self.assertEqual(payload["zeroed_count"], 1)
+
+        self.assertEqual(
+            InventoryBalance.objects.get(article=first, location=self.location, batch__isnull=True).on_hand,
+            Decimal("2"),
+        )
+        self.assertEqual(
+            InventoryBalance.objects.get(article=second, location=self.location, batch__isnull=True).on_hand,
+            Decimal("0"),
+        )
+
+    def test_stock_excel_import_blocks_confirm_when_missing_policy_review(self):
+        """Maneja test stock excel import blocks confirm when missing policy review."""
+        self.client.force_login(self.storekeeper)
+
+        unit = UnitOfMeasure.objects.first()
+        sector = Sector.objects.first()
+        first = Article.objects.create(
+            internal_code="TEST-STOCK-020",
+            name="Articulo importado review",
+            article_type=Article.ArticleType.PPE,
+            unit_of_measure=unit,
+            sector_responsible=sector,
+            tracking_mode=Article.TrackingMode.QUANTITY,
+        )
+        second = Article.objects.create(
+            internal_code="TEST-STOCK-021",
+            name="Articulo faltante review",
+            article_type=Article.ArticleType.PPE,
+            unit_of_measure=unit,
+            sector_responsible=sector,
+            tracking_mode=Article.TrackingMode.QUANTITY,
+        )
+        InventoryBalance.objects.create(article=first, location=self.location, on_hand=Decimal("1"))
+        InventoryBalance.objects.create(article=second, location=self.location, on_hand=Decimal("3"))
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "MAYO 26"
+        sheet.append(["DETALLE", "STK ACTUAL"])
+        sheet.append(["Articulo importado review", 2])
+
+        response = self.client.post(
+            "/api/balances/import-excel/",
+            data={
+                "mode": "confirm",
+                "missing_policy": "review",
+                "location_id": self.location.id,
+                "file": self.build_excel_upload(workbook, name="stock.xlsx"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("missing_policy", response.json()["detail"])
+
     def test_excel_import_accepts_simple_inventory_list(self):
         """Maneja test excel import accepts simple inventory list."""
         self.client.force_login(self.storekeeper)
