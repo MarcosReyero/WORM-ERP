@@ -2012,7 +2012,7 @@ def evaluate_safety_stock_alert(article):
         with transaction.atomic():
             # SELECT FOR UPDATE garantiza exclusividad en la transacción
             alert = (
-                SafetyStockAlertRule.objects.select_for_update()
+                SafetyStockAlertRule.objects.select_for_update(of=("self",))
                 .select_related(
                     "article__sector_responsible",
                     "article__primary_location",
