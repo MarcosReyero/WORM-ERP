@@ -51,6 +51,7 @@ services:
 
       STATIC_ROOT: /var/www/static
       MEDIA_ROOT: /var/www/media
+      RUN_SETUP: "true"
 
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-inventory@erp.local}

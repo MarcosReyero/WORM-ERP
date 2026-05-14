@@ -15,8 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN chmod +x /app/entrypoint.sh
 USER appuser
 
 EXPOSE 8000
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]
