@@ -4513,10 +4513,28 @@ def _parse_stock_import_entries(workbook, sheet_name):
     worksheet = workbook[sheet_name]
     entries = []
 
-    for row_number, (raw_name, raw_stock) in enumerate(
-        worksheet.iter_rows(min_row=2, min_col=1, max_col=2, values_only=True),
-        start=2,
-    ):
+    # Detectar formato del export del sistema (encabezados conocidos en fila 1).
+    header_row = [
+        normalize_excel_header(worksheet.cell(row=1, column=c).value)
+        for c in range(1, EXCEL_IMPORT_MAX_COLUMNS + 1)
+    ]
+    _EXPORT_NAME_HEADERS = {"articulo", "nombre", "descripcion", "producto", "detalle"}
+    _EXPORT_STOCK_HEADERS = {"stock_actual", "stk_actual", "stock", "cantidad", "existencias"}
+
+    try:
+        name_col = next(i + 1 for i, h in enumerate(header_row) if h in _EXPORT_NAME_HEADERS)
+        stock_col = next(i + 1 for i, h in enumerate(header_row) if h in _EXPORT_STOCK_HEADERS)
+        data_start_row = 2
+    except StopIteration:
+        # Formato simple: col A = nombre, col B = stock, sin encabezado.
+        name_col = 1
+        stock_col = 2
+        data_start_row = 2
+
+    for row_number in range(data_start_row, worksheet.max_row + 1):
+        raw_name = worksheet.cell(row=row_number, column=name_col).value
+        raw_stock = worksheet.cell(row=row_number, column=stock_col).value
+
         name = clean_string(raw_name)
         if not name:
             continue
@@ -4552,7 +4570,7 @@ def _parse_stock_import_entries(workbook, sheet_name):
 
     if not entries:
         raise InventoryApiError(
-            "No se detectaron filas con stock en el Excel. Verifica que exista la columna 'DETALLE' y 'STK ACTUAL'."
+            "No se detectaron filas con stock en el Excel. Verifica que la hoja tenga columnas 'Articulo' y 'Stock actual', o dos columnas sin encabezado (nombre | cantidad)."
         )
 
     return entries
