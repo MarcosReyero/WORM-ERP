@@ -1,4 +1,4 @@
-http://{$PUBLIC_DOMAIN} {
+:80 {
   encode gzip
 
   request_body {
