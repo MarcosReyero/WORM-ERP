@@ -49,6 +49,19 @@
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
 
+/* Sidebar animation performance */
+[data-slot="sidebar-container"] {
+  will-change: width;
+}
+
+[data-slot="sidebar-container"] {
+  overflow: hidden;
+}
+
+[data-slot="sidebar-inner"] {
+  contain: layout;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -3377,12 +3390,39 @@ a {
   background: var(--workspace-table-head);
 }
 
+.module-table--stock {
+  table-layout: fixed;
+}
+
 .module-table--stock th {
   white-space: nowrap;
   word-break: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
   position: sticky;
   top: 0;
   z-index: 2;
+}
+
+/* Articulo 24%, Tipo 10%, Stock 9%, Disponible 10%, Minimo 9%, Ubicacion 13%, Proveedor 15%, Estado 10% */
+.module-table--stock th:nth-child(1) { width: 24%; }
+.module-table--stock th:nth-child(2) { width: 10%; }
+.module-table--stock th:nth-child(3) { width: 9%; }
+.module-table--stock th:nth-child(4) { width: 10%; }
+.module-table--stock th:nth-child(5) { width: 9%; }
+.module-table--stock th:nth-child(6) { width: 13%; }
+.module-table--stock th:nth-child(7) { width: 15%; }
+.module-table--stock th:nth-child(8) { width: 10%; }
+
+.module-table--stock td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-table--stock td:first-child,
+.module-table--stock td:nth-child(7) {
+  white-space: normal;
 }
 
 .th-sortable {
