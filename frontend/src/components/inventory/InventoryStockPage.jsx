@@ -61,6 +61,7 @@ export function InventoryStockPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [alertFilter, setAlertFilter] = useState('all')
+  const [stockSortConfig, setStockSortConfig] = useState({ field: null, direction: 'asc' })
   const [utilityMode, setUtilityMode] = useState('table')
   const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, articleId: null })
   const [busyAction, setBusyAction] = useState('')
@@ -227,7 +228,36 @@ export function InventoryStockPage() {
     .filter((article) => (typeFilter === 'all' ? true : article.article_type === typeFilter))
     .filter((article) => (statusFilter === 'all' ? true : article.status === statusFilter))
     .filter((article) => matchesAlert(article, alertFilter))
-    .sort(sortArticlesForOverview)
+    .sort((a, b) => {
+      if (!stockSortConfig.field) return sortArticlesForOverview(a, b)
+      const dir = stockSortConfig.direction === 'asc' ? 1 : -1
+      switch (stockSortConfig.field) {
+        case 'name': return a.name.localeCompare(b.name, 'es') * dir
+        case 'type': return (a.article_type_label || '').localeCompare(b.article_type_label || '', 'es') * dir
+        case 'stock': return (a.current_stock - b.current_stock) * dir
+        case 'available': return (a.available_stock - b.available_stock) * dir
+        case 'minimum': return (a.minimum_stock - b.minimum_stock) * dir
+        case 'location': return (a.primary_location || '').localeCompare(b.primary_location || '', 'es') * dir
+        case 'supplier': return (a.supplier || '').localeCompare(b.supplier || '', 'es') * dir
+        case 'status': return getArticleStockLabel(a).localeCompare(getArticleStockLabel(b), 'es') * dir
+        default: return sortArticlesForOverview(a, b)
+      }
+    })
+  function handleStockSort(field) {
+    setStockSortConfig((current) =>
+      current.field === field
+        ? { field, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { field, direction: 'asc' },
+    )
+  }
+
+  function StockSortIcon({ field }) {
+    if (stockSortConfig.field !== field) return <span className="sort-icon sort-icon--idle">↕</span>
+    return stockSortConfig.direction === 'asc'
+      ? <span className="sort-icon sort-icon--active">↑</span>
+      : <span className="sort-icon sort-icon--active">↓</span>
+  }
+
   const hasActiveFilters = typeFilter !== 'all' || statusFilter !== 'all' || alertFilter !== 'all'
   const hasActiveSearch = Boolean(deferredStockQuery || deferredGlobalQuery)
   const isFilteredView = hasActiveSearch || hasActiveFilters
@@ -1294,14 +1324,14 @@ export function InventoryStockPage() {
                     <table className="module-table module-table--stock">
                       <thead>
                         <tr>
-                          <th>Articulo</th>
-                          <th>Tipo</th>
-                          <th>Stock</th>
-                          <th>Disponible</th>
-                          <th>Minimo</th>
-                          <th>Ubicacion</th>
-                          <th>Proveedor</th>
-                          <th>Estado</th>
+                          <th className="th-sortable" onClick={() => handleStockSort('name')}>Articulo <StockSortIcon field="name" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('type')}>Tipo <StockSortIcon field="type" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('stock')}>Stock <StockSortIcon field="stock" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('available')}>Disponible <StockSortIcon field="available" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('minimum')}>Minimo <StockSortIcon field="minimum" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('location')}>Ubicacion <StockSortIcon field="location" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('supplier')}>Proveedor <StockSortIcon field="supplier" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('status')}>Estado <StockSortIcon field="status" /></th>
                         </tr>
                       </thead>
                       <tbody>

@@ -3385,6 +3385,33 @@ a {
   z-index: 2;
 }
 
+.th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.th-sortable:hover {
+  color: var(--workspace-text);
+}
+
+.sort-icon {
+  display: inline-block;
+  margin-left: 4px;
+  font-style: normal;
+  font-size: 0.72rem;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.sort-icon--idle {
+  opacity: 0.35;
+}
+
+.sort-icon--active {
+  opacity: 1;
+  color: var(--workspace-link-hover, var(--workspace-text));
+}
+
 .module-table td {
   color: var(--workspace-text);
   vertical-align: top;
