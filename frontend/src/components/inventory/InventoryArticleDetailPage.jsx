@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
 import { fetchArticleDetail, updateArticle } from '../../lib/api.js'
 import {
@@ -6,7 +6,6 @@ import {
   ModulePageHeader,
   ModuleSurface,
   ModuleTableSection,
-  PanelMessage,
 } from '../modules/ModuleWorkspace.jsx'
 import {
   formatDateTime,
@@ -52,43 +51,36 @@ function buildArticleForm(article) {
 
 function buildFormData(form, imageFile, clearImage) {
   const payload = new FormData()
-
   Object.entries(form).forEach(([key, value]) => {
     if (typeof value === 'boolean') {
       payload.append(key, value ? 'true' : 'false')
       return
     }
-
     payload.append(key, value === null || value === undefined ? '' : String(value))
   })
-
-  if (imageFile) {
-    payload.append('image', imageFile)
-  }
-
-  if (clearImage) {
-    payload.append('clear_image', 'true')
-  }
-
+  if (imageFile) payload.append('image', imageFile)
+  if (clearImage) payload.append('clear_image', 'true')
   return payload
 }
 
 export function InventoryArticleDetailPage() {
   const { articleId } = useParams()
-  const { inventoryOverview, refreshInventoryModule, user } = useOutletContext()
-  const [detailState, setDetailState] = useState({
-    loading: true,
-    error: '',
-    data: null,
-  })
-  const [showEditForm, setShowEditForm] = useState(false)
-  const [showBalances, setShowBalances] = useState(false)
-  const [showMovements, setShowMovements] = useState(false)
-  const [busyAction, setBusyAction] = useState('')
+  const { inventoryOverview, refreshInventoryModule } = useOutletContext()
+  const [detailState, setDetailState] = useState({ loading: true, error: '', data: null })
   const [form, setForm] = useState(null)
-  const [feedback, setFeedback] = useState({ error: '', success: '' })
+  const [saveStatus, setSaveStatus] = useState('') // '' | 'saving' | 'saved' | 'error'
+  const [saveError, setSaveError] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [clearImage, setClearImage] = useState(false)
+  const [showBalances, setShowBalances] = useState(false)
+  const [showMovements, setShowMovements] = useState(false)
+  const fileInputRef = useRef(null)
+  const saveTimerRef = useRef(null)
+  const formRef = useRef(form)
+
+  useEffect(() => {
+    formRef.current = form
+  }, [form])
 
   const catalogs = inventoryOverview?.catalogs || {
     article_types: [],
@@ -102,46 +94,22 @@ export function InventoryArticleDetailPage() {
 
   useEffect(() => {
     let active = true
-
     async function loadDetail() {
-      setDetailState((current) => ({
-        ...current,
-        loading: true,
-        error: '',
-      }))
-
+      setDetailState((current) => ({ ...current, loading: true, error: '' }))
       try {
         const data = await fetchArticleDetail(articleId)
-        if (!active) {
-          return
-        }
-
-        setDetailState({
-          loading: false,
-          error: '',
-          data,
-        })
+        if (!active) return
+        setDetailState({ loading: false, error: '', data })
         setForm(buildArticleForm(data.article))
         setImageFile(null)
         setClearImage(false)
       } catch (error) {
-        if (!active) {
-          return
-        }
-
-        setDetailState({
-          loading: false,
-          error: error.message || 'No se pudo cargar la ficha del articulo.',
-          data: null,
-        })
+        if (!active) return
+        setDetailState({ loading: false, error: error.message || 'No se pudo cargar la ficha del articulo.', data: null })
       }
     }
-
     void loadDetail()
-
-    return () => {
-      active = false
-    }
+    return () => { active = false }
   }, [articleId])
 
   const rootCategories = useMemo(
@@ -149,77 +117,103 @@ export function InventoryArticleDetailPage() {
     [catalogs.categories],
   )
   const subcategoryOptions = useMemo(() => {
-    if (!form?.category_id) {
-      return catalogs.categories.filter((item) => item.parent_id)
-    }
-
-    return catalogs.categories.filter(
-      (item) => String(item.parent_id) === String(form.category_id),
-    )
+    if (!form?.category_id) return catalogs.categories.filter((item) => item.parent_id)
+    return catalogs.categories.filter((item) => String(item.parent_id) === String(form.category_id))
   }, [catalogs.categories, form?.category_id])
+
   const imagePreviewUrl = useMemo(() => {
-    if (imageFile) {
-      return URL.createObjectURL(imageFile)
-    }
-
-    if (clearImage) {
-      return ''
-    }
-
+    if (imageFile) return URL.createObjectURL(imageFile)
+    if (clearImage) return ''
     return detailState.data?.article?.image_url || ''
   }, [clearImage, detailState.data?.article?.image_url, imageFile])
 
   useEffect(() => {
-    if (!imagePreviewUrl.startsWith('blob:')) {
-      return undefined
-    }
-
-    return () => {
-      URL.revokeObjectURL(imagePreviewUrl)
-    }
+    if (!imagePreviewUrl.startsWith('blob:')) return undefined
+    return () => URL.revokeObjectURL(imagePreviewUrl)
   }, [imagePreviewUrl])
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    if (!form) {
-      return
-    }
+  const canEdit = Boolean(inventoryOverview?.permissions?.can_manage_master)
 
-    setBusyAction('save')
-    setFeedback({ error: '', success: '' })
-
+  async function saveForm(updatedForm, { file = null, clear = false } = {}) {
+    if (!canEdit) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    setSaveStatus('saving')
+    setSaveError('')
     try {
-      const payload = { ...form }
+      const payload = { ...updatedForm }
       if (!shouldRequireMinimumStock(payload.article_type, payload.is_critical)) {
         payload.minimum_stock = ''
       }
-
-      const response = await updateArticle(articleId, buildFormData(payload, imageFile, clearImage))
+      const response = await updateArticle(articleId, buildFormData(payload, file, clear))
       const nextDetail = response.item || (await fetchArticleDetail(articleId))
-
-      setDetailState({
-        loading: false,
-        error: '',
-        data: nextDetail,
-      })
-      setForm(buildArticleForm(nextDetail.article))
+      setDetailState({ loading: false, error: '', data: nextDetail })
+      const nextForm = buildArticleForm(nextDetail.article)
+      setForm(nextForm)
       setImageFile(null)
       setClearImage(false)
-      setFeedback({ error: '', success: 'Ficha actualizada correctamente.' })
-      await refreshInventoryModule()
+      setSaveStatus('saved')
+      refreshInventoryModule()
+      saveTimerRef.current = setTimeout(() => setSaveStatus(''), 2500)
     } catch (error) {
-      setFeedback({ error: error.message, success: '' })
-    } finally {
-      setBusyAction('')
+      setSaveStatus('error')
+      setSaveError(error.message || 'No se pudo guardar.')
     }
+  }
+
+  function handleBlur(currentForm) {
+    saveForm(currentForm ?? formRef.current)
+  }
+
+  function handleSelectChange(field, value) {
+    const next = { ...formRef.current, [field]: value }
+    setForm(next)
+    saveForm(next)
+  }
+
+  function handleArticleTypeChange(value) {
+    const nextTracking = pickDefaultTracking(value)
+    const next = {
+      ...formRef.current,
+      article_type: value,
+      tracking_mode: nextTracking,
+      loanable: value === 'tool' ? true : nextTracking === 'unit' ? formRef.current.loanable : false,
+    }
+    setForm(next)
+    saveForm(next)
+  }
+
+  function handleTrackingChange(value) {
+    const next = { ...formRef.current, tracking_mode: value, loanable: value === 'unit' ? formRef.current.loanable : false }
+    setForm(next)
+    saveForm(next)
+  }
+
+  function handleCheckboxChange(field, checked, extra = {}) {
+    const next = { ...formRef.current, [field]: checked, ...extra }
+    setForm(next)
+    saveForm(next)
+  }
+
+  function handleImageChange(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setImageFile(file)
+    setClearImage(false)
+    saveForm(formRef.current, { file, clear: false })
+    event.target.value = ''
+  }
+
+  function handleClearImage(event) {
+    event.stopPropagation()
+    setImageFile(null)
+    setClearImage(true)
+    saveForm(formRef.current, { file: null, clear: true })
   }
 
   if (detailState.loading && !detailState.data) {
     return (
       <div className="module-page-stack stock-titled-page">
-        <ModuleEmptyState
-          title="Cargando ficha"
-        />
+        <ModuleEmptyState title="Cargando ficha" />
       </div>
     )
   }
@@ -227,17 +221,13 @@ export function InventoryArticleDetailPage() {
   if (detailState.error || !detailState.data || !form) {
     return (
       <div className="module-page-stack stock-titled-page">
-        <PanelMessage error={detailState.error || 'No se encontro el articulo.'} success="" />
-        <Link className="ghost-link" to="/inventario/stock">
-          Volver a stock
-        </Link>
+        <p className="module-empty-copy">{detailState.error || 'No se encontro el articulo.'}</p>
+        <Link className="ghost-link" to="/inventario/stock">Volver a stock</Link>
       </div>
     )
   }
 
   const { article, balances, movements, tracked_units: trackedUnits } = detailState.data
-
-  const canEdit = inventoryOverview.permissions.can_manage_master
 
   return (
     <div className="module-page-stack stock-titled-page">
@@ -248,9 +238,10 @@ export function InventoryArticleDetailPage() {
             <span className={`status-pill ${getArticleStockTone(article)}`}>
               {getArticleStockLabel(article)}
             </span>
-            <Link className="ghost-link" to="/inventario/stock">
-              Volver a stock
-            </Link>
+            {saveStatus === 'saving' && <span className="save-indicator">Guardando...</span>}
+            {saveStatus === 'saved' && <span className="save-indicator is-saved">Guardado</span>}
+            {saveStatus === 'error' && <span className="save-indicator is-error">Error al guardar</span>}
+            <Link className="ghost-link" to="/inventario/stock">Volver a stock</Link>
           </>
         }
         eyebrow="Inventario / Stock"
@@ -258,38 +249,75 @@ export function InventoryArticleDetailPage() {
       />
 
       <div className="module-main-stack">
-        <ModuleSurface
-          actions={
-            canEdit ? (
-              <button
-                className="inline-action"
-                onClick={() => setShowEditForm((current) => !current)}
-                type="button"
-              >
-                {showEditForm ? 'Cerrar edicion' : 'Editar'}
-              </button>
-            ) : null
-          }
-          title="Ficha del producto"
-        >
+        <ModuleSurface>
+          {saveStatus === 'error' && saveError && (
+            <div className="inline-save-error">{saveError}</div>
+          )}
+
           <div className="record-summary">
-            <div className="record-media">
+            {/* Imagen con overlay */}
+            <div className="record-media record-media--editable">
               {imagePreviewUrl ? (
                 <img alt={article.name} src={imagePreviewUrl} />
               ) : (
                 <div className="record-media-placeholder">Sin imagen</div>
               )}
+              {canEdit && (
+                <div className="record-media-overlay">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    type="button"
+                  >
+                    Cambiar imagen
+                  </button>
+                  <button onClick={handleClearImage} type="button">
+                    Eliminar imagen
+                  </button>
+                </div>
+              )}
+              <input
+                accept=".jpg,.jpeg,.png,.webp,.gif"
+                onChange={handleImageChange}
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                type="file"
+              />
             </div>
 
             <div className="record-summary-copy">
-              <div className="record-summary-head">
-                <div>
-                  <strong>{article.name}</strong>
-                  <p>{article.description || 'Sin descripcion operativa cargada.'}</p>
-                </div>
-                <span className="module-chip is-muted">{article.article_type_label}</span>
+              {/* Nombre + tipo */}
+              <div className="record-inline-header">
+                <input
+                  className="ghost-field ghost-field--name"
+                  disabled={!canEdit}
+                  onBlur={(e) => handleBlur({ ...formRef.current, name: e.target.value })}
+                  onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
+                  value={form.name}
+                />
+                <select
+                  className="ghost-chip-select"
+                  disabled={!canEdit}
+                  onChange={(e) => handleArticleTypeChange(e.target.value)}
+                  value={form.article_type}
+                >
+                  {catalogs.article_types.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
               </div>
 
+              {/* Descripcion */}
+              <textarea
+                className="ghost-field ghost-field--description"
+                disabled={!canEdit}
+                onBlur={(e) => handleBlur({ ...formRef.current, description: e.target.value })}
+                onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))}
+                placeholder="Sin descripcion operativa cargada."
+                rows={2}
+                value={form.description}
+              />
+
+              {/* Tarjetas de stock */}
               <div className="record-meta-grid">
                 <article className="record-meta-card">
                   <span>Stock actual</span>
@@ -299,462 +327,233 @@ export function InventoryArticleDetailPage() {
                   <span>Disponible</span>
                   <strong>{formatQuantity(article.available_stock)}</strong>
                 </article>
-                <article className="record-meta-card">
+                <article className="record-meta-card record-meta-card--editable">
                   <span>Minimo</span>
-                  <strong>{formatQuantity(article.minimum_stock)}</strong>
+                  <input
+                    className="ghost-field ghost-field--meta-number"
+                    disabled={!canEdit}
+                    onBlur={(e) => handleBlur({ ...formRef.current, minimum_stock: e.target.value })}
+                    onChange={(e) => setForm((c) => ({ ...c, minimum_stock: e.target.value }))}
+                    placeholder="—"
+                    step="0.001"
+                    type="number"
+                    value={form.minimum_stock}
+                  />
                 </article>
-                <article className="record-meta-card">
+                <article className="record-meta-card record-meta-card--editable">
                   <span>Ubicacion base</span>
-                  <strong>{article.primary_location || '-'}</strong>
+                  <select
+                    className="ghost-field ghost-field--meta-select"
+                    disabled={!canEdit}
+                    onChange={(e) => handleSelectChange('primary_location_id', e.target.value)}
+                    value={form.primary_location_id}
+                  >
+                    <option value="">Sin definir</option>
+                    {catalogs.locations.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
                 </article>
               </div>
 
+              {/* Grilla de atributos */}
               <div className="record-detail-grid">
                 <div className="record-detail-item">
                   <span>Sector responsable</span>
-                  <strong>{article.sector_responsible}</strong>
+                  <select
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onChange={(e) => handleSelectChange('sector_responsible_id', e.target.value)}
+                    value={form.sector_responsible_id}
+                  >
+                    <option value="">Sin asignar</option>
+                    {catalogs.sectors.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="record-detail-item">
-                  <span>Unidad</span>
-                  <strong>{article.unit_of_measure.name}</strong>
+                  <span>Unidad de medida</span>
+                  <select
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onChange={(e) => handleSelectChange('unit_of_measure_id', e.target.value)}
+                    value={form.unit_of_measure_id}
+                  >
+                    <option value="">Sin asignar</option>
+                    {catalogs.units.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="record-detail-item">
                   <span>Categoria</span>
-                  <strong>{article.category || '-'}</strong>
+                  <select
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onChange={(e) =>
+                      handleSelectChange('category_id', e.target.value) ||
+                      setForm((c) => ({ ...c, subcategory_id: String(c.category_id) === String(e.target.value) ? c.subcategory_id : '' }))
+                    }
+                    value={form.category_id}
+                  >
+                    <option value="">Sin categoria</option>
+                    {rootCategories.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="record-detail-item">
                   <span>Subcategoria</span>
-                  <strong>{article.subcategory || '-'}</strong>
+                  <select
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onChange={(e) => handleSelectChange('subcategory_id', e.target.value)}
+                    value={form.subcategory_id}
+                  >
+                    <option value="">Sin subcategoria</option>
+                    {subcategoryOptions.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="record-detail-item">
                   <span>Proveedor habitual</span>
-                  <strong>{article.supplier || '-'}</strong>
-                  <small>
-                    {article.availability_days !== null && article.availability_days !== undefined
-                      ? `Disponibilidad estimada: ${article.availability_days} días`
-                      : 'Disponibilidad estimada: sin dato'}
-                  </small>
+                  <select
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onChange={(e) => handleSelectChange('supplier_id', e.target.value)}
+                    value={form.supplier_id}
+                  >
+                    <option value="">Sin proveedor</option>
+                    {catalogs.suppliers.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="record-detail-item">
                   <span>Tracking</span>
-                  <strong>{article.tracking_mode_label}</strong>
+                  <select
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onChange={(e) => handleTrackingChange(e.target.value)}
+                    value={form.tracking_mode}
+                  >
+                    {catalogs.tracking_modes.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="record-detail-item">
+                  <span>Estado</span>
+                  <select
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onChange={(e) => handleSelectChange('status', e.target.value)}
+                    value={form.status}
+                  >
+                    {ARTICLE_STATUS_OPTIONS.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="record-detail-item">
+                  <span>Precio referencia</span>
+                  <input
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onBlur={(e) => handleBlur({ ...formRef.current, reference_price: e.target.value })}
+                    onChange={(e) => setForm((c) => ({ ...c, reference_price: e.target.value }))}
+                    placeholder="—"
+                    step="0.01"
+                    type="number"
+                    value={form.reference_price}
+                  />
+                </div>
+                <div className="record-detail-item record-detail-item--full">
+                  <span>Observaciones</span>
+                  <textarea
+                    className="ghost-field ghost-field--detail"
+                    disabled={!canEdit}
+                    onBlur={(e) => handleBlur({ ...formRef.current, observations: e.target.value })}
+                    onChange={(e) => setForm((c) => ({ ...c, observations: e.target.value }))}
+                    placeholder="—"
+                    rows={2}
+                    value={form.observations}
+                  />
                 </div>
               </div>
 
-              <div className="checkbox-row">
-                <label>
-                  <input checked={article.is_critical} readOnly type="checkbox" />
-                  Critico
-                </label>
-                <label>
-                  <input checked={article.loanable} readOnly type="checkbox" />
-                  Prestable
-                </label>
-                <label>
-                  <input checked={article.requires_lot} readOnly type="checkbox" />
-                  Lote
-                </label>
-                <label>
-                  <input checked={article.requires_expiry} readOnly type="checkbox" />
-                  Vencimiento
-                </label>
-                <label>
-                  <input checked={article.requires_assignee} readOnly type="checkbox" />
-                  Asignacion
-                </label>
+              {/* Flags */}
+              <div className="record-flags">
+                {[
+                  {
+                    field: 'is_critical',
+                    label: 'Critico',
+                    onChange: (v) => handleCheckboxChange('is_critical', v),
+                  },
+                  {
+                    field: 'loanable',
+                    label: 'Prestable',
+                    onChange: (v) => handleCheckboxChange('loanable', v),
+                  },
+                  {
+                    field: 'requires_lot',
+                    label: 'Lote',
+                    onChange: (v) =>
+                      handleCheckboxChange('requires_lot', v, {
+                        requires_expiry: v ? form.requires_expiry : false,
+                      }),
+                  },
+                  {
+                    field: 'requires_expiry',
+                    label: 'Vencimiento',
+                    onChange: (v) =>
+                      handleCheckboxChange('requires_expiry', v, {
+                        requires_lot: v ? true : form.requires_lot,
+                      }),
+                  },
+                  {
+                    field: 'requires_serial',
+                    label: 'Serie',
+                    onChange: (v) => handleCheckboxChange('requires_serial', v),
+                  },
+                  {
+                    field: 'requires_size',
+                    label: 'Talle',
+                    onChange: (v) => handleCheckboxChange('requires_size', v),
+                  },
+                  {
+                    field: 'requires_quality',
+                    label: 'Calidad',
+                    onChange: (v) => handleCheckboxChange('requires_quality', v),
+                  },
+                  {
+                    field: 'requires_assignee',
+                    label: 'Asignacion',
+                    onChange: (v) => handleCheckboxChange('requires_assignee', v),
+                  },
+                ].map(({ field, label, onChange }) => (
+                  <button
+                    className={`record-flag-chip ${form[field] ? 'is-active' : ''}`}
+                    disabled={!canEdit}
+                    key={field}
+                    onClick={() => onChange(!form[field])}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
-
-          {showEditForm ? (
-            <div className="record-edit-section">
-              <div className="record-edit-divider" />
-              <form className="ops-form article-detail-form" onSubmit={handleSubmit}>
-                <div className="field-grid">
-                  <label className="field-span-2">
-                    Codigo interno
-                    <input disabled value={article.internal_code} />
-                  </label>
-                  <label className="field-span-2">
-                    Nombre
-                    <input
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, name: event.target.value }))
-                      }
-                      value={form.name}
-                    />
-                  </label>
-                  <label className="field-span-2">
-                    Descripcion
-                    <textarea
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, description: event.target.value }))
-                      }
-                      rows="2"
-                      value={form.description}
-                    />
-                  </label>
-                  <div className="field-span-2 article-photo-field">
-                    <span>Imagen del producto</span>
-                    <div className="article-photo-input">
-                      <div className="article-photo-preview">
-                        {imagePreviewUrl ? (
-                          <img alt={article.name} src={imagePreviewUrl} />
-                        ) : (
-                          <div className="record-media-placeholder">Sin imagen</div>
-                        )}
-                      </div>
-                      <div className="article-photo-controls">
-                        <input
-                          accept=".jpg,.jpeg,.png,.webp,.gif"
-                          className="article-photo-file-input"
-                          onChange={(event) => {
-                            setImageFile(event.target.files?.[0] || null)
-                            if (event.target.files?.[0]) {
-                              setClearImage(false)
-                            }
-                          }}
-                          type="file"
-                        />
-                        <p className="module-empty-copy">
-                          JPG, PNG, WEBP o GIF. La imagen se recorta automaticamente al cuadro.
-                        </p>
-                        <label className="article-photo-clear">
-                          <input
-                            checked={clearImage}
-                            onChange={(event) => setClearImage(event.target.checked)}
-                            type="checkbox"
-                          />
-                          Quitar imagen actual
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                  <label>
-                    Tipo
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => {
-                          const nextTracking = pickDefaultTracking(event.target.value)
-                          return {
-                            ...current,
-                            article_type: event.target.value,
-                            tracking_mode: nextTracking,
-                            loanable:
-                              event.target.value === 'tool'
-                                ? true
-                                : nextTracking === 'unit'
-                                  ? current.loanable
-                                  : false,
-                          }
-                        })
-                      }
-                      value={form.article_type}
-                    >
-                      {catalogs.article_types.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Tracking
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          tracking_mode: event.target.value,
-                          loanable: event.target.value === 'unit' ? current.loanable : false,
-                        }))
-                      }
-                      value={form.tracking_mode}
-                    >
-                      {catalogs.tracking_modes.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Estado
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, status: event.target.value }))
-                      }
-                      value={form.status}
-                    >
-                      {ARTICLE_STATUS_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Unidad
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, unit_of_measure_id: event.target.value }))
-                      }
-                      value={form.unit_of_measure_id}
-                    >
-                      <option value="">Seleccionar</option>
-                      {catalogs.units.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Sector responsable
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          sector_responsible_id: event.target.value,
-                        }))
-                      }
-                      value={form.sector_responsible_id}
-                    >
-                      <option value="">Seleccionar</option>
-                      {catalogs.sectors.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Ubicacion base
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          primary_location_id: event.target.value,
-                        }))
-                      }
-                      value={form.primary_location_id}
-                    >
-                      <option value="">Sin definir</option>
-                      {catalogs.locations.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Categoria
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          category_id: event.target.value,
-                          subcategory_id:
-                            String(current.category_id) === String(event.target.value)
-                              ? current.subcategory_id
-                              : '',
-                        }))
-                      }
-                      value={form.category_id}
-                    >
-                      <option value="">Sin categoria</option>
-                      {rootCategories.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Subcategoria
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, subcategory_id: event.target.value }))
-                      }
-                      value={form.subcategory_id}
-                    >
-                      <option value="">Sin subcategoria</option>
-                      {subcategoryOptions.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Proveedor
-                    <select
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, supplier_id: event.target.value }))
-                      }
-                      value={form.supplier_id}
-                    >
-                      <option value="">Sin proveedor</option>
-                      {catalogs.suppliers.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Stock minimo
-                    <input
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, minimum_stock: event.target.value }))
-                      }
-                      placeholder={
-                        shouldRequireMinimumStock(form.article_type, form.is_critical)
-                          ? 'Obligatorio'
-                          : 'Opcional'
-                      }
-                      step="0.001"
-                      type="number"
-                      value={form.minimum_stock}
-                    />
-                  </label>
-                  <label>
-                    Precio referencia
-                    <input
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, reference_price: event.target.value }))
-                      }
-                      step="0.01"
-                      type="number"
-                      value={form.reference_price}
-                    />
-                  </label>
-                  <label className="field-span-2">
-                    Observaciones
-                    <textarea
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, observations: event.target.value }))
-                      }
-                      rows="2"
-                      value={form.observations}
-                    />
-                  </label>
-                </div>
-
-                <div className="checkbox-row">
-                  <label>
-                    <input
-                      checked={form.is_critical}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, is_critical: event.target.checked }))
-                      }
-                      type="checkbox"
-                    />
-                    Critico
-                  </label>
-                  <label>
-                    <input
-                      checked={form.loanable}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, loanable: event.target.checked }))
-                      }
-                      type="checkbox"
-                    />
-                    Prestable
-                  </label>
-                  <label>
-                    <input
-                      checked={form.requires_lot}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          requires_lot: event.target.checked,
-                          requires_expiry: event.target.checked ? current.requires_expiry : false,
-                        }))
-                      }
-                      type="checkbox"
-                    />
-                    Lote
-                  </label>
-                  <label>
-                    <input
-                      checked={form.requires_expiry}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          requires_expiry: event.target.checked,
-                          requires_lot: event.target.checked ? true : current.requires_lot,
-                        }))
-                      }
-                      type="checkbox"
-                    />
-                    Vencimiento
-                  </label>
-                  <label>
-                    <input
-                      checked={form.requires_serial}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, requires_serial: event.target.checked }))
-                      }
-                      type="checkbox"
-                    />
-                    Serie
-                  </label>
-                  <label>
-                    <input
-                      checked={form.requires_size}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, requires_size: event.target.checked }))
-                      }
-                      type="checkbox"
-                    />
-                    Talle
-                  </label>
-                  <label>
-                    <input
-                      checked={form.requires_quality}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, requires_quality: event.target.checked }))
-                      }
-                      type="checkbox"
-                    />
-                    Calidad
-                  </label>
-                  <label>
-                    <input
-                      checked={form.requires_assignee}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          requires_assignee: event.target.checked,
-                        }))
-                      }
-                      type="checkbox"
-                    />
-                    Asignacion
-                  </label>
-                </div>
-
-                <PanelMessage error={feedback.error} success={feedback.success} />
-
-                <button
-                  className="primary-button"
-                  disabled={busyAction === 'save' || !canEdit}
-                  type="submit"
-                >
-                  {busyAction === 'save' ? 'Guardando...' : 'Guardar cambios'}
-                </button>
-
-                <p className="module-empty-copy">Ultima actualizacion por {user.full_name} desde el modulo.</p>
-              </form>
-            </div>
-          ) : null}
         </ModuleSurface>
 
         <ModuleTableSection
           actions={
             <button
               className="inline-action"
-              onClick={() => setShowBalances((current) => !current)}
+              onClick={() => setShowBalances((c) => !c)}
               type="button"
             >
               {showBalances ? 'Ocultar' : 'Ver'}
@@ -807,7 +606,7 @@ export function InventoryArticleDetailPage() {
           actions={
             <button
               className="inline-action"
-              onClick={() => setShowMovements((current) => !current)}
+              onClick={() => setShowMovements((c) => !c)}
               type="button"
             >
               {showMovements ? 'Ocultar' : 'Ver'}
@@ -876,9 +675,7 @@ export function InventoryArticleDetailPage() {
                     <tr key={unit.id}>
                       <td>{unit.internal_tag}</td>
                       <td>{unit.status_label}</td>
-                      <td>
-                        {unit.current_holder_person || unit.current_location || unit.current_sector || '-'}
-                      </td>
+                      <td>{unit.current_holder_person || unit.current_location || unit.current_sector || '-'}</td>
                       <td>{unit.serial_number || '-'}</td>
                       <td>{[unit.brand, unit.model].filter(Boolean).join(' / ') || '-'}</td>
                     </tr>
