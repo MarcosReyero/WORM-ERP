@@ -804,12 +804,12 @@ def _system_person():
     garantizar que exista una Persona disponible.
     """
     system_code = "SYSTEM-AUTO"
-    person = Person.objects.filter(employee_code=system_code).first()
+    person = Person.objects.filter(dni=system_code).first()
     if person:
         return person
     return Person.objects.create(
         full_name="Sistema",
-        employee_code=system_code,
+        dni=system_code,
         status=StatusCatalog.ACTIVE,
     )
 
@@ -1536,7 +1536,7 @@ def serialize_person(person):
     return {
         "id": person.id,
         "full_name": person.full_name,
-        "employee_code": person.employee_code,
+        "dni": person.dni,
         "sector": person.sector.name if person.sector else None,
         "status": person.status,
     }
@@ -4816,6 +4816,11 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
 
             article = Article.objects.select_for_update().get(pk=item["article_id"])
             desired_total = parse_decimal(item["next_stock"], "next_stock")
+            article_dirty = False
+
+            if not article.primary_location_id:
+                article.primary_location = location
+                article_dirty = True
 
             if article.tracking_mode == Article.TrackingMode.UNIT:
                 if (
@@ -4827,8 +4832,7 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
                     ).exists()
                 ):
                     article.tracking_mode = Article.TrackingMode.QUANTITY
-                    update_audit(article, user)
-                    save_validated(article)
+                    article_dirty = True
                     converted.append({"article_id": article.id, "name": article.name})
                 else:
                     warnings.append(
@@ -4839,6 +4843,10 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
                         }
                     )
                     continue
+
+            if article_dirty:
+                update_audit(article, user)
+                save_validated(article)
 
             batch_balances = list(
                 InventoryBalance.objects.select_for_update()

@@ -406,6 +406,15 @@ export function InventoryStockPage() {
     event.preventDefault()
     setStockImportFeedback({ error: '', success: '', summary: null })
 
+    if (!stockImportOptions.location_id) {
+      setStockImportFeedback({
+        error: 'Selecciona una ubicacion antes de continuar.',
+        success: '',
+        summary: null,
+      })
+      return
+    }
+
     if (!stockImportFile) {
       setStockImportFeedback({
         error: 'Selecciona un archivo Excel para importar.',
@@ -1050,10 +1059,27 @@ export function InventoryStockPage() {
             ) : utilityMode === 'import-stock' ? (
               <>
                 <p className="module-empty-copy">
-                  Importa el stock actual desde un Excel (primero analiza y luego confirma). Ajusta los balances de la
-                  ubicacion seleccionada.
+                  Importa el stock desde un Excel. Primero elegí la ubicacion de destino, luego el archivo. El sistema
+                  analiza los datos y te muestra un resumen antes de aplicar los cambios.
                 </p>
                 <form className="ops-form" onSubmit={handleStockImportSubmit}>
+                  <label>
+                    Ubicacion de destino
+                    <select
+                      onChange={(event) =>
+                        setStockImportOptions((current) => ({ ...current, location_id: event.target.value }))
+                      }
+                      value={stockImportOptions.location_id}
+                    >
+                      <option value="">— Seleccionar ubicacion —</option>
+                      {catalogs.locations.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
                   <label>
                     Archivo Excel
                     <input
@@ -1064,22 +1090,6 @@ export function InventoryStockPage() {
                       }}
                       type="file"
                     />
-                  </label>
-
-                  <label>
-                    Ubicacion
-                    <select
-                      onChange={(event) =>
-                        setStockImportOptions((current) => ({ ...current, location_id: event.target.value }))
-                      }
-                      value={stockImportOptions.location_id}
-                    >
-                      {catalogs.locations.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
                   </label>
 
                   <label>

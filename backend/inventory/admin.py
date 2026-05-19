@@ -48,9 +48,9 @@ class SectorAdmin(admin.ModelAdmin):
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "employee_code", "sector", "status")
+    list_display = ("full_name", "dni", "sector", "status")
     list_filter = ("status", "sector")
-    search_fields = ("full_name", "employee_code", "position")
+    search_fields = ("full_name", "dni")
 
 
 @admin.register(Supplier)
