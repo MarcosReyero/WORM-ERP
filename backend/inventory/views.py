@@ -1,6 +1,11 @@
+import logging
+
+from django.conf import settings as django_settings
 from django.http import HttpResponse, JsonResponse
 from django.db.utils import DatabaseError
 from django.views.decorators.http import require_GET, require_http_methods
+
+_logger = logging.getLogger(__name__)
 
 from accounts.permissions import has_module_permission
 from accounts.services import ensure_permission_catalog
@@ -109,15 +114,12 @@ def _handle_inventory_call(callback):
             status=500,
         )
     except Exception as exc:  # noqa: BLE001
-        return JsonResponse(
-            {
-                "detail": "Error interno del servidor.",
-                "code": "INTERNAL_ERROR",
-                "error": str(exc),
-                "error_type": exc.__class__.__name__,
-            },
-            status=500,
-        )
+        _logger.exception("Unhandled exception in inventory view: %s", exc)
+        body: dict = {"detail": "Error interno del servidor.", "code": "INTERNAL_ERROR"}
+        if django_settings.DEBUG:
+            body["error"] = str(exc)
+            body["error_type"] = exc.__class__.__name__
+        return JsonResponse(body, status=500)
 
 
 def _request_payload(request):

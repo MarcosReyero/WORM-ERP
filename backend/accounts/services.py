@@ -352,7 +352,18 @@ def update_profile_for_admin(user, profile_user_id, payload, files=None):
     if role:
         profile.role = role
     if status:
+        old_status = profile.status
         profile.status = status
+        # Invalidar sesiones activas cuando un admin desactiva al usuario
+        if status == UserProfile.Status.INACTIVE and old_status != UserProfile.Status.INACTIVE:
+            from django.contrib.sessions.models import Session
+            from django.utils import timezone as tz
+
+            active_sessions = Session.objects.filter(expire_date__gte=tz.now())
+            for session in active_sessions:
+                data = session.get_decoded()
+                if str(data.get("_auth_user_id")) == str(target_user.pk):
+                    session.delete()
     if preferred_theme in {choice for choice, _ in UserProfile.PreferredTheme.choices}:
         profile.preferred_theme = preferred_theme
 

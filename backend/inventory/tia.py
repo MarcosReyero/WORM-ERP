@@ -273,7 +273,7 @@ def _merge_runtime_config(default_config, runtime_config):
         "transport",
         "server_name",
         "server_path",
-        "command",
+        # "command" excluido: solo se toma de settings/env, nunca del runtime guardado por usuarios
         "timeout_seconds",
         "read_only",
         "tag_map_path",
@@ -314,12 +314,12 @@ def _validate_tia_config_payload(payload):
     server_path = str(payload.get("server_path") or get_tia_mcp_config()["server_path"]).strip()
     tag_map_path = str(payload.get("tag_map_path") or (Path(server_path) / "tag_map.yaml")).strip()
 
+    # "command" no se acepta del payload: se usa siempre el valor de settings/env
     return {
         "enabled": bool(payload.get("enabled")),
         "transport": "stdio",
         "server_name": str(payload.get("server_name") or "mcp-s7-server").strip(),
         "server_path": server_path,
-        "command": str(payload.get("command") or f'"{sys.executable}" server.py').strip(),
         "timeout_seconds": max(1.0, min(float(payload.get("timeout_seconds") or 4), 30.0)),
         "read_only": True,
         "tag_map_path": tag_map_path,

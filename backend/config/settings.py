@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from pathlib import Path
@@ -8,6 +9,8 @@ except ImportError:  # pragma: no cover
     dj_database_url = None
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+_logger = logging.getLogger(__name__)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -27,8 +30,16 @@ def _env_csv(name: str, default=None):
     return [value for value in values if value]
 
 
-SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "inventary-dev-secret-key"))
+_SECRET_KEY_DEFAULT = "inventary-dev-secret-key-insecure-do-not-use-in-production"
+SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", _SECRET_KEY_DEFAULT))
 DEBUG = _env_bool("DEBUG", _env_bool("DJANGO_DEBUG", True))
+
+if not DEBUG and SECRET_KEY == _SECRET_KEY_DEFAULT:
+    raise RuntimeError(
+        "SECRET_KEY no puede ser la clave por defecto en producción. "
+        "Configurá la variable de entorno SECRET_KEY con un valor seguro."
+    )
+
 ALLOWED_HOSTS = _env_csv(
     "ALLOWED_HOSTS",
     default=["127.0.0.1", "localhost", "testserver"],
@@ -237,3 +248,19 @@ else:
             },
         },
     }
+
+# Headers de seguridad HTTP — solo activos fuera de DEBUG para no interferir con el dev server
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = "DENY"
