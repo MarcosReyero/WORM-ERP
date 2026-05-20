@@ -803,13 +803,11 @@ def _system_person():
     No usamos FK directa a User en InternalRequest; en modo automatico necesitamos
     garantizar que exista una Persona disponible.
     """
-    system_code = "SYSTEM-AUTO"
-    person = Person.objects.filter(employee_code=system_code).first()
+    person = Person.objects.filter(full_name="Sistema").first()
     if person:
         return person
     return Person.objects.create(
         full_name="Sistema",
-        employee_code=system_code,
         status=StatusCatalog.ACTIVE,
     )
 
@@ -1536,7 +1534,6 @@ def serialize_person(person):
     return {
         "id": person.id,
         "full_name": person.full_name,
-        "employee_code": person.employee_code,
         "sector": person.sector.name if person.sector else None,
         "status": person.status,
     }

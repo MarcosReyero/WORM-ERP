@@ -105,7 +105,6 @@ class Person(AuditedModel):
         choices=StatusCatalog.choices,
         default=StatusCatalog.ACTIVE,
     )
-    employee_code = models.CharField(max_length=40, blank=True)
     sector = models.ForeignKey(
         Sector,
         on_delete=models.SET_NULL,
@@ -113,7 +112,6 @@ class Person(AuditedModel):
         blank=True,
         related_name="people",
     )
-    position = models.CharField(max_length=120, blank=True)
     supervisor = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
@@ -121,7 +119,6 @@ class Person(AuditedModel):
         blank=True,
         related_name="team_members",
     )
-    digital_signature = models.CharField(max_length=255, blank=True)
     observations = models.TextField(blank=True)
 
     class Meta:

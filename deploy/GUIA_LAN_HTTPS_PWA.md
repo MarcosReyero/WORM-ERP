@@ -12,7 +12,7 @@ Esta guía documenta el despliegue de **WORM ERP** en **red local (LAN)** con:
 
 ## 1) DNS en LAN (worm.lan → IP del server)
 
-### Opción recomendada: AdGuard Home como DNS local
+### Opción recomendada: AdGuard Home como DNS local (http://192.168.8.6:3000/)
 
 En el server (ej: `192.168.8.6`) podés correr AdGuard Home y hacer un **DNS rewrite**:
 
