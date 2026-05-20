@@ -1,6 +1,7 @@
 """
 Utilidades para verificar permisos de usuario en la plataforma.
 """
+import logging
 from functools import wraps
 from django.http import JsonResponse
 from django.core.exceptions import PermissionDenied
@@ -9,7 +10,10 @@ from .models import (
     RolePermission,
     SectorPermission,
     UserProfile,
+    UserPermission,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def has_module_permission(user, module_code, action_code="view"):
@@ -82,8 +86,8 @@ def has_module_permission(user, module_code, action_code="view"):
                 pass
 
             return False
-    except Exception:
-        # Si no hay permisos específicos, usar rol
+    except UserPermission.DoesNotExist:
+        # El usuario no tiene UserPermission creado: caer al rol
         try:
             profile = user.profile
             role_perm = RolePermission.objects.filter(
@@ -95,6 +99,13 @@ def has_module_permission(user, module_code, action_code="view"):
             return False
         except UserProfile.DoesNotExist:
             return False
+    except Exception:
+        # Error inesperado en la verificación de permisos: denegar acceso por seguridad
+        _logger.exception(
+            "Error inesperado verificando permiso %s.%s para usuario %s",
+            module_code, action_code, getattr(user, "username", user),
+        )
+        return False
 
 
 def has_sector_permission(user, sector, action="view"):

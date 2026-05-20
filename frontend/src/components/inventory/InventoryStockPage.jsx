@@ -1,7 +1,7 @@
 ﻿import { useDeferredValue, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { useEffect } from 'react'
-import { createArticle, exportArticlesToExcel, importArticlesFromExcel } from '../../lib/api.js'
+import { createArticle, exportArticlesToExcel, importArticlesFromExcel, importStockFromExcel } from '../../lib/api.js'
 import { CloseIcon, SearchIcon } from '../Icons.jsx'
 import {
   ModuleEmptyState,
@@ -61,12 +61,27 @@ export function InventoryStockPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [alertFilter, setAlertFilter] = useState('all')
+  const [stockSortConfig, setStockSortConfig] = useState({ field: null, direction: 'asc' })
   const [utilityMode, setUtilityMode] = useState('table')
   const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, articleId: null })
   const [busyAction, setBusyAction] = useState('')
   const [importFile, setImportFile] = useState(null)
+  const [stockImportFile, setStockImportFile] = useState(null)
   const [articleFeedback, setArticleFeedback] = useState({ error: '', success: '' })
   const [importFeedback, setImportFeedback] = useState({
+    error: '',
+    success: '',
+    summary: null,
+  })
+  const [stockImportOptions, setStockImportOptions] = useState({
+    sheet_name: 'MAYO 26',
+    location_id: '',
+    missing_policy: 'review',
+    unmatched_policy: 'skip',
+    allow_unit_conversion: true,
+    collapse_batches: false,
+  })
+  const [stockImportFeedback, setStockImportFeedback] = useState({
     error: '',
     success: '',
     summary: null,
@@ -176,18 +191,73 @@ export function InventoryStockPage() {
     }
   }, [contextMenu.isOpen])
 
+  useEffect(() => {
+    if (stockImportOptions.location_id) {
+      return
+    }
+
+    const locations = inventoryOverview?.catalogs?.locations ?? []
+    if (!locations.length) {
+      return
+    }
+
+    const preferred =
+      locations.find((item) => item.code === 'PANOL-001')?.id ||
+      locations.find((item) => item.code === 'DEP-PRINCIPAL')?.id ||
+      locations[0]?.id ||
+      ''
+
+    if (!preferred) {
+      return
+    }
+
+    setStockImportOptions((current) =>
+      current.location_id ? current : { ...current, location_id: String(preferred) },
+    )
+  }, [inventoryOverview, stockImportOptions.location_id])
+
   if (!inventoryOverview) {
     return null
   }
 
   const { articles, catalogs, permissions } = inventoryOverview
+
   const filteredArticles = articles
     .filter((article) => articleMatchesQuery(article, deferredGlobalQuery))
     .filter((article) => articleMatchesQuery(article, deferredStockQuery))
     .filter((article) => (typeFilter === 'all' ? true : article.article_type === typeFilter))
     .filter((article) => (statusFilter === 'all' ? true : article.status === statusFilter))
     .filter((article) => matchesAlert(article, alertFilter))
-    .sort(sortArticlesForOverview)
+    .sort((a, b) => {
+      if (!stockSortConfig.field) return sortArticlesForOverview(a, b)
+      const dir = stockSortConfig.direction === 'asc' ? 1 : -1
+      switch (stockSortConfig.field) {
+        case 'name': return a.name.localeCompare(b.name, 'es') * dir
+        case 'type': return (a.article_type_label || '').localeCompare(b.article_type_label || '', 'es') * dir
+        case 'stock': return (a.current_stock - b.current_stock) * dir
+        case 'available': return (a.available_stock - b.available_stock) * dir
+        case 'minimum': return (a.minimum_stock - b.minimum_stock) * dir
+        case 'location': return (a.primary_location || '').localeCompare(b.primary_location || '', 'es') * dir
+        case 'supplier': return (a.supplier || '').localeCompare(b.supplier || '', 'es') * dir
+        case 'status': return getArticleStockLabel(a).localeCompare(getArticleStockLabel(b), 'es') * dir
+        default: return sortArticlesForOverview(a, b)
+      }
+    })
+  function handleStockSort(field) {
+    setStockSortConfig((current) =>
+      current.field === field
+        ? { field, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { field, direction: 'asc' },
+    )
+  }
+
+  function StockSortIcon({ field }) {
+    if (stockSortConfig.field !== field) return <span className="sort-icon sort-icon--idle">↕</span>
+    return stockSortConfig.direction === 'asc'
+      ? <span className="sort-icon sort-icon--active">↑</span>
+      : <span className="sort-icon sort-icon--active">↓</span>
+  }
+
   const hasActiveFilters = typeFilter !== 'all' || statusFilter !== 'all' || alertFilter !== 'all'
   const hasActiveSearch = Boolean(deferredStockQuery || deferredGlobalQuery)
   const isFilteredView = hasActiveSearch || hasActiveFilters
@@ -198,6 +268,12 @@ export function InventoryStockPage() {
     importSummary?.errors?.length
       ? importSummary.errors
       : importSummary?.items?.filter((item) => item.decision === 'error') ?? []
+  const stockImportSummary = stockImportFeedback.summary
+  const stockPreviewReadyItems = stockImportSummary?.items?.filter((item) => item.decision === 'ready') ?? []
+  const stockPreviewSkippedItems = stockImportSummary?.items?.filter((item) => item.decision === 'skip') ?? []
+  const stockPreviewUnmatchedItems = stockImportSummary?.unmatched ?? []
+  const stockPreviewErrorItems = stockImportSummary?.errors ?? []
+  const stockPreviewMissingItems = stockImportSummary?.missing_in_excel ?? []
 
   async function handleExportArticles() {
     setExportFeedback({ error: '', success: '' })
@@ -326,6 +402,103 @@ export function InventoryStockPage() {
     }
   }
 
+  async function handleStockImportSubmit(event) {
+    event.preventDefault()
+    setStockImportFeedback({ error: '', success: '', summary: null })
+
+    if (!stockImportOptions.location_id) {
+      setStockImportFeedback({
+        error: 'Selecciona una ubicacion antes de continuar.',
+        success: '',
+        summary: null,
+      })
+      return
+    }
+
+    if (!stockImportFile) {
+      setStockImportFeedback({
+        error: 'Selecciona un archivo Excel para importar.',
+        success: '',
+        summary: null,
+      })
+      return
+    }
+
+    setBusyAction('stock-import')
+
+    try {
+      const response = await importStockFromExcel(stockImportFile, {
+        mode: 'preview',
+        sheetName: stockImportOptions.sheet_name,
+        locationId: stockImportOptions.location_id,
+        missingPolicy: stockImportOptions.missing_policy,
+        unmatchedPolicy: stockImportOptions.unmatched_policy,
+        allowUnitConversion: stockImportOptions.allow_unit_conversion,
+        collapseBatches: stockImportOptions.collapse_batches,
+      })
+
+      const summary = response.item
+      const missingLabel = summary.missing_in_excel_count
+        ? ` Faltan ${summary.missing_in_excel_count} articulos.`
+        : ''
+
+      setStockImportFeedback({
+        error: '',
+        success: `Se detectaron ${summary.ready_count} articulos listos para ajustar en ${summary.location.name}.${missingLabel}`,
+        summary,
+      })
+    } catch (error) {
+      setStockImportFeedback({
+        error: error.message,
+        success: '',
+        summary: null,
+      })
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function handleStockImportConfirm() {
+    setStockImportFeedback((current) => ({ ...current, error: '', success: '' }))
+
+    if (!stockImportFile) {
+      setStockImportFeedback((current) => ({
+        ...current,
+        error: 'Selecciona nuevamente el archivo Excel antes de confirmar.',
+      }))
+      return
+    }
+
+    setBusyAction('stock-import-confirm')
+
+    try {
+      const response = await importStockFromExcel(stockImportFile, {
+        mode: 'confirm',
+        sheetName: stockImportOptions.sheet_name,
+        locationId: stockImportOptions.location_id,
+        missingPolicy: stockImportOptions.missing_policy,
+        unmatchedPolicy: stockImportOptions.unmatched_policy,
+        allowUnitConversion: stockImportOptions.allow_unit_conversion,
+        collapseBatches: stockImportOptions.collapse_batches,
+      })
+
+      await refreshInventoryModule()
+      const summary = response.item
+      setStockImportFeedback({
+        error: '',
+        success: `Importacion confirmada. ${summary.updated_count} articulos ajustados.`,
+        summary,
+      })
+    } catch (error) {
+      setStockImportFeedback((current) => ({
+        ...current,
+        error: error.message,
+      }))
+    } finally {
+      setBusyAction('')
+    }
+  }
+
   return (
     <div className="module-page-stack stock-titled-page">
       <ModulePageHeader
@@ -366,6 +539,13 @@ export function InventoryStockPage() {
                     type="button"
                   >
                     Importar Excel
+                  </button>
+                  <button
+                    className={`module-utility-button ${utilityMode === 'import-stock' ? 'is-active' : ''}`}
+                    onClick={() => toggleUtility('import-stock')}
+                    type="button"
+                  >
+                    Importar stock
                   </button>
                 </span>
               </span>
@@ -876,6 +1056,276 @@ export function InventoryStockPage() {
                   </div>
                 </form>
               </>
+            ) : utilityMode === 'import-stock' ? (
+              <>
+                <p className="module-empty-copy">
+                  Importa el stock desde un Excel. Primero elegí la ubicacion de destino, luego el archivo. El sistema
+                  analiza los datos y te muestra un resumen antes de aplicar los cambios.
+                </p>
+                <form className="ops-form" onSubmit={handleStockImportSubmit}>
+                  <label>
+                    Ubicacion de destino
+                    <select
+                      onChange={(event) =>
+                        setStockImportOptions((current) => ({ ...current, location_id: event.target.value }))
+                      }
+                      value={stockImportOptions.location_id}
+                    >
+                      <option value="">— Seleccionar ubicacion —</option>
+                      {catalogs.locations.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Archivo Excel
+                    <input
+                      accept=".xlsx,.xlsm"
+                      onChange={(event) => {
+                        setStockImportFile(event.target.files?.[0] || null)
+                        setStockImportFeedback({ error: '', success: '', summary: null })
+                      }}
+                      type="file"
+                    />
+                  </label>
+
+                  <label>
+                    Hoja
+                    <input
+                      onChange={(event) =>
+                        setStockImportOptions((current) => ({ ...current, sheet_name: event.target.value }))
+                      }
+                      placeholder="MAYO 26"
+                      type="text"
+                      value={stockImportOptions.sheet_name}
+                    />
+                  </label>
+
+                  <label>
+                    Que hacer con articulos que no estan en el Excel
+                    <select
+                      onChange={(event) =>
+                        setStockImportOptions((current) => ({ ...current, missing_policy: event.target.value }))
+                      }
+                      value={stockImportOptions.missing_policy}
+                    >
+                      <option value="review">Revisar antes de confirmar</option>
+                      <option value="leave">Dejar sin cambios</option>
+                      <option value="zero">Poner en 0</option>
+                    </select>
+                  </label>
+
+                  <div className="checkbox-row">
+                    <label>
+                      <input
+                        checked={stockImportOptions.allow_unit_conversion}
+                        onChange={(event) =>
+                          setStockImportOptions((current) => ({
+                            ...current,
+                            allow_unit_conversion: event.target.checked,
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      Convertir articulos por unidad (si es seguro)
+                    </label>
+                    <label>
+                      <input
+                        checked={stockImportOptions.collapse_batches}
+                        onChange={(event) =>
+                          setStockImportOptions((current) => ({
+                            ...current,
+                            collapse_batches: event.target.checked,
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      Colapsar lotes (poner lotes en 0)
+                    </label>
+                  </div>
+
+                  <PanelMessage error={stockImportFeedback.error} success={stockImportFeedback.success} />
+
+                  {stockImportSummary ? (
+                    <div className="import-summary">
+                      <div className="record-meta-grid">
+                        <article className="record-meta-card">
+                          <span>
+                            {stockImportSummary.mode === 'confirm' ? 'Articulos ajustados' : 'Listos para ajustar'}
+                          </span>
+                          <strong>
+                            {stockImportSummary.mode === 'confirm'
+                              ? stockImportSummary.updated_count
+                              : stockImportSummary.ready_count}
+                          </strong>
+                        </article>
+                        <article className="record-meta-card">
+                          <span>Omitidos</span>
+                          <strong>{stockImportSummary.skip_count}</strong>
+                        </article>
+                        <article className="record-meta-card">
+                          <span>No encontrados</span>
+                          <strong>{stockImportSummary.unmatched_count}</strong>
+                        </article>
+                        <article className="record-meta-card">
+                          <span>Con error</span>
+                          <strong>{stockImportSummary.error_count}</strong>
+                        </article>
+                        <article className="record-meta-card">
+                          <span>Faltan en Excel</span>
+                          <strong>{stockImportSummary.missing_in_excel_count}</strong>
+                        </article>
+                      </div>
+
+                      {stockPreviewReadyItems.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>Articulos listos</strong>
+                            <span>{stockPreviewReadyItems.length} items</span>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {stockPreviewReadyItems.slice(0, 12).map((item) => (
+                              <div
+                                className="module-list-item import-preview-item"
+                                key={`${item.article_id}-${item.rows?.[0]}`}
+                              >
+                                <div>
+                                  <strong>{item.article_name || item.name}</strong>
+                                  <p>
+                                    Excel: {formatQuantity(item.excel_stock)} Â· Actual:{' '}
+                                    {formatQuantity(item.current_stock)} Â· Delta: {formatQuantity(item.delta)}
+                                  </p>
+                                </div>
+                                <span className="status-pill ok">Listo</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {stockPreviewSkippedItems.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>Omitidos</strong>
+                            <span>{stockPreviewSkippedItems.length} items</span>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {stockPreviewSkippedItems.slice(0, 8).map((item) => (
+                              <div
+                                className="module-list-item import-preview-item"
+                                key={`${item.article_id || item.name}-${item.rows?.[0]}-skip`}
+                              >
+                                <div>
+                                  <strong>{item.article_name || item.name}</strong>
+                                  <p>{item.detail}</p>
+                                </div>
+                                <span className="status-pill low">Omitido</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {stockPreviewUnmatchedItems.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>Sin match en el sistema</strong>
+                            <span>{stockPreviewUnmatchedItems.length} filas</span>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {stockPreviewUnmatchedItems.slice(0, 8).map((item) => (
+                              <div
+                                className="module-list-item import-preview-item"
+                                key={`${item.name}-${item.rows?.[0]}-unmatched`}
+                              >
+                                <div>
+                                  <strong>{item.name}</strong>
+                                  <p>{item.detail}</p>
+                                </div>
+                                <span className="status-pill out">No encontrado</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {stockPreviewErrorItems.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>Filas con problema</strong>
+                            <span>{stockPreviewErrorItems.length} filas</span>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {stockPreviewErrorItems.slice(0, 8).map((item) => (
+                              <div
+                                className="module-list-item import-preview-item"
+                                key={`${item.name}-${item.rows?.[0]}-error`}
+                              >
+                                <div>
+                                  <strong>{item.name}</strong>
+                                  <p>{item.detail}</p>
+                                </div>
+                                <span className="status-pill out">Error</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {stockPreviewMissingItems.length ? (
+                        <div className="import-preview-block">
+                          <div className="import-preview-heading">
+                            <strong>Articulos que no estan en el Excel</strong>
+                            <span>{stockImportSummary.missing_in_excel_count} items</span>
+                          </div>
+                          <div className="module-list import-preview-list">
+                            {stockPreviewMissingItems.slice(0, 8).map((item) => (
+                              <div
+                                className="module-list-item import-preview-item"
+                                key={`${item.article_id}-missing`}
+                              >
+                                <div>
+                                  <strong>{item.name}</strong>
+                                  <p>Actual: {formatQuantity(item.current_stock)}</p>
+                                </div>
+                                <span className="status-pill low">Falta</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div className="import-actions">
+                    <button
+                      className="primary-button"
+                      disabled={
+                        !permissions.can_manage_master ||
+                        busyAction === 'stock-import' ||
+                        busyAction === 'stock-import-confirm'
+                      }
+                      type="submit"
+                    >
+                      {busyAction === 'stock-import' ? 'Analizando...' : 'Analizar stock'}
+                    </button>
+
+                    {stockImportSummary?.mode === 'preview' && stockImportSummary.ready_count > 0 ? (
+                      <button
+                        className="secondary-button"
+                        disabled={!permissions.can_manage_master || busyAction === 'stock-import-confirm'}
+                        onClick={handleStockImportConfirm}
+                        type="button"
+                      >
+                        {busyAction === 'stock-import-confirm' ? 'Confirmando...' : 'Confirmar ajuste'}
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+              </>
             ) : (
               <>
                 <PanelMessage error={exportFeedback.error} success={exportFeedback.success} />
@@ -884,14 +1334,14 @@ export function InventoryStockPage() {
                     <table className="module-table module-table--stock">
                       <thead>
                         <tr>
-                          <th>Articulo</th>
-                          <th>Tipo</th>
-                          <th>Stock</th>
-                          <th>Disponible</th>
-                          <th>Minimo</th>
-                          <th>Ubicacion</th>
-                          <th>Proveedor</th>
-                          <th>Estado</th>
+                          <th className="th-sortable" onClick={() => handleStockSort('name')}>Articulo <StockSortIcon field="name" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('type')}>Tipo <StockSortIcon field="type" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('stock')}>Stock <StockSortIcon field="stock" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('available')}>Disponible <StockSortIcon field="available" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('minimum')}>Minimo <StockSortIcon field="minimum" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('location')}>Ubicacion <StockSortIcon field="location" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('supplier')}>Proveedor <StockSortIcon field="supplier" /></th>
+                          <th className="th-sortable" onClick={() => handleStockSort('status')}>Estado <StockSortIcon field="status" /></th>
                         </tr>
                       </thead>
                       <tbody>

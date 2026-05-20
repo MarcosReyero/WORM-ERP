@@ -173,15 +173,25 @@ export function ModuleHub() {
     setIsBackgroundMenuOpen(false)
   }
 
+  function selectPreset(preset) {
+    const value = `preset:${preset}`
+    try {
+      window.localStorage.setItem(DASHBOARD_BACKGROUND_STORAGE_KEY, value)
+    } catch {
+      // ignore
+    }
+    setCustomBackground(value)
+    setIsBackgroundMenuOpen(false)
+  }
+
+  const activePreset = customBackground.startsWith('preset:') ? customBackground.slice(7) : null
+  const customImageUrl = !activePreset && customBackground ? customBackground : null
+
   return (
     <div
-      className="dashboard-scene"
+      className={`dashboard-scene${activePreset ? ` dashboard-preset--${activePreset}` : ''}`}
       ref={stageRef}
-      style={
-        customBackground
-          ? { '--dashboard-custom-bg': `url("${customBackground}")` }
-          : undefined
-      }
+      style={customImageUrl ? { '--dashboard-custom-bg': `url("${customImageUrl}")` } : undefined}
     >
       <div aria-hidden="true" className="dashboard-backdrop">
         <span className="dashboard-particle dashboard-particle--1" />
@@ -204,7 +214,28 @@ export function ModuleHub() {
 
           {isBackgroundMenuOpen ? (
             <div className="dashboard-background-menu" ref={backgroundMenuRef} role="menu">
-              <p className="dashboard-background-menu-title">Fondo personalizado</p>
+              <p className="dashboard-background-menu-title">Fondos predefinidos</p>
+              <div className="dashboard-background-menu-presets">
+                <button
+                  className={`dashboard-background-preset-btn${activePreset === 'aurora' ? ' is-active' : ''}`}
+                  onClick={() => selectPreset('aurora')}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span aria-hidden="true" className="dashboard-background-preset-swatch dashboard-background-preset-swatch--aurora" />
+                  Aurora
+                </button>
+                <button
+                  className={`dashboard-background-preset-btn${activePreset === 'grafito' ? ' is-active' : ''}`}
+                  onClick={() => selectPreset('grafito')}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span aria-hidden="true" className="dashboard-background-preset-swatch dashboard-background-preset-swatch--grafito" />
+                  Grafito
+                </button>
+              </div>
+              <p className="dashboard-background-menu-title">Personalizado</p>
               <button
                 className="dashboard-background-menu-action"
                 onClick={() => backgroundInputRef.current?.click()}

@@ -68,7 +68,7 @@ def serialize_contact(user):
         "full_name": contact_full_name(user),
         "email": user.email,
         "avatar_url": profile.avatar.url if profile.avatar else None,
-        "telegram_chat_id": profile.telegram_chat_id,
+        "has_telegram": bool(profile.telegram_chat_id),
         "role": profile.role,
         "role_label": profile.get_role_display(),
         "status": profile.status,

@@ -300,6 +300,40 @@ export function importArticlesFromExcel(file, options = {}) {
   })
 }
 
+export function importStockFromExcel(file, options = {}) {
+  const body = new FormData()
+  body.append('file', file)
+  body.append('mode', options.mode || 'preview')
+
+  if (options.sheetName) {
+    body.append('sheet_name', options.sheetName)
+  }
+  if (options.locationId) {
+    body.append('location_id', String(options.locationId))
+  }
+  if (options.missingPolicy) {
+    body.append('missing_policy', options.missingPolicy)
+  }
+  if (options.unmatchedPolicy) {
+    body.append('unmatched_policy', options.unmatchedPolicy)
+  }
+
+  if (options.allowUnitConversion !== undefined) {
+    body.append('allow_unit_conversion', String(options.allowUnitConversion))
+  }
+  if (options.collapseBatches !== undefined) {
+    body.append('collapse_batches', String(options.collapseBatches))
+  }
+
+  return request('/api/balances/import-excel/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body,
+  })
+}
+
 export function fetchPersonalDailyReports() {
   return request('/api/personal/reports/')
 }

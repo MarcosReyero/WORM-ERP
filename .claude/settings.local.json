@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git stash *)",
+      "Bash(python manage.py test --verbosity=1)",
+      "Bash(python manage.py test accounts communications --verbosity=1)"
+    ]
+  }
+}

@@ -803,11 +803,20 @@ def _system_person():
     No usamos FK directa a User en InternalRequest; en modo automatico necesitamos
     garantizar que exista una Persona disponible.
     """
+<<<<<<< HEAD
     person = Person.objects.filter(full_name="Sistema").first()
+=======
+    system_code = "SYSTEM-AUTO"
+    person = Person.objects.filter(dni=system_code).first()
+>>>>>>> 91ea19cfdbb0b0b3617ca7050c692fe98ee714d3
     if person:
         return person
     return Person.objects.create(
         full_name="Sistema",
+<<<<<<< HEAD
+=======
+        dni=system_code,
+>>>>>>> 91ea19cfdbb0b0b3617ca7050c692fe98ee714d3
         status=StatusCatalog.ACTIVE,
     )
 
@@ -874,7 +883,7 @@ def maybe_create_purchase_request_for_minimum_stock(
 
     with transaction.atomic():
         locked_article = (
-            Article.objects.select_for_update()
+            Article.objects.select_for_update(of=("self",))
             .select_related("sector_responsible")
             .get(pk=article.pk)
         )
@@ -1534,6 +1543,10 @@ def serialize_person(person):
     return {
         "id": person.id,
         "full_name": person.full_name,
+<<<<<<< HEAD
+=======
+        "dni": person.dni,
+>>>>>>> 91ea19cfdbb0b0b3617ca7050c692fe98ee714d3
         "sector": person.sector.name if person.sector else None,
         "status": person.status,
     }
@@ -1921,7 +1934,7 @@ def evaluate_purchasing_minimum_stock_alarm(article):
     try:
         with transaction.atomic():
             config = (
-                MinimumStockAlarmConfig.objects.select_for_update()
+                MinimumStockAlarmConfig.objects.select_for_update(of=("self",))
                 .prefetch_related("recipients__profile")
                 .filter(key="purchasing_default", is_enabled=True)
                 .first()
@@ -2009,7 +2022,7 @@ def evaluate_safety_stock_alert(article):
         with transaction.atomic():
             # SELECT FOR UPDATE garantiza exclusividad en la transacción
             alert = (
-                SafetyStockAlertRule.objects.select_for_update()
+                SafetyStockAlertRule.objects.select_for_update(of=("self",))
                 .select_related(
                     "article__sector_responsible",
                     "article__primary_location",
@@ -3984,8 +3997,6 @@ def _simple_list_header_row(worksheet):
         values = _sheet_row_values(worksheet, row_number)
         if not values:
             continue
-        if len(values) != 1:
-            continue
         if normalize_excel_header(values[0]) in EXCEL_IMPORT_SIMPLE_HEADERS:
             return row_number
     return None
@@ -4498,6 +4509,430 @@ def import_articles_from_excel(user, excel_file, mode="preview"):
         "created_count": len(created),
         "created": created,
         "errors": base_errors + errors,
+    }
+
+
+def _parse_stock_import_entries(workbook, sheet_name):
+    """Parsea el Excel de stock y devuelve entradas normalizadas."""
+    if sheet_name not in workbook.sheetnames:
+        available = ", ".join(workbook.sheetnames)
+        raise InventoryApiError(
+            f"No se encontro la hoja '{sheet_name}'. Hojas disponibles: {available}"
+        )
+
+    worksheet = workbook[sheet_name]
+    entries = []
+
+    # Detectar formato del export del sistema (encabezados conocidos en fila 1).
+    header_row = [
+        normalize_excel_header(worksheet.cell(row=1, column=c).value)
+        for c in range(1, EXCEL_IMPORT_MAX_COLUMNS + 1)
+    ]
+    _EXPORT_NAME_HEADERS = {"articulo", "nombre", "descripcion", "producto", "detalle"}
+    _EXPORT_STOCK_HEADERS = {"stock_actual", "stk_actual", "stock", "cantidad", "existencias"}
+
+    try:
+        name_col = next(i + 1 for i, h in enumerate(header_row) if h in _EXPORT_NAME_HEADERS)
+        stock_col = next(i + 1 for i, h in enumerate(header_row) if h in _EXPORT_STOCK_HEADERS)
+        data_start_row = 2
+    except StopIteration:
+        # Formato simple: col A = nombre, col B = stock, sin encabezado.
+        name_col = 1
+        stock_col = 2
+        data_start_row = 2
+
+    for row_number in range(data_start_row, worksheet.max_row + 1):
+        raw_name = worksheet.cell(row=row_number, column=name_col).value
+        raw_stock = worksheet.cell(row=row_number, column=stock_col).value
+
+        name = clean_string(raw_name)
+        if not name:
+            continue
+
+        # Las filas de categoria suelen venir con el stock vacio.
+        if raw_stock in (None, ""):
+            continue
+
+        try:
+            stock_value = parse_decimal(raw_stock, "stock_actual")
+        except InventoryApiError as exc:
+            raise InventoryApiError(
+                f"Fila {row_number}: el stock no es numerico para '{name}'."
+            ) from exc
+
+        if stock_value < 0:
+            raise InventoryApiError(
+                f"Fila {row_number}: el stock no puede ser negativo para '{name}'."
+            )
+
+        key = _normalize_import_key(name)
+        if not key:
+            continue
+
+        entries.append(
+            {
+                "row": row_number,
+                "name": name,
+                "key": key,
+                "stock": stock_value,
+            }
+        )
+
+    if not entries:
+        raise InventoryApiError(
+            "No se detectaron filas con stock en el Excel. Verifica que la hoja tenga columnas 'Articulo' y 'Stock actual', o dos columnas sin encabezado (nombre | cantidad)."
+        )
+
+    return entries
+
+
+def _serialize_stock_import_item(item):
+    """Serializa un item de importacion de stock."""
+    return {
+        "rows": item["rows"],
+        "name": item["name"],
+        "excel_stock": str(item["excel_stock"]),
+        "decision": item["decision"],
+        "detail": item["detail"],
+        "article_id": item["article_id"],
+        "article_name": item["article_name"],
+        "tracking_mode": item["tracking_mode"],
+        "current_stock": str(item["current_stock"]),
+        "next_stock": str(item["next_stock"]),
+        "delta": str(item["delta"]),
+    }
+
+
+def import_stock_from_excel(user, excel_file, mode="preview", options=None):
+    """Importa stock (balances) desde un Excel con estructura tipo pañol."""
+    require_role(user, MASTER_ROLES)
+
+    if not excel_file:
+        raise InventoryApiError("Excel file is required")
+
+    options = options or {}
+    sheet_name = clean_string(options.get("sheet_name")) or "MAYO 26"
+    missing_policy = clean_string(options.get("missing_policy")) or "leave"
+    unmatched_policy = clean_string(options.get("unmatched_policy")) or "skip"
+    allow_unit_conversion = parse_boolean(options.get("allow_unit_conversion", True))
+    collapse_batches = parse_boolean(options.get("collapse_batches", False))
+
+    location = resolve_instance(
+        Location,
+        options.get("location_id"),
+        "location",
+        required=False,
+    )
+    if not location:
+        location = (
+            Location.objects.filter(code="PANOL-001").first()
+            or Location.objects.filter(code="DEP-PRINCIPAL").first()
+            or get_default_location()
+        )
+    if not location:
+        raise InventoryApiError("No se encontro una ubicacion destino para importar stock.")
+
+    if missing_policy not in {"leave", "zero", "review"}:
+        raise InventoryApiError("missing_policy invalida. Usa leave, zero o review.")
+    if unmatched_policy not in {"skip"}:
+        raise InventoryApiError("unmatched_policy invalida. Usa skip.")
+
+    try:
+        workbook = load_workbook(excel_file, data_only=True, read_only=True, keep_links=False)
+    except Exception as exc:  # noqa: BLE001
+        raise InventoryApiError("Could not read the Excel file") from exc
+
+    try:
+        raw_entries = _parse_stock_import_entries(workbook, sheet_name)
+    finally:
+        try:
+            workbook.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    # Consolidar por nombre normalizado para evitar duplicados.
+    consolidated = {}
+    for entry in raw_entries:
+        bucket = consolidated.setdefault(
+            entry["key"],
+            {
+                "name": entry["name"],
+                "rows": [],
+                "excel_stock": Decimal("0"),
+            },
+        )
+        bucket["rows"].append(entry["row"])
+        bucket["excel_stock"] += entry["stock"]
+
+    # Mapeo de articulos por nombre normalizado.
+    article_candidates = {}
+    for article in Article.objects.only(
+        "id",
+        "name",
+        "tracking_mode",
+        "article_type",
+        "loanable",
+        "requires_lot",
+        "requires_expiry",
+    ):
+        key = _normalize_import_key(article.name)
+        if not key:
+            continue
+        article_candidates.setdefault(key, []).append(article)
+
+    # Stock actual por articulo en ubicacion (suma todos los lotes).
+    current_totals = {
+        row["article"]: row["total"] or Decimal("0")
+        for row in InventoryBalance.objects.filter(location=location)
+        .values("article")
+        .annotate(total=Sum("on_hand"))
+    }
+    has_batch_balances = set(
+        InventoryBalance.objects.filter(location=location, batch__isnull=False).values_list(
+            "article_id", flat=True
+        )
+    )
+
+    # Articulos con unidades cargadas (para evitar conversion insegura).
+    tracked_unit_articles = set(
+        TrackedUnit.objects.exclude(
+            status__in=[TrackedUnit.UnitStatus.RETIRED, TrackedUnit.UnitStatus.LOST]
+        ).values_list("article_id", flat=True)
+    )
+
+    items = []
+    errors = []
+    unmatched = []
+
+    for key, group in consolidated.items():
+        base_item = {
+            "rows": sorted(group["rows"]),
+            "name": group["name"],
+            "excel_stock": group["excel_stock"],
+            "article_id": None,
+            "article_name": "",
+            "tracking_mode": "",
+            "current_stock": Decimal("0"),
+            "next_stock": group["excel_stock"],
+            "delta": Decimal("0"),
+            "decision": "ready",
+            "detail": "",
+        }
+
+        if len(group["rows"]) > 1:
+            base_item["decision"] = "error"
+            base_item["detail"] = "Item duplicado en el Excel (se repite en multiples filas)."
+            errors.append(_serialize_stock_import_item(base_item))
+            continue
+
+        candidates = article_candidates.get(key) or []
+        if not candidates:
+            base_item["decision"] = "unmatched"
+            base_item["detail"] = "No se encontro un articulo con el mismo nombre en el sistema."
+            unmatched.append(_serialize_stock_import_item(base_item))
+            continue
+
+        if len(candidates) > 1:
+            base_item["decision"] = "error"
+            base_item["detail"] = "Nombre ambiguo: hay mas de un articulo con el mismo nombre."
+            errors.append(_serialize_stock_import_item(base_item))
+            continue
+
+        article = candidates[0]
+        base_item["article_id"] = article.id
+        base_item["article_name"] = article.name
+        base_item["tracking_mode"] = article.tracking_mode
+        base_item["current_stock"] = current_totals.get(article.id, Decimal("0"))
+        base_item["delta"] = base_item["excel_stock"] - base_item["current_stock"]
+
+        # Validaciones previas a aplicar en confirm.
+        if article.tracking_mode == Article.TrackingMode.UNIT:
+            if not allow_unit_conversion:
+                base_item["decision"] = "skip"
+                base_item["detail"] = "Articulo por unidad. Importacion por stock solo soporta articulos por cantidad."
+            elif article.article_type == Article.ArticleType.TOOL or article.loanable:
+                base_item["decision"] = "skip"
+                base_item["detail"] = "Articulo por unidad (herramienta/prestable). No se convierte automaticamente."
+            elif article.id in tracked_unit_articles:
+                base_item["decision"] = "skip"
+                base_item["detail"] = "Articulo por unidad con unidades trazadas cargadas. Requiere ajuste manual."
+            else:
+                base_item["detail"] = "Articulo por unidad: se convertira a control por cantidad al confirmar."
+
+        if article.id in has_batch_balances and not collapse_batches:
+            base_item["decision"] = "skip"
+            base_item["detail"] = "Articulo con lotes/balances por lote. Habilita 'colapsar lotes' o ajusta manualmente."
+
+        items.append(_serialize_stock_import_item(base_item))
+
+    # Determinar articulos a cero segun politica (solo lo que ya tiene balance en la ubicacion).
+    eligible_article_ids = set(current_totals.keys())
+
+    if not collapse_batches:
+        eligible_article_ids.difference_update(has_batch_balances)
+
+    matched_article_ids = {item["article_id"] for item in items if item["decision"] == "ready" and item["article_id"]}
+    missing_article_ids = sorted(eligible_article_ids - matched_article_ids)
+    missing_preview = [
+        {
+            "article_id": article.id,
+            "name": article.name,
+            "current_stock": str(current_totals.get(article.id, Decimal("0"))),
+        }
+        for article in Article.objects.filter(id__in=missing_article_ids).only("id", "name").order_by("name")[:100]
+    ]
+
+    summary = {
+        "mode": "preview",
+        "sheet_name": sheet_name,
+        "location": {"id": location.id, "code": location.code, "name": location.name},
+        "missing_policy": missing_policy,
+        "unmatched_policy": unmatched_policy,
+        "allow_unit_conversion": allow_unit_conversion,
+        "collapse_batches": collapse_batches,
+        "ready_count": sum(1 for item in items if item["decision"] == "ready"),
+        "skip_count": sum(1 for item in items if item["decision"] == "skip"),
+        "unmatched_count": len(unmatched),
+        "error_count": len(errors),
+        "missing_in_excel_count": len(missing_article_ids),
+        "missing_in_excel": missing_preview,
+        "items": items,
+        "unmatched": unmatched,
+        "errors": errors,
+    }
+
+    if mode != "confirm":
+        return summary
+
+    if missing_policy == "review" and missing_article_ids:
+        raise InventoryApiError(
+            "Hay articulos que no aparecen en el Excel. Elige missing_policy=leave o missing_policy=zero antes de confirmar."
+        )
+
+    if unmatched and unmatched_policy == "skip":
+        # Permitimos confirmar igual, pero dejamos registro en el resultado.
+        pass
+
+    updated = []
+    warnings = []
+    zeroed = []
+    converted = []
+
+    with transaction.atomic():
+        # Aplicar updates para los items listos.
+        for item in items:
+            if item["decision"] != "ready" or not item["article_id"]:
+                continue
+
+            article = Article.objects.select_for_update().get(pk=item["article_id"])
+            desired_total = parse_decimal(item["next_stock"], "next_stock")
+            article_dirty = False
+
+            if not article.primary_location_id:
+                article.primary_location = location
+                article_dirty = True
+
+            if article.tracking_mode == Article.TrackingMode.UNIT:
+                if (
+                    allow_unit_conversion
+                    and article.article_type != Article.ArticleType.TOOL
+                    and not article.loanable
+                    and not TrackedUnit.objects.filter(article=article).exclude(
+                        status__in=[TrackedUnit.UnitStatus.RETIRED, TrackedUnit.UnitStatus.LOST]
+                    ).exists()
+                ):
+                    article.tracking_mode = Article.TrackingMode.QUANTITY
+                    article_dirty = True
+                    converted.append({"article_id": article.id, "name": article.name})
+                else:
+                    warnings.append(
+                        {
+                            "article_id": article.id,
+                            "name": article.name,
+                            "detail": "No se pudo convertir el articulo por unidad; se omitio el ajuste de stock.",
+                        }
+                    )
+                    continue
+
+            if article_dirty:
+                update_audit(article, user)
+                save_validated(article)
+
+            batch_balances = list(
+                InventoryBalance.objects.select_for_update()
+                .filter(article=article, location=location)
+                .exclude(batch__isnull=True)
+            )
+            if batch_balances and not collapse_batches:
+                warnings.append(
+                    {
+                        "article_id": article.id,
+                        "name": article.name,
+                        "detail": "Articulo con balances por lote; se omitio por seguridad.",
+                    }
+                )
+                continue
+
+            if batch_balances and collapse_batches:
+                for balance in batch_balances:
+                    if balance.on_hand != 0:
+                        balance.on_hand = Decimal("0")
+                        update_audit(balance, user)
+                        save_validated(balance)
+
+            balance = get_or_create_balance(article, location, user, batch=None)
+            balance.on_hand = desired_total
+            update_audit(balance, user)
+            save_validated(balance)
+
+            updated.append(
+                {
+                    "article_id": article.id,
+                    "name": article.name,
+                    "next_stock": str(desired_total),
+                }
+            )
+
+        # Politica de faltantes: poner en 0 lo que no aparezca en el Excel.
+        if missing_policy == "zero" and missing_article_ids:
+            for article_id in missing_article_ids:
+                article = Article.objects.select_for_update().get(pk=article_id)
+
+                if article.tracking_mode == Article.TrackingMode.UNIT:
+                    continue
+
+                batch_balances = list(
+                    InventoryBalance.objects.select_for_update()
+                    .filter(article=article, location=location)
+                    .exclude(batch__isnull=True)
+                )
+                if batch_balances and not collapse_batches:
+                    continue
+
+                if batch_balances and collapse_batches:
+                    for balance in batch_balances:
+                        if balance.on_hand != 0:
+                            balance.on_hand = Decimal("0")
+                            update_audit(balance, user)
+                            save_validated(balance)
+
+                balance = get_or_create_balance(article, location, user, batch=None)
+                if balance.on_hand != 0:
+                    balance.on_hand = Decimal("0")
+                    update_audit(balance, user)
+                    save_validated(balance)
+                zeroed.append({"article_id": article.id, "name": article.name})
+
+    return {
+        **summary,
+        "mode": "confirm",
+        "updated_count": len(updated),
+        "zeroed_count": len(zeroed),
+        "converted_count": len(converted),
+        "updated": updated[:50],
+        "zeroed": zeroed[:50],
+        "converted": converted[:50],
+        "warnings": warnings[:50],
     }
 
 
