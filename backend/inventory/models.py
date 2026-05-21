@@ -105,10 +105,7 @@ class Person(AuditedModel):
         choices=StatusCatalog.choices,
         default=StatusCatalog.ACTIVE,
     )
-<<<<<<< HEAD
-=======
     dni = models.CharField(max_length=40, blank=True)
->>>>>>> 91ea19cfdbb0b0b3617ca7050c692fe98ee714d3
     sector = models.ForeignKey(
         Sector,
         on_delete=models.SET_NULL,
@@ -116,17 +113,6 @@ class Person(AuditedModel):
         blank=True,
         related_name="people",
     )
-    supervisor = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="team_members",
-    )
-<<<<<<< HEAD
-    observations = models.TextField(blank=True)
-=======
->>>>>>> 91ea19cfdbb0b0b3617ca7050c692fe98ee714d3
 
     class Meta:
         ordering = ["full_name"]
