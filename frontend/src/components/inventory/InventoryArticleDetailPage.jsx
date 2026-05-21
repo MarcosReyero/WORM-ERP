@@ -229,6 +229,17 @@ export function InventoryArticleDetailPage() {
 
   const { article, balances, movements, tracked_units: trackedUnits } = detailState.data
 
+  const flagDefs = [
+    { field: 'is_critical', label: 'Crítico', onChange: (v) => handleCheckboxChange('is_critical', v) },
+    { field: 'loanable', label: 'Prestable', onChange: (v) => handleCheckboxChange('loanable', v) },
+    { field: 'requires_lot', label: 'Lote', onChange: (v) => handleCheckboxChange('requires_lot', v, { requires_expiry: v ? form.requires_expiry : false }) },
+    { field: 'requires_expiry', label: 'Vencimiento', onChange: (v) => handleCheckboxChange('requires_expiry', v, { requires_lot: v ? true : form.requires_lot }) },
+    { field: 'requires_serial', label: 'Nº Serie', onChange: (v) => handleCheckboxChange('requires_serial', v) },
+    { field: 'requires_size', label: 'Talle', onChange: (v) => handleCheckboxChange('requires_size', v) },
+    { field: 'requires_quality', label: 'Calidad', onChange: (v) => handleCheckboxChange('requires_quality', v) },
+    { field: 'requires_assignee', label: 'Asignación', onChange: (v) => handleCheckboxChange('requires_assignee', v) },
+  ]
+
   return (
     <div className="module-page-stack stock-titled-page">
       <ModulePageHeader
@@ -254,38 +265,23 @@ export function InventoryArticleDetailPage() {
             <div className="inline-save-error">{saveError}</div>
           )}
 
+          {/* ── Cabecera: imagen + identidad + KPIs ── */}
           <div className="record-summary">
-            {/* Imagen con overlay */}
             <div className="record-media record-media--editable">
-              {imagePreviewUrl ? (
-                <img alt={article.name} src={imagePreviewUrl} />
-              ) : (
-                <div className="record-media-placeholder">Sin imagen</div>
-              )}
+              {imagePreviewUrl
+                ? <img alt={article.name} src={imagePreviewUrl} />
+                : <div className="record-media-placeholder">Sin imagen</div>
+              }
               {canEdit && (
                 <div className="record-media-overlay">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    type="button"
-                  >
-                    Cambiar imagen
-                  </button>
-                  <button onClick={handleClearImage} type="button">
-                    Eliminar imagen
-                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} type="button">Cambiar</button>
+                  <button onClick={handleClearImage} type="button">Quitar</button>
                 </div>
               )}
-              <input
-                accept=".jpg,.jpeg,.png,.webp,.gif"
-                onChange={handleImageChange}
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                type="file"
-              />
+              <input accept=".jpg,.jpeg,.png,.webp,.gif" onChange={handleImageChange} ref={fileInputRef} style={{ display: 'none' }} type="file" />
             </div>
 
             <div className="record-summary-copy">
-              {/* Nombre + tipo */}
               <div className="record-inline-header">
                 <input
                   className="ghost-field ghost-field--name"
@@ -294,43 +290,37 @@ export function InventoryArticleDetailPage() {
                   onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
                   value={form.name}
                 />
-                <select
-                  className="ghost-chip-select"
-                  disabled={!canEdit}
-                  onChange={(e) => handleArticleTypeChange(e.target.value)}
-                  value={form.article_type}
-                >
+                <select className="ghost-chip-select" disabled={!canEdit} onChange={(e) => handleArticleTypeChange(e.target.value)} value={form.article_type}>
                   {catalogs.article_types.map((item) => (
                     <option key={item.value} value={item.value}>{item.label}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Descripcion */}
               <textarea
                 className="ghost-field ghost-field--description"
                 disabled={!canEdit}
                 onBlur={(e) => handleBlur({ ...formRef.current, description: e.target.value })}
                 onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))}
-                placeholder="Sin descripcion operativa cargada."
+                placeholder="Sin descripción operativa."
                 rows={2}
                 value={form.description}
               />
 
-              {/* Tarjetas de stock */}
-              <div className="record-meta-grid">
-                <article className="record-meta-card">
-                  <span>Stock actual</span>
-                  <strong>{formatQuantity(article.current_stock)}</strong>
-                </article>
-                <article className="record-meta-card">
-                  <span>Disponible</span>
-                  <strong>{formatQuantity(article.available_stock)}</strong>
-                </article>
-                <article className="record-meta-card record-meta-card--editable">
-                  <span>Minimo</span>
+              {/* KPI strip */}
+              <div className="kpi-strip">
+                <div className="kpi-item">
+                  <span className="kpi-label">Stock actual</span>
+                  <strong className="kpi-value">{formatQuantity(article.current_stock)}</strong>
+                </div>
+                <div className="kpi-item">
+                  <span className="kpi-label">Disponible</span>
+                  <strong className="kpi-value">{formatQuantity(article.available_stock)}</strong>
+                </div>
+                <div className={`kpi-item${canEdit ? ' kpi-item--editable' : ''}`}>
+                  <span className="kpi-label">Stock mínimo</span>
                   <input
-                    className="ghost-field ghost-field--meta-number"
+                    className="kpi-input"
                     disabled={!canEdit}
                     onBlur={(e) => handleBlur({ ...formRef.current, minimum_stock: e.target.value })}
                     onChange={(e) => setForm((c) => ({ ...c, minimum_stock: e.target.value }))}
@@ -339,11 +329,11 @@ export function InventoryArticleDetailPage() {
                     type="number"
                     value={form.minimum_stock}
                   />
-                </article>
-                <article className="record-meta-card record-meta-card--editable">
-                  <span>Ubicacion base</span>
+                </div>
+                <div className={`kpi-item${canEdit ? ' kpi-item--editable' : ''}`}>
+                  <span className="kpi-label">Ubicación base</span>
                   <select
-                    className="ghost-field ghost-field--meta-select"
+                    className="kpi-input"
                     disabled={!canEdit}
                     onChange={(e) => handleSelectChange('primary_location_id', e.target.value)}
                     value={form.primary_location_id}
@@ -353,199 +343,121 @@ export function InventoryArticleDetailPage() {
                       <option key={item.id} value={item.id}>{item.name}</option>
                     ))}
                   </select>
-                </article>
-              </div>
-
-              {/* Grilla de atributos */}
-              <div className="record-detail-grid">
-                <div className="record-detail-item">
-                  <span>Sector responsable</span>
-                  <select
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onChange={(e) => handleSelectChange('sector_responsible_id', e.target.value)}
-                    value={form.sector_responsible_id}
-                  >
-                    <option value="">Sin asignar</option>
-                    {catalogs.sectors.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                  </select>
                 </div>
-                <div className="record-detail-item">
-                  <span>Unidad de medida</span>
-                  <select
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onChange={(e) => handleSelectChange('unit_of_measure_id', e.target.value)}
-                    value={form.unit_of_measure_id}
-                  >
-                    <option value="">Sin asignar</option>
-                    {catalogs.units.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="record-detail-item">
-                  <span>Categoria</span>
-                  <select
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onChange={(e) =>
-                      handleSelectChange('category_id', e.target.value) ||
-                      setForm((c) => ({ ...c, subcategory_id: String(c.category_id) === String(e.target.value) ? c.subcategory_id : '' }))
-                    }
-                    value={form.category_id}
-                  >
-                    <option value="">Sin categoria</option>
-                    {rootCategories.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="record-detail-item">
-                  <span>Subcategoria</span>
-                  <select
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onChange={(e) => handleSelectChange('subcategory_id', e.target.value)}
-                    value={form.subcategory_id}
-                  >
-                    <option value="">Sin subcategoria</option>
-                    {subcategoryOptions.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="record-detail-item">
-                  <span>Proveedor habitual</span>
-                  <select
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onChange={(e) => handleSelectChange('supplier_id', e.target.value)}
-                    value={form.supplier_id}
-                  >
-                    <option value="">Sin proveedor</option>
-                    {catalogs.suppliers.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="record-detail-item">
-                  <span>Tracking</span>
-                  <select
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onChange={(e) => handleTrackingChange(e.target.value)}
-                    value={form.tracking_mode}
-                  >
-                    {catalogs.tracking_modes.map((item) => (
-                      <option key={item.value} value={item.value}>{item.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="record-detail-item">
-                  <span>Estado</span>
-                  <select
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onChange={(e) => handleSelectChange('status', e.target.value)}
-                    value={form.status}
-                  >
-                    {ARTICLE_STATUS_OPTIONS.map((item) => (
-                      <option key={item.value} value={item.value}>{item.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="record-detail-item">
-                  <span>Precio referencia</span>
-                  <input
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onBlur={(e) => handleBlur({ ...formRef.current, reference_price: e.target.value })}
-                    onChange={(e) => setForm((c) => ({ ...c, reference_price: e.target.value }))}
-                    placeholder="—"
-                    step="0.01"
-                    type="number"
-                    value={form.reference_price}
-                  />
-                </div>
-                <div className="record-detail-item record-detail-item--full">
-                  <span>Observaciones</span>
-                  <textarea
-                    className="ghost-field ghost-field--detail"
-                    disabled={!canEdit}
-                    onBlur={(e) => handleBlur({ ...formRef.current, observations: e.target.value })}
-                    onChange={(e) => setForm((c) => ({ ...c, observations: e.target.value }))}
-                    placeholder="—"
-                    rows={2}
-                    value={form.observations}
-                  />
-                </div>
-              </div>
-
-              {/* Flags */}
-              <div className="record-flags">
-                {[
-                  {
-                    field: 'is_critical',
-                    label: 'Critico',
-                    onChange: (v) => handleCheckboxChange('is_critical', v),
-                  },
-                  {
-                    field: 'loanable',
-                    label: 'Prestable',
-                    onChange: (v) => handleCheckboxChange('loanable', v),
-                  },
-                  {
-                    field: 'requires_lot',
-                    label: 'Lote',
-                    onChange: (v) =>
-                      handleCheckboxChange('requires_lot', v, {
-                        requires_expiry: v ? form.requires_expiry : false,
-                      }),
-                  },
-                  {
-                    field: 'requires_expiry',
-                    label: 'Vencimiento',
-                    onChange: (v) =>
-                      handleCheckboxChange('requires_expiry', v, {
-                        requires_lot: v ? true : form.requires_lot,
-                      }),
-                  },
-                  {
-                    field: 'requires_serial',
-                    label: 'Serie',
-                    onChange: (v) => handleCheckboxChange('requires_serial', v),
-                  },
-                  {
-                    field: 'requires_size',
-                    label: 'Talle',
-                    onChange: (v) => handleCheckboxChange('requires_size', v),
-                  },
-                  {
-                    field: 'requires_quality',
-                    label: 'Calidad',
-                    onChange: (v) => handleCheckboxChange('requires_quality', v),
-                  },
-                  {
-                    field: 'requires_assignee',
-                    label: 'Asignacion',
-                    onChange: (v) => handleCheckboxChange('requires_assignee', v),
-                  },
-                ].map(({ field, label, onChange }) => (
-                  <button
-                    className={`record-flag-chip ${form[field] ? 'is-active' : ''}`}
-                    disabled={!canEdit}
-                    key={field}
-                    onClick={() => onChange(!form[field])}
-                    type="button"
-                  >
-                    {label}
-                  </button>
-                ))}
               </div>
             </div>
+          </div>
+
+          {/* ── Paneles de detalle ── */}
+          <div className="detail-panels">
+            <div className="detail-panel">
+              <div className="detail-panel-title">Clasificación</div>
+
+              <div className={`detail-row${canEdit ? ' detail-row--editable' : ''}`}>
+                <span className="detail-row-label">Categoría</span>
+                <select className="detail-row-input" disabled={!canEdit} onChange={(e) => handleSelectChange('category_id', e.target.value)} value={form.category_id}>
+                  <option value="">Sin categoría</option>
+                  {rootCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </div>
+
+              <div className={`detail-row${canEdit ? ' detail-row--editable' : ''}`}>
+                <span className="detail-row-label">Subcategoría</span>
+                <select className="detail-row-input" disabled={!canEdit} onChange={(e) => handleSelectChange('subcategory_id', e.target.value)} value={form.subcategory_id}>
+                  <option value="">Sin subcategoría</option>
+                  {subcategoryOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </div>
+
+              <div className={`detail-row${canEdit ? ' detail-row--editable' : ''}`}>
+                <span className="detail-row-label">Seguimiento</span>
+                <select className="detail-row-input" disabled={!canEdit} onChange={(e) => handleTrackingChange(e.target.value)} value={form.tracking_mode}>
+                  {catalogs.tracking_modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+              </div>
+
+              <div className={`detail-row${canEdit ? ' detail-row--editable' : ''}`}>
+                <span className="detail-row-label">Estado</span>
+                <select className="detail-row-input" disabled={!canEdit} onChange={(e) => handleSelectChange('status', e.target.value)} value={form.status}>
+                  {ARTICLE_STATUS_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="detail-panel">
+              <div className="detail-panel-title">Logística</div>
+
+              <div className={`detail-row${canEdit ? ' detail-row--editable' : ''}`}>
+                <span className="detail-row-label">Sector resp.</span>
+                <select className="detail-row-input" disabled={!canEdit} onChange={(e) => handleSelectChange('sector_responsible_id', e.target.value)} value={form.sector_responsible_id}>
+                  <option value="">Sin asignar</option>
+                  {catalogs.sectors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </div>
+
+              <div className={`detail-row${canEdit ? ' detail-row--editable' : ''}`}>
+                <span className="detail-row-label">Proveedor</span>
+                <select className="detail-row-input" disabled={!canEdit} onChange={(e) => handleSelectChange('supplier_id', e.target.value)} value={form.supplier_id}>
+                  <option value="">Sin proveedor</option>
+                  {catalogs.suppliers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </div>
+
+              <div className={`detail-row${canEdit ? ' detail-row--editable' : ''}`}>
+                <span className="detail-row-label">Unid. de medida</span>
+                <select className="detail-row-input" disabled={!canEdit} onChange={(e) => handleSelectChange('unit_of_measure_id', e.target.value)} value={form.unit_of_measure_id}>
+                  <option value="">Sin asignar</option>
+                  {catalogs.units.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </div>
+
+              <div className={`detail-row${canEdit ? ' detail-row--editable' : ''}`}>
+                <span className="detail-row-label">Precio referencia</span>
+                <input
+                  className="detail-row-input"
+                  disabled={!canEdit}
+                  onBlur={(e) => handleBlur({ ...formRef.current, reference_price: e.target.value })}
+                  onChange={(e) => setForm((c) => ({ ...c, reference_price: e.target.value }))}
+                  placeholder="—"
+                  step="0.01"
+                  type="number"
+                  value={form.reference_price}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Atributos / flags ── */}
+          <div className="detail-panel">
+            <div className="detail-panel-title">Atributos</div>
+            <div className="record-flags">
+              {flagDefs.map(({ field, label, onChange }) => (
+                <button
+                  className={`record-flag-chip ${form[field] ? 'is-active' : ''}`}
+                  disabled={!canEdit}
+                  key={field}
+                  onClick={() => onChange(!form[field])}
+                  type="button"
+                >
+                  {form[field] && <span className="flag-dot" />}
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Observaciones ── */}
+          <div className={`detail-row detail-row--obs${canEdit ? ' detail-row--editable' : ''}`}>
+            <span className="detail-row-label">Observaciones</span>
+            <textarea
+              className="detail-row-input"
+              disabled={!canEdit}
+              onBlur={(e) => handleBlur({ ...formRef.current, observations: e.target.value })}
+              onChange={(e) => setForm((c) => ({ ...c, observations: e.target.value }))}
+              placeholder="Sin observaciones."
+              rows={3}
+              value={form.observations}
+            />
           </div>
         </ModuleSurface>
 

@@ -5345,6 +5345,236 @@ select.ghost-field--meta-select {
   opacity: 0.85;
 }
 
+.flag-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--workspace-input-focus);
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
+/* ── KPI strip ───────────────────────────────────────── */
+
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.kpi-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--workspace-record-bg);
+  border: 1px solid var(--workspace-border);
+  min-width: 0;
+  transition: border-color 0.14s;
+}
+
+.kpi-item--editable {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--workspace-input-focus) 40%, var(--workspace-border));
+}
+
+.kpi-item--editable:focus-within {
+  border-style: solid;
+  border-color: var(--workspace-input-focus);
+  background: color-mix(in srgb, var(--workspace-input-focus) 5%, var(--workspace-record-bg));
+}
+
+.kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--workspace-muted);
+  line-height: 1;
+}
+
+.kpi-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--workspace-heading);
+  line-height: 1.2;
+}
+
+.kpi-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--workspace-heading);
+  font: inherit;
+  padding: 0;
+  cursor: text;
+}
+
+.kpi-input:disabled {
+  cursor: default;
+  color: var(--workspace-heading);
+}
+
+select.kpi-input {
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: auto;
+}
+
+select.kpi-input:disabled {
+  cursor: default;
+}
+
+/* ── Detail panels grid ──────────────────────────────── */
+
+.detail-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--workspace-record-bg);
+  border: 1px solid var(--workspace-border);
+}
+
+.detail-panel-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--workspace-muted);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid transparent;
+  min-height: 30px;
+  transition: background 0.1s;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row--editable:not(:focus-within):hover {
+  background: color-mix(in srgb, var(--workspace-input-focus) 5%, transparent);
+  border-radius: 6px;
+}
+
+.detail-row--editable:focus-within {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--workspace-input-focus) 7%, transparent);
+}
+
+.detail-row-label {
+  flex: 0 0 130px;
+  font-size: 0.8rem;
+  color: var(--workspace-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-row-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--workspace-heading);
+  padding: 0;
+}
+
+.detail-row-input:disabled {
+  cursor: default;
+  color: var(--workspace-heading);
+  opacity: 1;
+}
+
+select.detail-row-input {
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: auto;
+}
+
+select.detail-row-input:disabled {
+  cursor: default;
+}
+
+.detail-row--editable .detail-row-label::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--workspace-input-focus) 50%, transparent);
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.detail-row--obs {
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--workspace-record-bg);
+  border: 1px solid var(--workspace-border);
+}
+
+.detail-row--obs .detail-row-label {
+  flex: 0 0 100px;
+  padding-top: 2px;
+}
+
+.detail-row--obs.detail-row--editable {
+  border-color: color-mix(in srgb, var(--workspace-input-focus) 35%, var(--workspace-border));
+  border-style: dashed;
+}
+
+.detail-row--obs.detail-row--editable:focus-within {
+  border-style: solid;
+  border-color: var(--workspace-input-focus);
+  background: color-mix(in srgb, var(--workspace-input-focus) 5%, var(--workspace-record-bg));
+}
+
+.detail-row--obs .detail-row-input {
+  resize: vertical;
+  min-height: 3em;
+}
+
+@media (max-width: 720px) {
+  .kpi-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .detail-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Inline-edit: layout helpers ─────────────────────── */
 
 .record-detail-item--full {
