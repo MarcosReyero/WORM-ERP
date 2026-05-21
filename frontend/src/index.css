@@ -5425,10 +5425,15 @@ select.kpi-input {
   cursor: pointer;
   appearance: auto;
   -webkit-appearance: auto;
+  background: var(--workspace-input-bg);
+  color: var(--workspace-input-text);
+  border-radius: 4px;
+  padding: 1px 4px;
 }
 
 select.kpi-input:disabled {
   cursor: default;
+  background: transparent;
 }
 
 /* ── Detail panels grid ──────────────────────────────── */
@@ -5504,7 +5509,7 @@ select.kpi-input:disabled {
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--workspace-heading);
+  color: var(--workspace-input-text);
   padding: 0;
 }
 
@@ -5512,16 +5517,29 @@ select.kpi-input:disabled {
   cursor: default;
   color: var(--workspace-heading);
   opacity: 1;
+  background: transparent;
 }
 
 select.detail-row-input {
   cursor: pointer;
   appearance: auto;
   -webkit-appearance: auto;
+  background: var(--workspace-input-bg);
+  color: var(--workspace-input-text);
+  border-radius: 4px;
+  padding: 2px 4px;
 }
 
 select.detail-row-input:disabled {
   cursor: default;
+  background: transparent;
+  color: var(--workspace-heading);
+}
+
+select.kpi-input option,
+select.detail-row-input option {
+  background: var(--workspace-input-bg);
+  color: var(--workspace-input-text);
 }
 
 .detail-row--editable .detail-row-label::after {
