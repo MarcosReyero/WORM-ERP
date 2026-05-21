@@ -48,15 +48,9 @@ class SectorAdmin(admin.ModelAdmin):
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
-<<<<<<< HEAD
-    list_display = ("full_name", "sector", "status")
-    list_filter = ("status", "sector")
-    search_fields = ("full_name",)
-=======
     list_display = ("full_name", "dni", "sector", "status")
     list_filter = ("status", "sector")
     search_fields = ("full_name", "dni")
->>>>>>> 91ea19cfdbb0b0b3617ca7050c692fe98ee714d3
 
 
 @admin.register(Supplier)
