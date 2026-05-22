@@ -371,6 +371,7 @@ class Article(AuditedModel):
         null=True,
         blank=True,
     )
+    auto_purchase_request = models.BooleanField(default=False)
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.SET_NULL,

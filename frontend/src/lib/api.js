@@ -746,3 +746,16 @@ export function sendInventoryFullStockReportNow() {
     body: JSON.stringify({ action: 'send_now' }),
   })
 }
+
+export function fetchAutoPurchaseConfig(categoryId = null) {
+  const params = categoryId ? `?category_id=${categoryId}` : ''
+  return request(`/api/purchasing/auto-purchase-config/${params}`)
+}
+
+export function saveAutoPurchaseConfig(payload) {
+  return request('/api/purchasing/auto-purchase-config/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    body: JSON.stringify(payload),
+  })
+}

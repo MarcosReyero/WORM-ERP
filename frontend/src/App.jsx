@@ -83,6 +83,9 @@ const PurchasingAlarmsPage = lazy(() =>
     default: module.PurchasingAlarmsPage,
   })),
 )
+const AutoPurchasePage = lazy(() =>
+  import('./components/purchasing/AutoPurchasePage.jsx').then((module) => ({ default: module.AutoPurchasePage })),
+)
 const ProfileDetailsPage = lazy(() =>
   import('./components/profile/ProfileDetailsPage.jsx').then((module) => ({ default: module.ProfileDetailsPage })),
 )
@@ -444,6 +447,7 @@ function App() {
             <Route index element={<ModuleNavIndexRedirect fallbackTo="/compras/solicitudes" />} />
             <Route path="solicitudes" element={<RequestsPage />} />
             <Route path="alarmas" element={<PurchasingAlarmsPage />} />
+            <Route path="automatizacion" element={<AutoPurchasePage />} />
           </Route>
           <Route path="tia" element={<TiaLayout />}>
             <Route index element={<ModuleNavIndexRedirect fallbackTo="/tia/enlace-s7" />} />

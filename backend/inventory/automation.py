@@ -728,7 +728,7 @@ class InventoryAutomationRunner(threading.Thread):
                 )
             return
 
-        from .services import evaluate_safety_stock_alert
+        from .services import evaluate_safety_stock_alert, run_auto_purchase_requests
 
         batch_size = getattr(settings, "INVENTORY_AUTOMATION_BATCH_SIZE", 100)
         heartbeat_seconds = getattr(settings, "INVENTORY_AUTOMATION_JOB_HEARTBEAT_SECONDS", 15)
@@ -828,6 +828,11 @@ class InventoryAutomationRunner(threading.Thread):
                         "batch_number": batch_number,
                     },
                 )
+
+            try:
+                run_auto_purchase_requests()
+            except Exception as exc:  # noqa: BLE001
+                RECONCILE_LOGGER.warning("auto_purchase_requests_error", extra={"error": str(exc)})
 
             outcome = (
                 InventoryAutomationTaskState.LastRunStatus.WARNING

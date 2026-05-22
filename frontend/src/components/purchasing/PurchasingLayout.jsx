@@ -19,6 +19,12 @@ export function PurchasingLayout() {
           hint: 'Minimos, destinatarios y canales',
           shortLabel: 'A',
         },
+        {
+          to: '/compras/automatizacion',
+          label: 'Automatización',
+          hint: 'Solicitudes automáticas por stock mínimo',
+          shortLabel: 'M',
+        },
       ],
     },
   ]

@@ -4329,6 +4329,50 @@ a {
   }
 }
 
+.auto-purchase-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0 2px;
+}
+
+.auto-purchase-info-hint {
+  font-size: 0.82rem;
+  color: var(--workspace-muted);
+}
+
+.alarm-chip-low {
+  background: color-mix(in srgb, var(--status-low-bg, #fef3c7) 60%, transparent);
+  color: var(--status-low-text, #92400e);
+  border: 1px solid color-mix(in srgb, var(--status-low-text, #92400e) 25%, transparent);
+}
+
+.auto-purchase-category-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--workspace-muted);
+}
+
+.auto-purchase-category-filter select {
+  font-size: 0.85rem;
+}
+
+.auto-purchase-col-check {
+  width: 44px;
+  text-align: center;
+}
+
+.auto-purchase-row-low td {
+  background: color-mix(in srgb, var(--status-low-bg, #fef3c7) 30%, transparent);
+}
+
+.auto-purchase-row-changed td {
+  background: color-mix(in srgb, var(--workspace-input-focus, #3b82f6) 8%, transparent);
+}
+
 .alarm-alert-banner {
   display: flex;
   align-items: center;
