@@ -3011,6 +3011,7 @@ a {
   gap: 10px;
   min-height: 0;
   min-width: 0;
+  align-content: start;
 }
 
 .module-page-header {
@@ -4191,7 +4192,7 @@ a {
   border-radius: 12px;
   background: var(--workspace-surface);
   border: 1px solid var(--workspace-border);
-  overflow: hidden;
+  clip-path: inset(0 round 12px);
 }
 
 .alarm-form-panel-header {
@@ -4201,6 +4202,7 @@ a {
   padding: 12px 20px;
   background: var(--workspace-surface-muted);
   border-bottom: 1px solid var(--workspace-border);
+  border-radius: 12px 12px 0 0;
 }
 
 .alarm-form-panel-title {
