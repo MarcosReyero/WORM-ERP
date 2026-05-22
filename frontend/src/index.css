@@ -4243,7 +4243,7 @@ a {
 }
 
 .alarm-form-recipients {
-  height: 100%;
+  flex: 1;
 }
 
 .alarm-form-actions {
@@ -4352,9 +4352,9 @@ a {
 .alarm-recipient-options {
   display: grid;
   gap: 8px;
-  max-height: 240px;
+  max-height: none;
   padding: 4px;
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .alarm-mode-tabs {
