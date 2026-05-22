@@ -4266,6 +4266,50 @@ a {
   }
 }
 
+.alarm-automation-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.alarm-automation-card {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--workspace-record-bg);
+  border: 1px solid var(--workspace-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.alarm-automation-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.alarm-automation-card-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--workspace-heading);
+}
+
+.alarm-automation-card-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 900px) {
+  .alarm-automation-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .alarm-alert-banner {
   display: flex;
   align-items: center;
