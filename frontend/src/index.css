@@ -4187,6 +4187,85 @@ a {
   font-size: 0.82rem;
 }
 
+.alarm-form-panel {
+  border-radius: 12px;
+  background: var(--workspace-surface);
+  border: 1px solid var(--workspace-border);
+  overflow: hidden;
+}
+
+.alarm-form-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--workspace-surface-muted);
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.alarm-form-panel-title {
+  font-size: 0.9rem;
+  color: var(--workspace-heading);
+}
+
+.alarm-form-close {
+  background: transparent;
+  border: none;
+  color: var(--workspace-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.12s, color 0.12s;
+}
+
+.alarm-form-close:hover {
+  background: var(--workspace-border);
+  color: var(--workspace-heading);
+}
+
+.alarm-form-body {
+  padding: 20px;
+}
+
+.alarm-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.alarm-form-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.alarm-form-recipients {
+  height: 100%;
+}
+
+.alarm-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.inline-action.is-active {
+  background: color-mix(in srgb, var(--workspace-input-focus) 14%, transparent);
+  color: var(--workspace-input-focus);
+  border-color: color-mix(in srgb, var(--workspace-input-focus) 40%, transparent);
+}
+
+@media (max-width: 720px) {
+  .alarm-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .alarm-alert-banner {
   display: flex;
   align-items: center;

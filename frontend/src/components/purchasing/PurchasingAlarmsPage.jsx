@@ -3,7 +3,6 @@ import { useOutletContext } from 'react-router-dom'
 import { fetchPurchasingAlarms, savePurchasingAlarm } from '../../lib/api.js'
 import { SearchSelect } from '../SearchSelect.jsx'
 import {
-  ModuleActionPanel,
   ModuleEmptyState,
   ModulePageHeader,
   ModuleTableSection,
@@ -79,7 +78,10 @@ function getRuleLabel(rule) {
 }
 
 function channelLabel(notifyEmail, notifyTelegram) {
-  return [notifyEmail ? 'Email' : null, notifyTelegram ? 'Telegram' : null].filter(Boolean).join(' + ') || 'Sin canal'
+  return (
+    [notifyEmail ? 'Email' : null, notifyTelegram ? 'Telegram' : null].filter(Boolean).join(' + ') ||
+    'Sin canal'
+  )
 }
 
 export function PurchasingAlarmsPage() {
@@ -88,8 +90,8 @@ export function PurchasingAlarmsPage() {
   const [saving, setSaving] = useState(false)
   const [data, setData] = useState(null)
   const [selectedRuleId, setSelectedRuleId] = useState(null)
-  const [selectedScope, setSelectedScope] = useState('global')
-  const [form, setForm] = useState(buildEmptyGlobalForm())
+  const [selectedScope, setSelectedScope] = useState(null) // null = nothing selected
+  const [form, setForm] = useState(null)
   const [feedback, setFeedback] = useState({ error: '', success: '' })
 
   useEffect(() => {
@@ -100,22 +102,6 @@ export function PurchasingAlarmsPage() {
         if (!active) return
         setData(response)
         setLoading(false)
-        if (response?.global) {
-          setSelectedScope('global')
-          setSelectedRuleId(null)
-          setForm(buildEmptyGlobalForm(response.global))
-        } else {
-          const first = response?.rules?.[0]
-          if (first) {
-            setSelectedScope('rule')
-            setSelectedRuleId(first.id)
-            setForm(buildFormFromRule(first))
-          } else {
-            setSelectedScope('rule')
-            setSelectedRuleId(null)
-            setForm(buildEmptyRuleForm())
-          }
-        }
       } catch (error) {
         if (!active) return
         setFeedback({ error: error.message || 'No se pudieron cargar las alarmas.', success: '' })
@@ -137,23 +123,48 @@ export function PurchasingAlarmsPage() {
   )
 
   const articleOptions = useMemo(
-    () => (data?.articles || []).map((article) => ({ id: String(article.id), label: article.label })),
+    () => (data?.articles || []).map((a) => ({ id: String(a.id), label: a.label })),
     [data?.articles],
   )
 
   const recipients = data?.catalogs?.alarm_recipients || []
 
-  function selectGlobal() {
+  function openGlobal() {
+    if (selectedScope === 'global') {
+      setSelectedScope(null)
+      setForm(null)
+      return
+    }
     setSelectedScope('global')
     setSelectedRuleId(null)
     setForm(buildEmptyGlobalForm(data?.global))
     setFeedback({ error: '', success: '' })
   }
 
-  function selectRule(rule) {
+  function openRule(rule) {
+    if (selectedScope === 'rule' && rule.id === selectedRuleId) {
+      setSelectedScope(null)
+      setSelectedRuleId(null)
+      setForm(null)
+      return
+    }
     setSelectedScope('rule')
     setSelectedRuleId(rule.id)
     setForm(buildFormFromRule(rule))
+    setFeedback({ error: '', success: '' })
+  }
+
+  function openNewRule() {
+    setSelectedScope('rule')
+    setSelectedRuleId(null)
+    setForm(buildEmptyRuleForm())
+    setFeedback({ error: '', success: '' })
+  }
+
+  function closeForm() {
+    setSelectedScope(null)
+    setSelectedRuleId(null)
+    setForm(null)
     setFeedback({ error: '', success: '' })
   }
 
@@ -170,18 +181,12 @@ export function PurchasingAlarmsPage() {
     const response = await fetchPurchasingAlarms()
     setData(response)
     if (scope === 'global') {
-      setSelectedScope('global')
-      setSelectedRuleId(null)
       setForm(buildEmptyGlobalForm(response.global))
       return
     }
     if (selectedId) {
       const matched = (response.rules || []).find((r) => r.id === selectedId)
-      if (matched) {
-        setSelectedScope('rule')
-        setSelectedRuleId(matched.id)
-        setForm(buildFormFromRule(matched))
-      }
+      if (matched) setForm(buildFormFromRule(matched))
     }
   }
 
@@ -195,40 +200,31 @@ export function PurchasingAlarmsPage() {
         await reload(null, 'global')
       } else {
         const ruleId = response.item?.id || selectedRuleId
+        setSelectedRuleId(ruleId)
         await reload(ruleId, 'rule')
       }
       setFeedback({ error: '', success: 'Alarma guardada.' })
     } catch (error) {
-      setFeedback({ error: error.message || 'No se pudo guardar la alarma.', success: '' })
+      setFeedback({ error: error.message || 'No se pudo guardar.', success: '' })
     } finally {
       setSaving(false)
     }
   }
 
   if (!user) return null
-
   if (loading) return <ModuleEmptyState title="Preparando alarmas" />
   if (!data) return <ModuleEmptyState title="Sin datos" />
+
+  const formTitle =
+    selectedScope === 'global'
+      ? 'Regla global — todos los artículos'
+      : selectedRuleId
+        ? 'Editar alarma individual'
+        : 'Nueva alarma individual'
 
   return (
     <div className="module-page-stack">
       <ModulePageHeader
-        actions={
-          <div className="module-header-actions">
-            <button
-              className="secondary-button"
-              onClick={() => {
-                setSelectedScope('rule')
-                setSelectedRuleId(null)
-                setForm(buildEmptyRuleForm())
-                setFeedback({ error: '', success: '' })
-              }}
-              type="button"
-            >
-              + Nueva alarma
-            </button>
-          </div>
-        }
         eyebrow="Compras / Alarmas"
         title="Alarmas por stock mínimo"
       />
@@ -238,62 +234,71 @@ export function PurchasingAlarmsPage() {
       {triggeredCount > 0 && (
         <div className="alarm-alert-banner">
           <span className="alarm-alert-icon">⚠</span>
-          <strong>{triggeredCount} alarma{triggeredCount !== 1 ? 's' : ''} activada{triggeredCount !== 1 ? 's' : ''}</strong>
+          <strong>
+            {triggeredCount} alarma{triggeredCount !== 1 ? 's' : ''} activada
+            {triggeredCount !== 1 ? 's' : ''}
+          </strong>
           <span>— artículos por debajo del stock mínimo.</span>
         </div>
       )}
 
-      <section className="module-page-grid">
-        <div className="module-main-stack">
-          <ModuleTableSection title="Reglas configuradas">
-            <div className="module-table-wrap">
-              <table className="module-table">
-                <thead>
-                  <tr>
-                    <th>Artículo</th>
-                    <th>Stock actual / mínimo</th>
-                    <th>Estado</th>
-                    <th>Canales</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Global row */}
-                  <tr
-                    className={`alarm-global-row${selectedScope === 'global' ? ' is-selected' : ''}`}
-                    onClick={selectGlobal}
-                  >
-                    <td>
-                      <strong>Todos los artículos</strong>
-                      <div className="muted">Regla global</div>
-                    </td>
-                    <td className="muted">—</td>
-                    <td>
-                      <span className={`status-pill ${data?.global?.is_enabled ? 'ok' : 'out'}`}>
-                        {data?.global?.is_enabled ? 'Habilitada' : 'Deshabilitada'}
-                      </span>
-                    </td>
-                    <td className="muted">
-                      {channelLabel(data?.global?.notify_email, data?.global?.notify_telegram)}
-                    </td>
-                  </tr>
-
-                  {filteredRules.length ? (
-                    filteredRules.map((rule) => (
+      <div className="module-main-stack">
+        <ModuleTableSection
+          title="Reglas configuradas"
+          actions={
+            <div className="module-header-actions">
+              <button
+                className={`inline-action${selectedScope === 'global' ? ' is-active' : ''}`}
+                onClick={openGlobal}
+                type="button"
+              >
+                Regla global
+              </button>
+              <button className="inline-action" onClick={openNewRule} type="button">
+                + Nueva alarma
+              </button>
+            </div>
+          }
+        >
+          <div className="module-table-wrap">
+            <table className="module-table">
+              <thead>
+                <tr>
+                  <th>Artículo</th>
+                  <th>Stock actual</th>
+                  <th>Stock mínimo</th>
+                  <th>Estado</th>
+                  <th>Canales</th>
+                  <th>Destinatarios</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRules.length ? (
+                  filteredRules.map((rule) => {
+                    const isSelected = selectedScope === 'rule' && rule.id === selectedRuleId
+                    return (
                       <tr
                         key={rule.id}
-                        className={selectedScope === 'rule' && rule.id === selectedRuleId ? 'is-selected' : ''}
-                        onClick={() => selectRule(rule)}
+                        className={isSelected ? 'is-selected' : ''}
+                        onClick={() => openRule(rule)}
+                        style={{ cursor: 'pointer' }}
                       >
                         <td>
                           <strong>{rule.article_name}</strong>
                           <div className="muted">{rule.article_code}</div>
                         </td>
                         <td>
-                          {rule.current_stock !== null && rule.minimum_stock !== null ? (
-                            <span className={rule.status === 'triggered' ? 'alarm-stock-triggered' : ''}>
+                          {rule.current_stock !== null ? (
+                            <span className={rule.status === 'triggered' && rule.is_enabled ? 'alarm-stock-triggered' : ''}>
                               {formatQuantity(rule.current_stock)}
-                              <span className="muted"> / mín {formatQuantity(rule.minimum_stock)}</span>
                             </span>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {rule.minimum_stock !== null ? (
+                            <span className="muted">{formatQuantity(rule.minimum_stock)}</span>
                           ) : (
                             <span className="muted">—</span>
                           )}
@@ -306,141 +311,157 @@ export function PurchasingAlarmsPage() {
                         <td className="muted">
                           {channelLabel(rule.notify_email, rule.notify_telegram)}
                         </td>
+                        <td className="muted">
+                          {rule.recipients.length
+                            ? rule.recipients.map((r) => r.full_name).join(', ')
+                            : '—'}
+                        </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="muted">
-                        Sin alarmas individuales. Usá el botón "Nueva alarma" para agregar una.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </ModuleTableSection>
-        </div>
+                    )
+                  })
+                ) : (
+                  <tr>
+                    <td className="muted" colSpan={6}>
+                      Sin alarmas individuales. Usá el botón "+ Nueva alarma" para agregar una.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </ModuleTableSection>
 
-        <ModuleActionPanel
-          title={
-            selectedScope === 'global'
-              ? 'Regla global'
-              : selectedRuleId
-                ? 'Editar alarma'
-                : 'Nueva alarma'
-          }
-          subtitle={
-            selectedScope === 'global'
-              ? 'Se activa cuando cualquier artículo con stock mínimo configurado cae por debajo del umbral.'
-              : 'Alarma individual para un artículo específico.'
-          }
-        >
-          <form className="module-form" onSubmit={handleSubmit}>
-            {selectedScope === 'rule' ? (
-              <label className="field">
-                <span>Artículo</span>
-                <SearchSelect
-                  options={articleOptions}
-                  value={form.article_id}
-                  onChange={(value) => setForm((c) => ({ ...c, article_id: String(value) }))}
-                  placeholder="Buscar artículo con stock mínimo..."
-                />
-              </label>
-            ) : null}
-
-            <label className="checkbox-field">
-              <input
-                checked={Boolean(form.is_enabled)}
-                onChange={(e) => setForm((c) => ({ ...c, is_enabled: e.target.checked }))}
-                type="checkbox"
-              />
-              <span>Regla habilitada</span>
-            </label>
-
-            <div className="module-card-section">
-              <div className="module-card-section-title">Canales de notificación</div>
-              <label className="checkbox-field">
-                <input
-                  checked={Boolean(form.notify_email)}
-                  onChange={(e) => setForm((c) => ({ ...c, notify_email: e.target.checked }))}
-                  type="checkbox"
-                />
-                <span>Email</span>
-              </label>
-              <label className="checkbox-field">
-                <input
-                  checked={Boolean(form.notify_telegram)}
-                  onChange={(e) => setForm((c) => ({ ...c, notify_telegram: e.target.checked }))}
-                  type="checkbox"
-                />
-                <span>Telegram</span>
-              </label>
-              <div className="muted" style={{ fontSize: '0.8rem', marginTop: 4 }}>
-                El Chat ID de Telegram se configura en Administración → Usuarios.
-              </div>
-            </div>
-
-            <div className="module-card-section">
-              <div className="module-card-section-title">Destinatarios</div>
-              {recipients.length ? (
-                <div className="alarm-recipient-options">
-                  {recipients.map((recipient) => (
-                    <label className="alarm-recipient-option" key={recipient.id}>
-                      <input
-                        checked={form.recipient_user_ids.includes(String(recipient.id))}
-                        onChange={() => toggleRecipient(String(recipient.id))}
-                        type="checkbox"
-                      />
-                      <span>
-                        <strong>{recipient.full_name}</strong>
-                        <small>
-                          {recipient.email || 'Sin email'}
-                          {recipient.telegram_chat_id ? ' · Telegram ✓' : ''}
-                        </small>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <div className="muted">No hay perfiles activos disponibles.</div>
-              )}
-            </div>
-
-            {form.notify_email ? (
-              <label className="field">
-                <span>Emails adicionales (opcional)</span>
-                <textarea
-                  className="text-area"
-                  onChange={(e) => setForm((c) => ({ ...c, additional_emails: e.target.value }))}
-                  placeholder="Uno por línea o separados por coma"
-                  rows={3}
-                  value={form.additional_emails}
-                />
-              </label>
-            ) : null}
-
-            <label className="field">
-              <span>Notas (opcional)</span>
-              <textarea
-                className="text-area"
-                onChange={(e) => setForm((c) => ({ ...c, notes: e.target.value }))}
-                rows={2}
-                value={form.notes}
-              />
-            </label>
-
-            <div className="module-form-actions">
-              <button
-                className="primary-button"
-                disabled={saving || (selectedScope === 'rule' && !form.article_id)}
-                type="submit"
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
+        {/* ── Inline form panel ── */}
+        {selectedScope && form && (
+          <div className="alarm-form-panel">
+            <div className="alarm-form-panel-header">
+              <strong className="alarm-form-panel-title">{formTitle}</strong>
+              <button className="alarm-form-close" onClick={closeForm} type="button">
+                ✕
               </button>
             </div>
-          </form>
-        </ModuleActionPanel>
-      </section>
+
+            <form className="alarm-form-body" onSubmit={handleSubmit}>
+              <div className="alarm-form-grid">
+                {/* Left column */}
+                <div className="alarm-form-col">
+                  {selectedScope === 'rule' && (
+                    <label className="field">
+                      <span>Artículo</span>
+                      <SearchSelect
+                        options={articleOptions}
+                        value={form.article_id}
+                        onChange={(value) => setForm((c) => ({ ...c, article_id: String(value) }))}
+                        placeholder="Buscar artículo con stock mínimo..."
+                      />
+                    </label>
+                  )}
+
+                  <div className="module-card-section">
+                    <div className="module-card-section-title">Estado</div>
+                    <label className="checkbox-field">
+                      <input
+                        checked={Boolean(form.is_enabled)}
+                        onChange={(e) => setForm((c) => ({ ...c, is_enabled: e.target.checked }))}
+                        type="checkbox"
+                      />
+                      <span>Regla habilitada</span>
+                    </label>
+                  </div>
+
+                  <div className="module-card-section">
+                    <div className="module-card-section-title">Canales de notificación</div>
+                    <label className="checkbox-field">
+                      <input
+                        checked={Boolean(form.notify_email)}
+                        onChange={(e) => setForm((c) => ({ ...c, notify_email: e.target.checked }))}
+                        type="checkbox"
+                      />
+                      <span>Email</span>
+                    </label>
+                    <label className="checkbox-field">
+                      <input
+                        checked={Boolean(form.notify_telegram)}
+                        onChange={(e) => setForm((c) => ({ ...c, notify_telegram: e.target.checked }))}
+                        type="checkbox"
+                      />
+                      <span>Telegram</span>
+                    </label>
+                    <div className="muted" style={{ fontSize: '0.8rem', marginTop: 2 }}>
+                      El Chat ID de Telegram se configura en Administración → Usuarios.
+                    </div>
+                  </div>
+
+                  {form.notify_email && (
+                    <label className="field">
+                      <span>Emails adicionales (opcional)</span>
+                      <textarea
+                        className="text-area"
+                        onChange={(e) => setForm((c) => ({ ...c, additional_emails: e.target.value }))}
+                        placeholder="Uno por línea o separados por coma"
+                        rows={2}
+                        value={form.additional_emails}
+                      />
+                    </label>
+                  )}
+
+                  <label className="field">
+                    <span>Notas (opcional)</span>
+                    <textarea
+                      className="text-area"
+                      onChange={(e) => setForm((c) => ({ ...c, notes: e.target.value }))}
+                      rows={2}
+                      value={form.notes}
+                    />
+                  </label>
+                </div>
+
+                {/* Right column: recipients */}
+                <div className="alarm-form-col">
+                  <div className="module-card-section alarm-form-recipients">
+                    <div className="module-card-section-title">Destinatarios</div>
+                    {recipients.length ? (
+                      <div className="alarm-recipient-options">
+                        {recipients.map((recipient) => (
+                          <label className="alarm-recipient-option" key={recipient.id}>
+                            <input
+                              checked={form.recipient_user_ids.includes(String(recipient.id))}
+                              onChange={() => toggleRecipient(String(recipient.id))}
+                              type="checkbox"
+                            />
+                            <span>
+                              <strong>{recipient.full_name}</strong>
+                              <small>
+                                {recipient.email || 'Sin email'}
+                                {recipient.telegram_chat_id ? ' · Telegram ✓' : ''}
+                              </small>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="muted">No hay perfiles activos.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="alarm-form-actions">
+                <button
+                  className="primary-button"
+                  disabled={saving || (selectedScope === 'rule' && !form.article_id)}
+                  type="submit"
+                >
+                  {saving ? 'Guardando...' : 'Guardar'}
+                </button>
+                <button className="secondary-button" onClick={closeForm} type="button">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
