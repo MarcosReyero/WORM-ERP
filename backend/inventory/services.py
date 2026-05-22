@@ -1380,33 +1380,13 @@ def build_minimum_stock_digest_message(config, low_stock_articles):
     """Construye minimum stock digest message."""
     subject = f"[Inventario] Resumen de stock minimo ({len(low_stock_articles)} articulos)"
     lines = [
-        "Resumen automatico de articulos en o por debajo del stock minimo.",
-        "",
-        f"Total afectados: {len(low_stock_articles)}",
-        "",
+        f"Resumen automatico de stock minimo — {timezone.localdate().isoformat()}.",
+        f"Se encontraron {len(low_stock_articles)} articulo(s) en o por debajo del stock minimo.",
+        "El detalle completo se encuentra en el archivo Excel adjunto.",
     ]
-
-    for article in low_stock_articles:
-        lines.extend(
-            [
-                f"- {article['name']} ({article['internal_code']})",
-                f"  Stock actual: {article['current_stock']}",
-                f"  Stock minimo: {article['minimum_stock']}",
-                f"  Sector responsable: {article['sector_responsible'] or 'Sin sector'}",
-                f"  Ubicacion principal: {article['primary_location'] or 'Sin ubicacion'}",
-                "",
-            ]
-        )
-
     if clean_string(config.notes):
-        lines.extend(
-            [
-                "Notas:",
-                config.notes.strip(),
-            ]
-        )
-
-    return subject, "\n".join(lines).strip()
+        lines.extend(["", config.notes.strip()])
+    return subject, "\n".join(lines)
 
 
 def send_minimum_stock_digest_email(config, recipient_emails, low_stock_articles):
@@ -1655,24 +1635,14 @@ def send_safety_stock_alert_email(alert):
 
     article = alert.article
     current_stock = alert.last_stock_value if alert.last_stock_value is not None else current_stock_for_article(article)
-    location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
     subject = f"[Alarma] Stock minimo alcanzado: {article.name} ({article.internal_code})"
-    body = "\n".join(
-        [
-            "Se activo una alarma automatica por stock minimo.",
-            "",
-            f"Articulo: {article.name}",
-            f"Codigo interno: {article.internal_code}",
-            f"Tipo: {article.get_article_type_display()}",
-            f"Stock actual: {serialize_decimal(current_stock)}",
-            f"Stock minimo: {serialize_decimal(article.minimum_stock)}",
-            f"Sector responsable: {article.sector_responsible.name}",
-            f"Ubicacion principal: {location_name}",
-            "",
-            "Revisa el modulo correspondiente para tomar accion.",
-            alert.notes.strip() if alert.notes.strip() else "",
-        ]
-    ).strip()
+    lines = [
+        f"Alerta automatica de stock minimo — {article.name} ({article.internal_code}).",
+        "El detalle del articulo se encuentra en el archivo Excel adjunto.",
+    ]
+    if alert.notes.strip():
+        lines.extend(["", alert.notes.strip()])
+    body = "\n".join(lines)
 
     report_filename, report_payload = build_article_alert_excel(article, current_stock)
     try:
@@ -1833,24 +1803,14 @@ def send_minimum_stock_alarm_email(config, article, current_stock=None):
         return False
 
     current_stock_value = current_stock if current_stock is not None else current_stock_for_article(article)
-    location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
     subject = f"[Compras] Stock minimo alcanzado: {article.name} ({article.internal_code})"
-    body = "\n".join(
-        [
-            "Se activo una alarma automatica por stock minimo.",
-            "",
-            f"Articulo: {article.name}",
-            f"Codigo interno: {article.internal_code}",
-            f"Tipo: {article.get_article_type_display()}",
-            f"Stock actual: {serialize_decimal(current_stock_value)}",
-            f"Stock minimo: {serialize_decimal(article.minimum_stock)}",
-            f"Sector responsable: {article.sector_responsible.name}",
-            f"Ubicacion principal: {location_name}",
-            "",
-            "Revisa el modulo de Compras para tomar accion.",
-            config.notes.strip() if config.notes.strip() else "",
-        ]
-    ).strip()
+    lines = [
+        f"Alerta automatica de stock minimo — {article.name} ({article.internal_code}).",
+        "El detalle del articulo se encuentra en el archivo Excel adjunto.",
+    ]
+    if config.notes.strip():
+        lines.extend(["", config.notes.strip()])
+    body = "\n".join(lines)
 
     report_filename, report_payload = build_article_alert_excel(article, current_stock_value)
     try:
@@ -2547,29 +2507,15 @@ def dispatch_minimum_stock_digest(config_id, due_key):
 
 def build_full_stock_report_message(config, article_count, report_filename, due_key=""):
     """Construye full stock report message."""
-    report_label = ""
-    if due_key and ":" in str(due_key):
-        report_label = due_key.split(":", 1)[1]
-
-    subject_suffix = report_label or timezone.localdate().isoformat()
+    subject_suffix = timezone.localdate().isoformat()
     subject = f"[Inventario] Reporte de stock completo ({subject_suffix})"
     lines = [
-        "Reporte automatico del stock completo (archivo Excel adjunto).",
-        "",
-        f"Total articulos: {article_count}",
-        f"Archivo: {report_filename}",
-        "",
+        f"Reporte automatico de stock completo — {timezone.localdate().isoformat()}.",
+        f"Incluye {article_count} articulo(s). El detalle completo se encuentra en el archivo Excel adjunto.",
     ]
-
     if clean_string(config.notes):
-        lines.extend(
-            [
-                "Notas:",
-                config.notes.strip(),
-            ]
-        )
-
-    return subject, "\n".join(lines).strip()
+        lines.extend(["", config.notes.strip()])
+    return subject, "\n".join(lines)
 
 
 def send_full_stock_report_email(config, recipient_emails, report_filename, report_payload, article_count, due_key=""):
