@@ -1344,6 +1344,38 @@ def resolve_digest_recipients(config):
     }
 
 
+def build_article_alert_excel(article, current_stock_value):
+    """Construye Excel con los datos de un artículo en alerta de stock."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Alerta"
+    columns = (
+        "Codigo interno", "Articulo", "Tipo",
+        "Stock actual", "Stock minimo",
+        "Sector responsable", "Ubicacion principal",
+    )
+    sheet.append(columns)
+    sheet.append([
+        article.internal_code,
+        article.name,
+        article.get_article_type_display(),
+        current_stock_value,
+        article.minimum_stock,
+        article.sector_responsible.name if article.sector_responsible else "",
+        article.primary_location.name if article.primary_location else "",
+    ])
+    sheet.freeze_panes = "A2"
+    column_widths = [18, 34, 20, 14, 14, 22, 22]
+    for index, width in enumerate(column_widths, start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+    for cell in sheet["D2:E2"][0]:
+        cell.number_format = "0.###"
+    output = BytesIO()
+    workbook.save(output)
+    filename = f"alerta-stock-{article.internal_code}-{timezone.localdate().isoformat()}.xlsx"
+    return filename, output.getvalue()
+
+
 def build_minimum_stock_digest_message(config, low_stock_articles):
     """Construye minimum stock digest message."""
     subject = f"[Inventario] Resumen de stock minimo ({len(low_stock_articles)} articulos)"
@@ -1378,19 +1410,26 @@ def build_minimum_stock_digest_message(config, low_stock_articles):
 
 
 def send_minimum_stock_digest_email(config, recipient_emails, low_stock_articles):
-    """Env?a minimum stock digest email."""
+    """Env?a minimum stock digest email con Excel adjunto."""
     if not getattr(settings, "INVENTORY_ALARM_EMAILS_ENABLED", True):
         return False, "El envio por mail esta desactivado en la configuracion."
 
     subject, body = build_minimum_stock_digest_message(config, low_stock_articles)
+    _, report_payload = build_stock_export_excel_from_articles(low_stock_articles)
+    report_filename = f"stock-minimo-{timezone.localdate().isoformat()}.xlsx"
     try:
-        sent = send_mail(
+        message = EmailMessage(
             subject=subject,
-            message=body,
+            body=body,
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
-            recipient_list=recipient_emails,
-            fail_silently=False,
+            to=recipient_emails,
         )
+        message.attach(
+            report_filename,
+            report_payload,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        sent = message.send(fail_silently=False)
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
 
@@ -1635,14 +1674,20 @@ def send_safety_stock_alert_email(alert):
         ]
     ).strip()
 
+    report_filename, report_payload = build_article_alert_excel(article, current_stock)
     try:
-        sent = send_mail(
+        email_msg = EmailMessage(
             subject=subject,
-            message=body,
+            body=body,
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
-            recipient_list=recipients,
-            fail_silently=False,
+            to=recipients,
         )
+        email_msg.attach(
+            report_filename,
+            report_payload,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        sent = email_msg.send(fail_silently=False)
     except Exception as exc:  # noqa: BLE001
         alert.last_email_error = str(exc)
         save_validated(alert)
@@ -1807,14 +1852,20 @@ def send_minimum_stock_alarm_email(config, article, current_stock=None):
         ]
     ).strip()
 
+    report_filename, report_payload = build_article_alert_excel(article, current_stock_value)
     try:
-        sent = send_mail(
+        email_msg = EmailMessage(
             subject=subject,
-            message=body,
+            body=body,
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
-            recipient_list=recipients,
-            fail_silently=False,
+            to=recipients,
         )
+        email_msg.attach(
+            report_filename,
+            report_payload,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        sent = email_msg.send(fail_silently=False)
     except Exception as exc:  # noqa: BLE001
         config.last_email_error = str(exc)
         save_validated(config)
