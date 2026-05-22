@@ -4187,6 +4187,32 @@ a {
   font-size: 0.82rem;
 }
 
+.alarm-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--workspace-status-low-bg);
+  border: 1px solid color-mix(in srgb, var(--workspace-status-low-text) 30%, transparent);
+  color: var(--workspace-status-low-text);
+  font-size: 0.88rem;
+}
+
+.alarm-alert-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.alarm-global-row {
+  background: color-mix(in srgb, var(--workspace-border) 30%, transparent);
+}
+
+.alarm-stock-triggered {
+  color: var(--workspace-status-low-text);
+  font-weight: 600;
+}
+
 .alarm-recipient-list {
   display: grid;
   gap: 10px;

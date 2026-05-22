@@ -642,7 +642,7 @@ def apply_balance_delta(article, location, quantity_delta, user, batch=None):
     new_value = balance.on_hand + quantity_delta
     if new_value < 0:
         raise InventoryApiError(
-            f"Not enough stock at {location.name} for {article.name}",
+            f"Stock insuficiente en {location.name} para {article.name}",
             status=400,
         )
     balance.on_hand = new_value
