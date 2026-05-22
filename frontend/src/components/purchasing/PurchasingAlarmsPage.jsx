@@ -342,121 +342,85 @@ export function PurchasingAlarmsPage() {
             </div>
 
             <form className="alarm-form-body" onSubmit={handleSubmit}>
-              <div className="alarm-form-grid">
-                {/* Left column */}
-                <div className="alarm-form-col">
-                  {selectedScope === 'rule' && (
-                    <label className="field">
-                      <span>Artículo</span>
-                      <SearchSelect
-                        options={articleOptions}
-                        value={form.article_id}
-                        onChange={(value) => setForm((c) => ({ ...c, article_id: String(value) }))}
-                        placeholder="Buscar artículo con stock mínimo..."
-                      />
-                    </label>
-                  )}
+              <div className="alarm-form-section">
+                {selectedScope === 'rule' && (
+                  <label className="field">
+                    <span>Artículo</span>
+                    <SearchSelect
+                      options={articleOptions}
+                      value={form.article_id}
+                      onChange={(value) => setForm((c) => ({ ...c, article_id: String(value) }))}
+                      placeholder="Buscar artículo con stock mínimo..."
+                    />
+                  </label>
+                )}
 
-                  <div className="module-card-section">
+                <div className="alarm-form-row">
+                  <div className="module-card-section" style={{ flex: '1 1 160px' }}>
                     <div className="module-card-section-title">Estado</div>
                     <label className="checkbox-field">
-                      <input
-                        checked={Boolean(form.is_enabled)}
-                        onChange={(e) => setForm((c) => ({ ...c, is_enabled: e.target.checked }))}
-                        type="checkbox"
-                      />
+                      <input checked={Boolean(form.is_enabled)} onChange={(e) => setForm((c) => ({ ...c, is_enabled: e.target.checked }))} type="checkbox" />
                       <span>Regla habilitada</span>
                     </label>
                   </div>
-
-                  <div className="module-card-section">
+                  <div className="module-card-section" style={{ flex: '1 1 200px' }}>
                     <div className="module-card-section-title">Canales de notificación</div>
                     <label className="checkbox-field">
-                      <input
-                        checked={Boolean(form.notify_email)}
-                        onChange={(e) => setForm((c) => ({ ...c, notify_email: e.target.checked }))}
-                        type="checkbox"
-                      />
+                      <input checked={Boolean(form.notify_email)} onChange={(e) => setForm((c) => ({ ...c, notify_email: e.target.checked }))} type="checkbox" />
                       <span>Email</span>
                     </label>
                     <label className="checkbox-field">
-                      <input
-                        checked={Boolean(form.notify_telegram)}
-                        onChange={(e) => setForm((c) => ({ ...c, notify_telegram: e.target.checked }))}
-                        type="checkbox"
-                      />
+                      <input checked={Boolean(form.notify_telegram)} onChange={(e) => setForm((c) => ({ ...c, notify_telegram: e.target.checked }))} type="checkbox" />
                       <span>Telegram</span>
                     </label>
                     <div className="muted" style={{ fontSize: '0.8rem', marginTop: 2 }}>
                       El Chat ID de Telegram se configura en Administración → Usuarios.
                     </div>
                   </div>
+                </div>
 
+                <div className="module-card-section">
+                  <div className="module-card-section-title">Destinatarios</div>
+                  {recipients.length ? (
+                    <div className="alarm-recipients-grid">
+                      {recipients.map((recipient) => (
+                        <label className="alarm-recipient-option" key={recipient.id}>
+                          <input
+                            checked={form.recipient_user_ids.includes(String(recipient.id))}
+                            onChange={() => toggleRecipient(String(recipient.id))}
+                            type="checkbox"
+                          />
+                          <span>
+                            <strong>{recipient.full_name}</strong>
+                            <small>{recipient.email || 'Sin email'}{recipient.telegram_chat_id ? ' · Telegram ✓' : ''}</small>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="muted">No hay perfiles activos.</div>
+                  )}
+                </div>
+
+                <div className="alarm-form-row">
                   {form.notify_email && (
                     <label className="field">
                       <span>Emails adicionales (opcional)</span>
-                      <textarea
-                        className="text-area"
-                        onChange={(e) => setForm((c) => ({ ...c, additional_emails: e.target.value }))}
-                        placeholder="Uno por línea o separados por coma"
-                        rows={2}
-                        value={form.additional_emails}
-                      />
+                      <textarea className="text-area" onChange={(e) => setForm((c) => ({ ...c, additional_emails: e.target.value }))} placeholder="Uno por línea o separados por coma" rows={2} value={form.additional_emails} />
                     </label>
                   )}
-
                   <label className="field">
                     <span>Notas (opcional)</span>
-                    <textarea
-                      className="text-area"
-                      onChange={(e) => setForm((c) => ({ ...c, notes: e.target.value }))}
-                      rows={2}
-                      value={form.notes}
-                    />
+                    <textarea className="text-area" onChange={(e) => setForm((c) => ({ ...c, notes: e.target.value }))} rows={2} value={form.notes} />
                   </label>
-                </div>
-
-                {/* Right column: recipients */}
-                <div className="alarm-form-col">
-                  <div className="module-card-section alarm-form-recipients">
-                    <div className="module-card-section-title">Destinatarios</div>
-                    {recipients.length ? (
-                      <div className="alarm-recipient-options">
-                        {recipients.map((recipient) => (
-                          <label className="alarm-recipient-option" key={recipient.id}>
-                            <input
-                              checked={form.recipient_user_ids.includes(String(recipient.id))}
-                              onChange={() => toggleRecipient(String(recipient.id))}
-                              type="checkbox"
-                            />
-                            <span>
-                              <strong>{recipient.full_name}</strong>
-                              <small>
-                                {recipient.email || 'Sin email'}
-                                {recipient.telegram_chat_id ? ' · Telegram ✓' : ''}
-                              </small>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="muted">No hay perfiles activos.</div>
-                    )}
-                  </div>
                 </div>
               </div>
 
               <div className="alarm-form-actions">
-                <button
-                  className="primary-button"
-                  disabled={saving || (selectedScope === 'rule' && !form.article_id)}
-                  type="submit"
-                >
+                <button className="primary-button" disabled={saving || (selectedScope === 'rule' && !form.article_id)} type="submit">
                   {saving ? 'Guardando...' : 'Guardar'}
                 </button>
-                <button className="secondary-button" onClick={closeForm} type="button">
-                  Cancelar
-                </button>
+                <button className="secondary-button" onClick={closeForm} type="button">Cancelar</button>
               </div>
             </form>
           </div>

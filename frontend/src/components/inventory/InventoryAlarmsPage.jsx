@@ -101,7 +101,7 @@ function getAutomationLabel(taskState) {
 function RecipientList({ recipients, selectedIds, onToggle }) {
   if (!recipients.length) return <p className="module-empty-copy">No hay perfiles activos disponibles.</p>
   return (
-    <div className="alarm-recipient-options">
+    <div className="alarm-recipients-grid">
       {recipients.map((r) => (
         <label className="alarm-recipient-option" key={r.id}>
           <input checked={selectedIds.includes(String(r.id))} onChange={() => onToggle(String(r.id))} type="checkbox" />
@@ -397,51 +397,48 @@ export function InventoryAlarmsPage() {
             <PanelMessage error={safetyFeedback.error} success={safetyFeedback.success} />
             {safetyEligibleArticles.length ? (
               <form onSubmit={handleSafetySubmit}>
-                <div className="alarm-form-grid">
-                  <div className="alarm-form-col">
-                    <label className="field">
-                      <span>Artículo con stock mínimo</span>
-                      <SearchSelect
-                        options={safetyEligibleArticles.map((a) => ({ id: a.id, label: `${a.name} — ${a.internal_code}` }))}
-                        value={safetyForm.article_id}
-                        onChange={handleSelectSafetyArticle}
-                        placeholder="Buscar artículo..."
-                      />
-                    </label>
+                <div className="alarm-form-section">
+                  <label className="field">
+                    <span>Artículo con stock mínimo</span>
+                    <SearchSelect
+                      options={safetyEligibleArticles.map((a) => ({ id: a.id, label: `${a.name} — ${a.internal_code}` }))}
+                      value={safetyForm.article_id}
+                      onChange={handleSelectSafetyArticle}
+                      placeholder="Buscar artículo..."
+                    />
+                  </label>
 
-                    {selectedArticle && (
-                      <div className="alarm-rule-context">
-                        <div className="alarm-rule-context-head">
-                          <span className="module-chip">{selectedArticle.internal_code}</span>
-                          <span className={`status-pill ${getSafetyAlertTone(selectedRule || { is_enabled: false })}`}>
-                            {selectedRule ? getSafetyAlertLabel(selectedRule) : 'Sin regla'}
-                          </span>
-                        </div>
-                        <p>Stock actual <strong>{formatQuantity(selectedArticle.current_stock)}</strong> · Mínimo <strong>{formatQuantity(selectedArticle.minimum_stock)}</strong></p>
+                  {selectedArticle && (
+                    <div className="alarm-rule-context">
+                      <div className="alarm-rule-context-head">
+                        <span className="module-chip">{selectedArticle.internal_code}</span>
+                        <span className={`status-pill ${getSafetyAlertTone(selectedRule || { is_enabled: false })}`}>
+                          {selectedRule ? getSafetyAlertLabel(selectedRule) : 'Sin regla'}
+                        </span>
                       </div>
-                    )}
+                      <p>Stock actual <strong>{formatQuantity(selectedArticle.current_stock)}</strong> · Mínimo <strong>{formatQuantity(selectedArticle.minimum_stock)}</strong></p>
+                    </div>
+                  )}
 
-                    <label className="checkbox-field">
-                      <input checked={safetyForm.is_enabled} onChange={(e) => setSafetyForm((c) => ({ ...c, is_enabled: e.target.checked }))} type="checkbox" />
-                      <span>Alarma habilitada</span>
-                    </label>
+                  <label className="checkbox-field">
+                    <input checked={safetyForm.is_enabled} onChange={(e) => setSafetyForm((c) => ({ ...c, is_enabled: e.target.checked }))} type="checkbox" />
+                    <span>Alarma habilitada</span>
+                  </label>
 
+                  <div className="module-card-section">
+                    <div className="module-card-section-title">Destinatarios</div>
+                    <RecipientList recipients={recipients} selectedIds={safetyForm.recipient_user_ids} onToggle={toggleRecipient(setSafetyForm)} />
+                  </div>
+
+                  <div className="alarm-form-row">
                     <label className="field">
                       <span>Emails adicionales (opcional)</span>
-                      <textarea className="text-area" onChange={(e) => setSafetyForm((c) => ({ ...c, additional_emails: e.target.value }))} placeholder="uno@empresa.com&#10;dos@empresa.com" rows={2} value={safetyForm.additional_emails} />
+                      <textarea className="text-area" onChange={(e) => setSafetyForm((c) => ({ ...c, additional_emails: e.target.value }))} placeholder="uno@empresa.com, dos@empresa.com" rows={2} value={safetyForm.additional_emails} />
                     </label>
-
                     <label className="field">
                       <span>Nota para el aviso (opcional)</span>
                       <textarea className="text-area" onChange={(e) => setSafetyForm((c) => ({ ...c, notes: e.target.value }))} placeholder="Detalle operativo que se incluirá en el mail." rows={2} value={safetyForm.notes} />
                     </label>
-                  </div>
-
-                  <div className="alarm-form-col">
-                    <div className="module-card-section alarm-form-recipients">
-                      <div className="module-card-section-title">Destinatarios</div>
-                      <RecipientList recipients={recipients} selectedIds={safetyForm.recipient_user_ids} onToggle={toggleRecipient(setSafetyForm)} />
-                    </div>
                   </div>
                 </div>
 
@@ -512,27 +509,25 @@ export function InventoryAlarmsPage() {
           <InlineFormPanel title="Configurar resumen periódico de stock mínimo" onClose={() => setActivePanel(null)}>
             <PanelMessage error={periodicFeedback.error} success={periodicFeedback.success} />
             <form onSubmit={handlePeriodicSubmit}>
-              <div className="alarm-form-grid">
-                <div className="alarm-form-col">
-                  <label className="checkbox-field">
-                    <input checked={periodicForm.is_enabled} onChange={(e) => setPeriodicForm((c) => ({ ...c, is_enabled: e.target.checked }))} type="checkbox" />
-                    <span>Resumen habilitado</span>
-                  </label>
-                  <ScheduleFields form={periodicForm} setForm={setPeriodicForm} />
+              <div className="alarm-form-section">
+                <label className="checkbox-field">
+                  <input checked={periodicForm.is_enabled} onChange={(e) => setPeriodicForm((c) => ({ ...c, is_enabled: e.target.checked }))} type="checkbox" />
+                  <span>Resumen habilitado</span>
+                </label>
+                <ScheduleFields form={periodicForm} setForm={setPeriodicForm} />
+                <div className="module-card-section">
+                  <div className="module-card-section-title">Destinatarios</div>
+                  <RecipientList recipients={recipients} selectedIds={periodicForm.recipient_user_ids} onToggle={toggleRecipient(setPeriodicForm)} />
+                </div>
+                <div className="alarm-form-row">
                   <label className="field">
                     <span>Emails adicionales (opcional)</span>
-                    <textarea className="text-area" onChange={(e) => setPeriodicForm((c) => ({ ...c, additional_emails: e.target.value }))} placeholder="uno@empresa.com&#10;dos@empresa.com" rows={2} value={periodicForm.additional_emails} />
+                    <textarea className="text-area" onChange={(e) => setPeriodicForm((c) => ({ ...c, additional_emails: e.target.value }))} placeholder="uno@empresa.com, dos@empresa.com" rows={2} value={periodicForm.additional_emails} />
                   </label>
                   <label className="field">
                     <span>Nota para el resumen (opcional)</span>
                     <textarea className="text-area" onChange={(e) => setPeriodicForm((c) => ({ ...c, notes: e.target.value }))} placeholder="Contexto operativo que se incluirá en el mail." rows={2} value={periodicForm.notes} />
                   </label>
-                </div>
-                <div className="alarm-form-col">
-                  <div className="module-card-section alarm-form-recipients">
-                    <div className="module-card-section-title">Destinatarios</div>
-                    <RecipientList recipients={recipients} selectedIds={periodicForm.recipient_user_ids} onToggle={toggleRecipient(setPeriodicForm)} />
-                  </div>
                 </div>
               </div>
               <div className="alarm-form-actions">
@@ -592,27 +587,25 @@ export function InventoryAlarmsPage() {
           <InlineFormPanel title="Configurar reporte periódico de stock completo" onClose={() => setActivePanel(null)}>
             <PanelMessage error={fullStockFeedback.error} success={fullStockFeedback.success} />
             <form onSubmit={handleFullStockReportSubmit}>
-              <div className="alarm-form-grid">
-                <div className="alarm-form-col">
-                  <label className="checkbox-field">
-                    <input checked={fullStockForm.is_enabled} onChange={(e) => setFullStockForm((c) => ({ ...c, is_enabled: e.target.checked }))} type="checkbox" />
-                    <span>Reporte habilitado</span>
-                  </label>
-                  <ScheduleFields form={fullStockForm} setForm={setFullStockForm} />
+              <div className="alarm-form-section">
+                <label className="checkbox-field">
+                  <input checked={fullStockForm.is_enabled} onChange={(e) => setFullStockForm((c) => ({ ...c, is_enabled: e.target.checked }))} type="checkbox" />
+                  <span>Reporte habilitado</span>
+                </label>
+                <ScheduleFields form={fullStockForm} setForm={setFullStockForm} />
+                <div className="module-card-section">
+                  <div className="module-card-section-title">Destinatarios</div>
+                  <RecipientList recipients={recipients} selectedIds={fullStockForm.recipient_user_ids} onToggle={toggleRecipient(setFullStockForm)} />
+                </div>
+                <div className="alarm-form-row">
                   <label className="field">
                     <span>Emails adicionales (opcional)</span>
-                    <textarea className="text-area" onChange={(e) => setFullStockForm((c) => ({ ...c, additional_emails: e.target.value }))} placeholder="uno@empresa.com&#10;dos@empresa.com" rows={2} value={fullStockForm.additional_emails} />
+                    <textarea className="text-area" onChange={(e) => setFullStockForm((c) => ({ ...c, additional_emails: e.target.value }))} placeholder="uno@empresa.com, dos@empresa.com" rows={2} value={fullStockForm.additional_emails} />
                   </label>
                   <label className="field">
                     <span>Nota para el reporte (opcional)</span>
                     <textarea className="text-area" onChange={(e) => setFullStockForm((c) => ({ ...c, notes: e.target.value }))} placeholder="Contexto operativo que se incluirá en el reporte." rows={2} value={fullStockForm.notes} />
                   </label>
-                </div>
-                <div className="alarm-form-col">
-                  <div className="module-card-section alarm-form-recipients">
-                    <div className="module-card-section-title">Destinatarios</div>
-                    <RecipientList recipients={recipients} selectedIds={fullStockForm.recipient_user_ids} onToggle={toggleRecipient(setFullStockForm)} />
-                  </div>
                 </div>
               </div>
               <div className="alarm-form-actions">
@@ -671,8 +664,8 @@ export function InventoryAlarmsPage() {
           <InlineFormPanel title="Nueva alarma interna" onClose={() => setActivePanel(null)}>
             <PanelMessage error={manualFeedback.error} success={manualFeedback.success} />
             <form onSubmit={handleManualSubmit}>
-              <div className="alarm-form-grid">
-                <div className="alarm-form-col">
+              <div className="alarm-form-section">
+                <div className="alarm-form-row">
                   <label className="field">
                     <span>Destinatario</span>
                     <select onChange={(e) => setManualForm((c) => ({ ...c, target_user_id: e.target.value }))} required value={manualForm.target_user_id}>
@@ -696,16 +689,14 @@ export function InventoryAlarmsPage() {
                     </select>
                   </label>
                 </div>
-                <div className="alarm-form-col">
-                  <label className="field">
-                    <span>Título</span>
-                    <input onChange={(e) => setManualForm((c) => ({ ...c, title: e.target.value }))} required type="text" value={manualForm.title} />
-                  </label>
-                  <label className="field">
-                    <span>Mensaje</span>
-                    <textarea className="text-area" onChange={(e) => setManualForm((c) => ({ ...c, body: e.target.value }))} required rows={4} value={manualForm.body} />
-                  </label>
-                </div>
+                <label className="field">
+                  <span>Título</span>
+                  <input onChange={(e) => setManualForm((c) => ({ ...c, title: e.target.value }))} required type="text" value={manualForm.title} />
+                </label>
+                <label className="field">
+                  <span>Mensaje</span>
+                  <textarea className="text-area" onChange={(e) => setManualForm((c) => ({ ...c, body: e.target.value }))} required rows={4} value={manualForm.body} />
+                </label>
               </div>
               <div className="alarm-form-actions">
                 <button className="primary-button" disabled={sendingManualAlarm || !manualForm.target_user_id || !manualForm.title.trim() || !manualForm.body.trim()} type="submit">

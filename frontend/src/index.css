@@ -4229,23 +4229,7 @@ a {
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.alarm-form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
-}
-
-.alarm-form-col {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.alarm-form-recipients {
-  flex: 1;
+  gap: 18px;
 }
 
 .alarm-form-actions {
@@ -4254,6 +4238,31 @@ a {
   gap: 10px;
   padding-top: 16px;
   border-top: 1px solid var(--workspace-border);
+}
+
+.alarm-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alarm-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.alarm-form-row > .field,
+.alarm-form-row > label {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.alarm-recipients-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  padding: 4px 0;
 }
 
 .inline-action.is-active {
