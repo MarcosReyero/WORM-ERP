@@ -5,6 +5,8 @@ import {
   saveInventoryFullStockReport,
   saveInventoryMinimumStockDigest,
   saveInventorySafetyAlert,
+  sendInventoryMinimumStockDigestNow,
+  sendInventoryFullStockReportNow,
 } from '../../lib/api.js'
 import { SearchSelect } from '../SearchSelect.jsx'
 import {
@@ -162,6 +164,10 @@ export function InventoryAlarmsPage() {
   const [savingPeriodicRule, setSavingPeriodicRule] = useState(false)
   const [savingFullStockReport, setSavingFullStockReport] = useState(false)
   const [sendingManualAlarm, setSendingManualAlarm] = useState(false)
+  const [sendingDigestNow, setSendingDigestNow] = useState(false)
+  const [sendingFullReportNow, setSendingFullReportNow] = useState(false)
+  const [digestNowFeedback, setDigestNowFeedback] = useState({ error: '', success: '' })
+  const [fullReportNowFeedback, setFullReportNowFeedback] = useState({ error: '', success: '' })
   const [safetyFeedback, setSafetyFeedback] = useState({ error: '', success: '' })
   const [periodicFeedback, setPeriodicFeedback] = useState({ error: '', success: '' })
   const [fullStockFeedback, setFullStockFeedback] = useState({ error: '', success: '' })
@@ -279,6 +285,34 @@ export function InventoryAlarmsPage() {
       setFullStockFeedback({ error: error.message || 'No se pudo guardar.', success: '' })
     } finally {
       setSavingFullStockReport(false)
+    }
+  }
+
+  async function handleSendDigestNow() {
+    setSendingDigestNow(true)
+    setDigestNowFeedback({ error: '', success: '' })
+    try {
+      await sendInventoryMinimumStockDigestNow()
+      await refreshInventoryModule()
+      setDigestNowFeedback({ error: '', success: 'Resumen enviado.' })
+    } catch (error) {
+      setDigestNowFeedback({ error: error.message || 'No se pudo enviar el resumen.', success: '' })
+    } finally {
+      setSendingDigestNow(false)
+    }
+  }
+
+  async function handleSendFullReportNow() {
+    setSendingFullReportNow(true)
+    setFullReportNowFeedback({ error: '', success: '' })
+    try {
+      await sendInventoryFullStockReportNow()
+      await refreshInventoryModule()
+      setFullReportNowFeedback({ error: '', success: 'Reporte enviado.' })
+    } catch (error) {
+      setFullReportNowFeedback({ error: error.message || 'No se pudo enviar el reporte.', success: '' })
+    } finally {
+      setSendingFullReportNow(false)
     }
   }
 
@@ -461,6 +495,18 @@ export function InventoryAlarmsPage() {
           actions={
             <div className="module-header-actions">
               <span className="module-chip">{minimumStockDigest?.low_stock_count || 0} artículos hoy</span>
+              {digestNowFeedback.success && <span className="inline-feedback-ok">{digestNowFeedback.success}</span>}
+              {digestNowFeedback.error && <span className="inline-feedback-err">{digestNowFeedback.error}</span>}
+              {minimumStockDigest?.id && (
+                <button
+                  className="inline-action"
+                  disabled={sendingDigestNow}
+                  onClick={handleSendDigestNow}
+                  type="button"
+                >
+                  {sendingDigestNow ? 'Enviando...' : 'Enviar ahora'}
+                </button>
+              )}
               <button
                 className={`inline-action${activePanel === 'periodic' ? ' is-active' : ''}`}
                 onClick={() => { togglePanel('periodic'); setPeriodicFeedback({ error: '', success: '' }) }}
@@ -544,6 +590,18 @@ export function InventoryAlarmsPage() {
           actions={
             <div className="module-header-actions">
               <span className="module-chip">{fullStockReport?.article_count || 0} artículos</span>
+              {fullReportNowFeedback.success && <span className="inline-feedback-ok">{fullReportNowFeedback.success}</span>}
+              {fullReportNowFeedback.error && <span className="inline-feedback-err">{fullReportNowFeedback.error}</span>}
+              {fullStockReport?.id && (
+                <button
+                  className="inline-action"
+                  disabled={sendingFullReportNow}
+                  onClick={handleSendFullReportNow}
+                  type="button"
+                >
+                  {sendingFullReportNow ? 'Enviando...' : 'Enviar ahora'}
+                </button>
+              )}
               <button
                 className={`inline-action${activePanel === 'fullstock' ? ' is-active' : ''}`}
                 onClick={() => { togglePanel('fullstock'); setFullStockFeedback({ error: '', success: '' }) }}

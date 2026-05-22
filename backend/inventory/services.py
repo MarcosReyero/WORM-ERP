@@ -2304,6 +2304,33 @@ def save_full_stock_report_config(user, payload):
     return serialize_full_stock_report_config(refreshed_config, save_warning=save_warning)
 
 
+def force_send_minimum_stock_digest(user):
+    """Envía el resumen de stock mínimo de forma manual inmediata."""
+    require_role(user, ALARM_ROLES)
+    config = MinimumStockDigestConfig.objects.filter(key="default").first()
+    if not config:
+        raise InventoryApiError("No hay configuración de resumen. Guardá una primero.")
+    if not config.is_enabled:
+        raise InventoryApiError("El resumen está deshabilitado. Habilitalo antes de enviar.")
+    due_key = f"manual-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+    result = dispatch_minimum_stock_digest(config.id, due_key)
+    if result.get("delivery_status") == MinimumStockDigestConfig.DeliveryStatus.SKIPPED:
+        raise InventoryApiError("No hay artículos con stock bajo en este momento — no se envió nada.")
+    return result
+
+
+def force_send_full_stock_report(user):
+    """Envía el reporte de stock completo de forma manual inmediata."""
+    require_role(user, ALARM_ROLES)
+    config = FullStockReportConfig.objects.filter(key="default").first()
+    if not config:
+        raise InventoryApiError("No hay configuración de reporte. Guardá una primero.")
+    if not config.is_enabled:
+        raise InventoryApiError("El reporte está deshabilitado. Habilitalo antes de enviar.")
+    due_key = f"manual-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+    return dispatch_full_stock_report(config.id, due_key)
+
+
 def dispatch_minimum_stock_digest(config_id, due_key):
     """Maneja dispatch minimum stock digest."""
     config = (

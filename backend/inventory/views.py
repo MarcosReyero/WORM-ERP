@@ -59,6 +59,8 @@ from .services import (
     return_checkout,
     save_minimum_stock_digest_config,
     save_full_stock_report_config,
+    force_send_minimum_stock_digest,
+    force_send_full_stock_report,
     save_purchasing_minimum_stock_alarm_config,
     save_safety_stock_alert_rule,
     serialize_article,
@@ -757,7 +759,11 @@ def inventory_minimum_stock_digest(request):
         denied = _require_permission(request, "alarms", "change")
         if denied:
             return denied
-        item = save_minimum_stock_digest_config(request.user, parse_json(request))
+        payload = parse_json(request)
+        if payload.get("action") == "send_now":
+            force_send_minimum_stock_digest(request.user)
+            return JsonResponse({"detail": "Resumen enviado correctamente."}, status=200)
+        item = save_minimum_stock_digest_config(request.user, payload)
         return JsonResponse({"detail": "Minimum stock digest saved", "item": item}, status=201)
 
     return _handle_inventory_call(handler)
@@ -782,7 +788,11 @@ def inventory_full_stock_report(request):
         denied = _require_permission(request, "reports", "change")
         if denied:
             return denied
-        item = save_full_stock_report_config(request.user, parse_json(request))
+        payload = parse_json(request)
+        if payload.get("action") == "send_now":
+            force_send_full_stock_report(request.user)
+            return JsonResponse({"detail": "Reporte enviado correctamente."}, status=200)
+        item = save_full_stock_report_config(request.user, payload)
         return JsonResponse({"detail": "Full stock report saved", "item": item}, status=201)
 
     return _handle_inventory_call(handler)

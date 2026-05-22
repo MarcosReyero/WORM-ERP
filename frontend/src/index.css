@@ -2960,6 +2960,18 @@ a {
   flex-wrap: wrap;
 }
 
+.inline-feedback-ok {
+  font-size: 0.8rem;
+  color: var(--status-ok-text, #1a6b3c);
+  font-weight: 500;
+}
+
+.inline-feedback-err {
+  font-size: 0.8rem;
+  color: var(--status-low-text, #9b1c1c);
+  font-weight: 500;
+}
+
 .module-chip {
   display: inline-flex;
   align-items: center;

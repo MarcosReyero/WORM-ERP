@@ -726,3 +726,23 @@ export function saveInventoryFullStockReport(payload) {
     body: JSON.stringify(payload),
   })
 }
+
+export function sendInventoryMinimumStockDigestNow() {
+  return request('/api/inventory/minimum-stock-digest/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify({ action: 'send_now' }),
+  })
+}
+
+export function sendInventoryFullStockReportNow() {
+  return request('/api/inventory/full-stock-report/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify({ action: 'send_now' }),
+  })
+}
