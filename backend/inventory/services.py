@@ -650,6 +650,45 @@ def apply_balance_delta(article, location, quantity_delta, user, batch=None):
     return balance
 
 
+def apply_balance_delta_from_available(article, quantity, user):
+    """Descuenta stock de los balances existentes cuando el origen es automatico."""
+    balances = list(
+        InventoryBalance.objects.select_for_update()
+        .select_related("location")
+        .filter(article=article, on_hand__gt=0)
+    )
+    balances.sort(
+        key=lambda balance: (
+            balance.location_id != article.primary_location_id,
+            balance.location.name,
+            balance.id,
+        )
+    )
+    total_on_hand = sum((balance.on_hand for balance in balances), Decimal("0"))
+    if total_on_hand < quantity:
+        reference_location = article.primary_location or get_default_location()
+        location_name = reference_location.name if reference_location else "stock disponible"
+        raise InventoryApiError(
+            f"Stock insuficiente en {location_name} para {article.name}",
+            status=400,
+        )
+
+    remaining = quantity
+    first_location = None
+    for balance in balances:
+        if remaining <= 0:
+            break
+        consumed = min(balance.on_hand, remaining)
+        balance.on_hand -= consumed
+        update_audit(balance, user)
+        save_validated(balance)
+        if first_location is None:
+            first_location = balance.location
+        remaining -= consumed
+
+    return first_location
+
+
 def next_unit_tag(article, index):
     """Maneja next unit tag."""
     return f"{article.internal_code}-{index:03d}"
@@ -1573,6 +1612,7 @@ def serialize_movement(movement):
         "quantity": serialize_decimal(movement.quantity),
         "recorded_by": movement.recorded_by.username,
         "tracked_unit": movement.tracked_unit.internal_tag if movement.tracked_unit else None,
+        "batch": movement.batch.lot_code if movement.batch else None,
         "source_location": movement.source_location.name if movement.source_location else None,
         "target_location": movement.target_location.name if movement.target_location else None,
         "person": movement.person.full_name if movement.person else None,
@@ -3448,7 +3488,8 @@ def update_article(user, article_id, payload, files=None):
 def _resolve_quantity_article_movement(article, movement, payload, user):
     """Maneja resolve quantity article movement."""
     batch = create_or_update_batch(article, payload, user)
-    source_location = movement.source_location or article.primary_location or get_default_location()
+    selected_source_location = movement.source_location
+    source_location = selected_source_location or article.primary_location or get_default_location()
     target_location = movement.target_location or article.primary_location or get_default_location()
 
     if movement.movement_type in {
@@ -3469,10 +3510,13 @@ def _resolve_quantity_article_movement(article, movement, payload, user):
         StockMovement.MovementType.EXPIRED_OUT,
         StockMovement.MovementType.DISPOSAL_OUT,
     }:
-        if not source_location:
-            raise InventoryApiError("source_location is required")
-        movement.source_location = source_location
-        apply_balance_delta(article, source_location, movement.quantity * Decimal("-1"), user, batch=batch)
+        if selected_source_location or batch:
+            if not source_location:
+                raise InventoryApiError("source_location is required")
+            movement.source_location = source_location
+            apply_balance_delta(article, source_location, movement.quantity * Decimal("-1"), user, batch=batch)
+        else:
+            movement.source_location = apply_balance_delta_from_available(article, movement.quantity, user)
     elif movement.movement_type == StockMovement.MovementType.TRANSFER:
         if not source_location or not target_location:
             raise InventoryApiError("source_location and target_location are required")
@@ -5726,6 +5770,25 @@ STOCK_EXPORT_COLUMNS = (
 )
 
 
+MOVEMENT_EXPORT_COLUMNS = (
+    "Fecha",
+    "Tipo",
+    "Articulo",
+    "Cantidad",
+    "Origen",
+    "Destino",
+    "Persona",
+    "Sector",
+    "Lote",
+    "Unidad trazada",
+    "Registrado por",
+    "Autorizado por",
+    "Motivo",
+    "Documento",
+    "Observaciones",
+)
+
+
 def build_stock_export_excel(filters=None):
     """Construye stock export excel."""
     articles = filter_articles_for_stock_view(list_articles(), filters=filters)
@@ -5772,3 +5835,101 @@ def build_stock_export_excel_from_articles(articles):
     output = BytesIO()
     workbook.save(output)
     return f"stock-{timezone.localdate().isoformat()}.xlsx", output.getvalue()
+
+
+def movement_matches_export_query(movement, query):
+    """Devuelve si un movimiento coincide con la busqueda de exportacion."""
+    normalized_query = clean_casefold(query or "")
+    if not normalized_query:
+        return True
+    target = " ".join(
+        str(value)
+        for value in [
+            movement.get("movement_type_label"),
+            movement.get("article"),
+            movement.get("source_location"),
+            movement.get("target_location"),
+            movement.get("person"),
+            movement.get("sector"),
+            movement.get("recorded_by"),
+            movement.get("reason_text"),
+            movement.get("tracked_unit"),
+            movement.get("batch"),
+            movement.get("document_ref"),
+            movement.get("notes"),
+        ]
+        if value
+    )
+    return normalized_query in clean_casefold(target)
+
+
+def list_movements(filters=None):
+    """Lista movimientos con filtros opcionales."""
+    filters = filters or {}
+    movement_type = clean_casefold(filters.get("movement_type") or "all")
+    query = filters.get("query") or filters.get("global_query") or ""
+    movements = [
+        serialize_movement(movement)
+        for movement in StockMovement.objects.select_related(
+            "article",
+            "recorded_by",
+            "tracked_unit",
+            "batch",
+            "source_location",
+            "target_location",
+            "person",
+            "sector",
+            "authorized_by",
+        ).order_by("-timestamp", "-id")
+    ]
+    return [
+        movement
+        for movement in movements
+        if (movement_type == "all" or clean_casefold(movement.get("movement_type")) == movement_type)
+        and movement_matches_export_query(movement, query)
+    ]
+
+
+def build_movements_export_excel(filters=None):
+    """Construye Excel de movimientos."""
+    movements = list_movements(filters=filters)
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Movimientos"
+    sheet.append(MOVEMENT_EXPORT_COLUMNS)
+
+    for movement in movements:
+        sheet.append(
+            [
+                movement.get("timestamp") or "",
+                movement.get("movement_type_label") or "",
+                movement.get("article") or "",
+                movement.get("quantity"),
+                movement.get("source_location") or "",
+                movement.get("target_location") or "",
+                movement.get("person") or "",
+                movement.get("sector") or "",
+                movement.get("batch") or "",
+                movement.get("tracked_unit") or "",
+                movement.get("recorded_by") or "",
+                movement.get("authorized_by") or "",
+                movement.get("reason_text") or "",
+                movement.get("document_ref") or "",
+                movement.get("notes") or "",
+            ]
+        )
+
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = f"A1:{get_column_letter(len(MOVEMENT_EXPORT_COLUMNS))}{sheet.max_row}"
+
+    column_widths = [22, 24, 34, 12, 22, 22, 24, 22, 18, 18, 18, 18, 34, 18, 34]
+    for index, width in enumerate(column_widths, start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=4, max_col=4):
+        for cell in row:
+            cell.number_format = "0.###"
+
+    output = BytesIO()
+    workbook.save(output)
+    return f"movimientos-{timezone.localdate().isoformat()}.xlsx", output.getvalue()

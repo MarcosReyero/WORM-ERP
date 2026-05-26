@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useLocation, useOutletContext } from 'react-router-dom'
-import { createMovement } from '../../lib/api.js'
+import { createMovement, exportMovementsToExcel, fetchMovements } from '../../lib/api.js'
 import { CloseIcon, SearchIcon } from '../Icons.jsx'
 import {
   ModuleEmptyState,
@@ -143,6 +143,8 @@ export function InventoryMovementsPage() {
   const [movementTypeFilter, setMovementTypeFilter] = useState('all')
   const [busyAction, setBusyAction] = useState('')
   const [movementFeedback, setMovementFeedback] = useState({ error: '', success: '' })
+  const [movementHistory, setMovementHistory] = useState([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const [registerMovementType, setRegisterMovementType] = useState(
     MOVEMENT_MODE_CONFIG.egress.defaultType,
   )
@@ -156,7 +158,7 @@ export function InventoryMovementsPage() {
     sectors: [],
     people: [],
   }
-  const movements = inventoryOverview?.movements ?? []
+  const movements = historyLoaded ? movementHistory : inventoryOverview?.movements ?? []
   const permissions = inventoryOverview?.permissions ?? { can_record_movement: false }
   const movementMode = getMovementMode(registerMovementType)
   const movementModeConfig = MOVEMENT_MODE_CONFIG[movementMode]
@@ -213,6 +215,34 @@ export function InventoryMovementsPage() {
     setMovementLines([createEmptyMovementLine(nextArticleId)])
   }, [articlesById, location.key, location.state, presetKey])
 
+  useEffect(() => {
+    if (activeView !== 'history' || historyLoaded || busyAction === 'history') {
+      return
+    }
+
+    let isMounted = true
+    setBusyAction('history')
+    fetchMovements()
+      .then((response) => {
+        if (!isMounted) return
+        setMovementHistory(response.items || [])
+        setHistoryLoaded(true)
+      })
+      .catch((error) => {
+        if (!isMounted) return
+        setMovementFeedback({ error: error.message, success: '' })
+      })
+      .finally(() => {
+        if (isMounted) {
+          setBusyAction('')
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [activeView, busyAction, historyLoaded])
+
   async function handleMovementSubmit(event) {
     event.preventDefault()
     if (!movementLines.length || pendingLinesWithoutQuantity) {
@@ -236,6 +266,8 @@ export function InventoryMovementsPage() {
         successCount += 1
       }
       await refreshInventoryModule()
+      setHistoryLoaded(false)
+      setMovementHistory([])
       setMovementLines([])
       setArticleSearch('')
       setMovementFeedback({
@@ -256,6 +288,23 @@ export function InventoryMovementsPage() {
           ? `${successCount} movimiento(s) registrado(s) antes del error.`
           : '',
       })
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function handleExportMovements() {
+    setMovementFeedback({ error: '', success: '' })
+    setBusyAction('movement-export')
+
+    try {
+      await exportMovementsToExcel({
+        query: deferredQuery,
+        movementType: movementTypeFilter,
+      })
+      setMovementFeedback({ error: '', success: 'Excel exportado.' })
+    } catch (error) {
+      setMovementFeedback({ error: error.message, success: '' })
     } finally {
       setBusyAction('')
     }
@@ -357,6 +406,24 @@ export function InventoryMovementsPage() {
                       ))}
                     </select>
                   </label>
+                  <label>
+                    Exportar
+                    <button
+                      className="inline-action"
+                      disabled={busyAction === 'movement-export'}
+                      onClick={() => {
+                        void handleExportMovements()
+                      }}
+                      type="button"
+                    >
+                      {busyAction === 'movement-export' ? 'Exportando...' : 'Exportar Excel'}
+                    </button>
+                  </label>
+                </div>
+                <div className="module-toolbar-meta">
+                  <span className="module-chip is-muted">
+                    {historyLoaded ? 'Historial completo' : 'Resumen reciente'}
+                  </span>
                 </div>
               </ModuleToolbar>
             }

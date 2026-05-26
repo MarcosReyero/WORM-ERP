@@ -629,6 +629,52 @@ export function createMovement(payload) {
   })
 }
 
+export function fetchMovements(filters = {}) {
+  const search = new URLSearchParams({
+    query: filters.query || '',
+    movement_type: filters.movementType || 'all',
+  })
+
+  return request(`/api/movements/?${search.toString()}`)
+}
+
+export async function exportMovementsToExcel(filters = {}) {
+  const search = new URLSearchParams({
+    query: filters.query || '',
+    movement_type: filters.movementType || 'all',
+  })
+
+  const response = await fetch(`/api/movements/export-excel/?${search.toString()}`, {
+    credentials: 'include',
+    method: 'GET',
+  })
+
+  if (!response.ok) {
+    const isJson = response.headers.get('content-type')?.includes('application/json')
+    const data = isJson ? await response.json() : null
+    const error = new Error(data?.detail || 'No se pudo exportar el Excel.')
+    error.status = response.status
+    throw error
+  }
+
+  const blob = await response.blob()
+  const filename = parseDownloadFilename(
+    response.headers.get('content-disposition'),
+    'movimientos.xlsx',
+  )
+  const downloadUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = downloadUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(downloadUrl)
+
+  return { filename }
+}
+
 export function createCheckout(payload) {
   return request('/api/checkouts/', {
     method: 'POST',

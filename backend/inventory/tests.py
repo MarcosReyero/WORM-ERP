@@ -900,6 +900,86 @@ class InventoryApiTests(TestCase):
         balance.refresh_from_db()
         self.assertEqual(balance.on_hand, previous_stock + Decimal("5"))
 
+    def test_quantity_egress_can_consume_all_stock_with_zero_minimum(self):
+        """Permite retirar hasta dejar stock cero cuando el minimo es cero."""
+        self.client.force_login(self.storekeeper)
+        article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
+        article.minimum_stock = Decimal("0")
+        article.primary_location = self.location
+        article.save(update_fields=["minimum_stock", "primary_location"])
+        InventoryBalance.objects.filter(article=article).delete()
+        InventoryBalance.objects.create(
+            article=article,
+            location=self.location,
+            on_hand=Decimal("9"),
+            created_by=self.storekeeper,
+            updated_by=self.storekeeper,
+        )
+
+        response = self.client.post(
+            "/api/movements/",
+            data=json.dumps(
+                {
+                    "article_id": article.id,
+                    "movement_type": "consumption_out",
+                    "quantity": "9",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        balance = InventoryBalance.objects.get(article=article, location=self.location)
+        self.assertEqual(balance.on_hand, Decimal("0"))
+
+    def test_quantity_egress_without_source_consumes_split_stock(self):
+        """El origen automatico descuenta de varios balances si hace falta."""
+        self.client.force_login(self.storekeeper)
+        article = Article.objects.filter(tracking_mode=Article.TrackingMode.QUANTITY).first()
+        article.minimum_stock = Decimal("0")
+        article.primary_location = self.location
+        article.save(update_fields=["minimum_stock", "primary_location"])
+        secondary_location = Location.objects.create(
+            code="DEP-AUX-TEST",
+            name="Deposito auxiliar test",
+            location_type=Location.LocationType.WAREHOUSE,
+            created_by=self.storekeeper,
+            updated_by=self.storekeeper,
+        )
+        InventoryBalance.objects.filter(article=article).delete()
+        InventoryBalance.objects.create(
+            article=article,
+            location=self.location,
+            on_hand=Decimal("4"),
+            created_by=self.storekeeper,
+            updated_by=self.storekeeper,
+        )
+        InventoryBalance.objects.create(
+            article=article,
+            location=secondary_location,
+            on_hand=Decimal("5"),
+            created_by=self.storekeeper,
+            updated_by=self.storekeeper,
+        )
+
+        response = self.client.post(
+            "/api/movements/",
+            data=json.dumps(
+                {
+                    "article_id": article.id,
+                    "movement_type": "consumption_out",
+                    "quantity": "9",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            InventoryBalance.objects.filter(article=article).aggregate(total=Sum("on_hand"))["total"],
+            Decimal("0"),
+        )
+
     def test_checkout_and_return_updates_tracked_unit(self):
         """Maneja test checkout and return updates tracked unit."""
         self.client.force_login(self.storekeeper)

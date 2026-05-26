@@ -29,6 +29,7 @@ from .models import (
 from .services import (
     InventoryApiError,
     add_count_line,
+    build_movements_export_excel,
     build_stock_export_excel,
     build_dashboard,
     build_inventory_overview,
@@ -51,6 +52,7 @@ from .services import (
     bulk_delete_personal_daily_reports,
     delete_personal_daily_report,
     list_articles,
+    list_movements,
     list_personal_daily_reports,
     list_safety_stock_alerts,
     active_alarm_recipients,
@@ -499,20 +501,7 @@ def movements(request):
         denied = _require_permission(request, "movements", "view")
         if denied:
             return denied
-        items = [
-            serialize_movement(movement)
-            for movement in StockMovement.objects.select_related(
-                "article",
-                "recorded_by",
-                "tracked_unit",
-                "source_location",
-                "target_location",
-                "person",
-                "sector",
-                "authorized_by",
-            ).order_by("-timestamp", "-id")
-        ]
-        return JsonResponse({"items": items})
+        return JsonResponse({"items": list_movements(request.GET)})
 
     def handler():
         """Maneja handler."""
@@ -524,6 +513,29 @@ def movements(request):
             {"detail": "Movement registered", "item": serialize_movement(movement)},
             status=201,
         )
+
+    return _handle_inventory_call(handler)
+
+
+@require_GET
+def movement_export_excel(request):
+    """Exporta movimientos a Excel."""
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    denied = _require_permission(request, "movements", "view")
+    if denied:
+        return denied
+
+    def handler():
+        """Maneja handler."""
+        filename, payload = build_movements_export_excel(request.GET)
+        response = HttpResponse(
+            payload,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
     return _handle_inventory_call(handler)
 
