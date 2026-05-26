@@ -1,4 +1,4 @@
-# 🔧 Desarrollo de Automatización - Quick Start
+#  Desarrollo de Automatización - Quick Start
 
 Guía rápida para probar la automatización de stock mínimo en desarrollo local.
 
@@ -81,13 +81,13 @@ Cuando ejecutas el comando en desarrollo:
 
 ```
 ╔════════════════════════════════════════════════════════════╗
-║  🚀 MODO DESARROLLO - Automatización de Stock Mínimo      ║
+║   MODO DESARROLLO - Automatización de Stock Mínimo      ║
 ╚════════════════════════════════════════════════════════════╝
 
 Configuración:
   • Poll interval:      60 segundos
   • Reconcile interval: 600 segundos
-  • Verbose logging:    ✓ ENABLED
+  • Verbose logging:     ENABLED
 
 Presiona Ctrl+C para detener.
 
@@ -227,7 +227,7 @@ Presiona **Ctrl+C** en la terminal. Deberías ver:
 
 ```
 Interrupción por usuario (Ctrl+C)
-✓ Scheduler finalizado.
+ Scheduler finalizado.
 ```
 
 Si algo falla, logs van a:
@@ -247,4 +247,4 @@ Una vez que lo pruebes localmente y veas que funciona:
 
 ---
 
-¡Happy testing! 🎉
+¡Happy testing!

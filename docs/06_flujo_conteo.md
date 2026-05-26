@@ -6,82 +6,82 @@ Este diagrama documenta el proceso completo de realizar un conteo físico de inv
 
 ```mermaid
 flowchart TD
-    A["📊 Usuario: Supervisor"] -->|"Inicia Conteo"| B["InventoryCountsPage.jsx"]
-    
+    A[" Usuario: Supervisor"] -->|"Inicia Conteo"| B["InventoryCountsPage.jsx"]
+
     B -->|"POST /counts/"| C["views.py"]
     C -->|"create_count_session()"| D["services.py"]
-    
+
     D -->|"Valida Permiso"| E{"¿Usuario<br/>COUNT_ROLE?"}
-    E -->|NO| F["❌ 403 Forbidden"]
+    E -->|NO| F[" 403 Forbidden"]
     E -->|SÍ| G["Crea<br/>PhysicalCountSession"]
-    
-    G -->|"Payload:<br/>count_type,<br/>scope,<br/>scheduled_for"| H["💾 Base de Datos<br/>PhysicalCountSession<br/>status=OPEN"]
-    
-    H -->|"✅ Retorna session_id"| B
-    B -->|"Toast: Conteo Abierto"| I["🎯 Sesión de Conteo"]
-    
+
+    G -->|"Payload:<br/>count_type,<br/>scope,<br/>scheduled_for"| H[" Base de Datos<br/>PhysicalCountSession<br/>status=OPEN"]
+
+    H -->|" Retorna session_id"| B
+    B -->|"Toast: Conteo Abierto"| I[" Sesión de Conteo"]
+
     I -->|"Usuario(s) ingresan<br/>artículos contados"| J["POST /counts/<id>/lines/"]
-    
+
     J -->|"Payload:<br/>article_id,<br/>location_id,<br/>counted_qty,<br/>counter_person_id"| C
     C -->|"add_count_line()"| D
-    
+
     D -->|"1. Valida Artículo"| K["¿Artículo<br/>existe?"]
-    K -->|NO| L["❌ Error"]
+    K -->|NO| L[" Error"]
     K -->|SÍ| M["2. Obtiene Stock<br/>del Sistema"]
-    
+
     M -->|"SELECT current_stock"| N["InventoryBalance<br/>o conteo de<br/>TrackedUnits"]
-    
+
     N -->|"3. Crea Línea"| O["PhysicalCountLine<br/>system_qty vs counted_qty"]
-    
+
     O -->|"4. Calcula Diferencia"| P["difference_qty =<br/>counted_qty - system_qty"]
-    
+
     P -->|"Si diferencia ≠ 0"| Q["StockDiscrepancy<br/>created"]
-    P -->|"Si diferencia = 0"| R["✅ Sin discrepancia"]
-    
-    Q --> S["📋 Discrepancia<br/>status=OPEN<br/>difference_type=<br/>POSITIVE/NEGATIVE"]
+    P -->|"Si diferencia = 0"| R[" Sin discrepancia"]
+
+    Q --> S[" Discrepancia<br/>status=OPEN<br/>difference_type=<br/>POSITIVE/NEGATIVE"]
     R --> T["Siguiente línea"]
     S --> T
 
 %% REVISIÓN %%
-    U["👤 Usuario: Jefe Almacén"] -->|"Revisa Conteo"| V["POST /counts/<id>/close"]
-    
+    U[" Usuario: Jefe Almacén"] -->|"Revisa Conteo"| V["POST /counts/<id>/close"]
+
     V -->|"Valida que todas<br/>las líneas fueron<br/>contadas"| W{"¿Conteo<br/>Completo?"}
-    
-    W -->|NO| X["❌ Error:<br/>Faltan líneas"]
+
+    W -->|NO| X[" Error:<br/>Faltan líneas"]
     W -->|SÍ| Y["Cambia Session<br/>a status=REVIEW"]
-    
-    Y -->|"GET /discrepancies"| Z["🔍 Vista de<br/>Discrepancias"]
-    
+
+    Y -->|"GET /discrepancies"| Z[" Vista de<br/>Discrepancias"]
+
     Z -->|"Muestra diferencias"| AA["Artículo | Ubicación | Sistema | Real | Diferencia"]
 
     AA -->|"Para cada discrepancia"| AB["Usuario elige:<br/>1. Investigar<br/>2. Resolver<br/>3. Ignorar"]
-    
+
     AB -->|"POST /discrepancies/<id>/resolve"| C
-    
+
     C -->|"resolve_discrepancy()"| D
-    
+
     D -->|"Payload:<br/>action,<br/>notes,<br/>recommendation"| AC["¿Acción = RESOLVE?"]
-    
+
     AC -->|SÍ| AD["Crea corrección<br/>StockMovement<br/>ADJUSTMENT_IN/OUT"]
     AD -->|"Actualiza<br/>InventoryBalance"| AE["Cierra<br/>StockDiscrepancy<br/>status=RESOLVED"]
-    
+
     AC -->|"IGNORE"| AF["Marca como<br/>IGNORED<br/>Sin corrección"]
-    
+
     AE --> AG["Siguiente<br/>Discrepancia"]
     AF --> AG
 
 %% CIERRE %%
-    AH["👤 Usuario: Cierra Conteo"] -->|"POST /counts/<id>/finalize"| C
-    
+    AH[" Usuario: Cierra Conteo"] -->|"POST /counts/<id>/finalize"| C
+
     C -->|"Valida que todas<br/>discrepancias<br/>fueron procesadas"| AI{"¿Todas<br/>Resueltas?"}
-    
-    AI -->|NO| AJ["⚠️ Advertencia:<br/>Discrepancias abiertas"]
+
+    AI -->|NO| AJ[" Advertencia:<br/>Discrepancias abiertas"]
     AI -->|SÍ| AK["PhysicalCountSession<br/>status=CLOSED"]
-    
-    AK -->|"✅ Genera Reporte"| AL["📊 Resumen de Conteo:<br/>- Artículos contados<br/>- Discrepancias encontradas<br/>- Ajustes realizados<br/>- Usuario responsable<br/>- Fecha/Hora"]
-    
-    AL -->|"Auditoría completa"| AM["✅ Conteo Finalizado"]
-    
+
+    AK -->|" Genera Reporte"| AL[" Resumen de Conteo:<br/>- Artículos contados<br/>- Discrepancias encontradas<br/>- Ajustes realizados<br/>- Usuario responsable<br/>- Fecha/Hora"]
+
+    AL -->|"Auditoría completa"| AM[" Conteo Finalizado"]
+
     style A fill:#bbdefb
     style B fill:#f3e5f5
     style G fill:#e0f2f1
@@ -98,7 +98,7 @@ flowchart TD
 
 ## Fases del Conteo
 
-### 📋 FASE 1: Creación de Sesión
+###  FASE 1: Creación de Sesión
 
 **Endpoint:** `POST /api/inventory/counts/`
 
@@ -129,7 +129,7 @@ def create_count_session(payload, user):
     # 1. Valida permisos
     if user.profile.role not in ['SUPERVISOR', 'STOREKEEPER']:
         raise ValidationError("Permiso insuficiente")
-    
+
     # 2. Crea sesión
     session = PhysicalCountSession.objects.create(
         count_type=payload['count_type'],
@@ -139,7 +139,7 @@ def create_count_session(payload, user):
         created_by=user,
         notes=payload.get('notes', '')
     )
-    
+
     return serialize_count_session(session)
 ```
 
@@ -155,7 +155,7 @@ def create_count_session(payload, user):
 }
 ```
 
-### 🔍 FASE 2: Registro de Líneas de Conteo
+###  FASE 2: Registro de Líneas de Conteo
 
 **Durante:** Equipo físico cuenta artículos en almacén
 
@@ -176,16 +176,16 @@ def create_count_session(payload, user):
 ```python
 def add_count_line(session_id, payload, user):
     session = PhysicalCountSession.objects.get(id=session_id)
-    
+
     # 1. Validar sesión abierta
     if session.status != 'OPEN':
         raise ValidationError("Sesión no abierta")
-    
+
     # 2. Validar artículo
     article = Article.objects.get(id=payload['article_id'])
     location = Location.objects.get(id=payload['location_id'])
     counter = Person.objects.get(id=payload['counter_person_id'])
-    
+
     # 3. Obtener stock del sistema
     if article.tracking_mode == 'QUANTITY':
         # Por cantidad: usar InventoryBalance
@@ -201,7 +201,7 @@ def add_count_line(session_id, payload, user):
             current_location=location,
             status='AVAILABLE'
         ).count()
-    
+
     # 4. Crear línea de conteo
     count_line = PhysicalCountLine.objects.create(
         session=session,
@@ -213,10 +213,10 @@ def add_count_line(session_id, payload, user):
         review_status='pending',
         created_by=user
     )
-    
+
     # 5. Calcular diferencia
     difference_qty = payload['counted_qty'] - system_qty
-    
+
     if difference_qty != 0:
         # Crear discrepancia
         discrepancy = StockDiscrepancy.objects.create(
@@ -229,7 +229,7 @@ def add_count_line(session_id, payload, user):
             detected_by=user,
             detected_at=now()
         )
-        
+
         return {
             'line': serialize_line(count_line),
             'discrepancy': serialize_discrepancy(discrepancy)
@@ -265,7 +265,7 @@ Próximos pasos:
   2. Resolver discrepancia (ajuste)
 ```
 
-### ✅ FASE 3: Cierre de Sesión y Revisión
+###  FASE 3: Cierre de Sesión y Revisión
 
 **Endpoint:** `POST /api/inventory/counts/<session_id>/close`
 
@@ -281,22 +281,22 @@ Próximos pasos:
 ```python
 def close_count_session(session_id, payload, user):
     session = PhysicalCountSession.objects.get(id=session_id)
-    
+
     # 1. Valida que tenga líneas
     line_count = PhysicalCountLine.objects.filter(session=session).count()
     if line_count == 0:
         raise ValidationError("Sin líneas de conteo")
-    
+
     # 2. Notifica discrepancias pendientes
     pending_disc = StockDiscrepancy.objects.filter(
         count_line__session=session,
         status='OPEN'
     ).count()
-    
+
     if pending_disc > 0:
         # Advertencia pero permitir
         log_warning(f"{pending_disc} discrepancias sin resolver")
-    
+
     # 3. Cambia status
     session.status = 'REVIEW'
     session.save()
@@ -308,13 +308,13 @@ def close_count_session(session_id, payload, user):
 Status: REVIEW (amarillo)
 
 Opciones:
-1. ✏️ Editar líneas (reabrir para corregir)
-2. 📹 Ver discrepancias
-3. ✅ Finalizar (si todas resueltas)
-4. ❌ Cancelar (descartar conteo)
+1.  Editar líneas (reabrir para corregir)
+2.  Ver discrepancias
+3.  Finalizar (si todas resueltas)
+4.  Cancelar (descartar conteo)
 ```
 
-### 🔍 FASE 4: Resolución de Discrepancias
+###  FASE 4: Resolución de Discrepancias
 
 **Vista:** InventoryDiscrepanciesPage
 
@@ -325,7 +325,7 @@ Artículo       | Ubicación              | Sistema | Real | Dif  | Acción
 ─────────────────────────────────────────────────────────────────────
 Guantes Nitrilo | Almacén Principal      | 100    | 95   | -5   | [resolver]
 Tiner          | Almacén Principal      | 20     | 25   | +5   | [resolver]
-Tinta Azul     | Almacén Principal      | 50     | 50   | 0    | ✓
+Tinta Azul     | Almacén Principal      | 50     | 50   | 0    |
 ```
 
 **Endpoint:** `POST /api/inventory/discrepancies/<disc_id>/resolve`
@@ -343,7 +343,7 @@ Tinta Azul     | Almacén Principal      | 50     | 50   | 0    | ✓
 
 | Action | Effect | Stock | Acude |
 |--------|--------|-------|-------|
-| `RESOLVE` | Ajusta a cantidad real | Sí ✓ | Movimiento ADJUSTMENT |
+| `RESOLVE` | Ajusta a cantidad real | Sí  | Movimiento ADJUSTMENT |
 | `IGNORE` | Cierra sin ajuste | No | Solo auditoría |
 | `INVESTIGATE` | Marca como investigando | No | Requiere seguimiento |
 
@@ -352,14 +352,14 @@ Tinta Azul     | Almacén Principal      | 50     | 50   | 0    | ✓
 ```python
 def resolve_discrepancy(discrepancy_id, payload, user):
     disc = StockDiscrepancy.objects.get(id=discrepancy_id)
-    
+
     if payload['action'] == 'RESOLVE':
         # 1. Crear movimiento de ajuste
         if disc.difference_qty > 0:
             movement_type = 'ADJUSTMENT_IN'
         else:
             movement_type = 'ADJUSTMENT_OUT'
-        
+
         movement = StockMovement.objects.create(
             movement_type=movement_type,
             article=disc.article,
@@ -369,7 +369,7 @@ def resolve_discrepancy(discrepancy_id, payload, user):
             recorded_by=user,
             timestamp=now()
         )
-        
+
         # 2. Actualizar balance (si es QUANTITY)
         if disc.article.tracking_mode == 'QUANTITY':
             balance = InventoryBalance.objects.get(
@@ -377,12 +377,12 @@ def resolve_discrepancy(discrepancy_id, payload, user):
                 location=disc.location
             )
             balance.apply_balance_delta(disc.difference_qty)
-        
+
         # 3. Marcar discrepancia como resuelta
         disc.status = 'RESOLVED'
         disc.approved_by = user
         disc.save()
-        
+
     elif payload['action'] == 'IGNORE':
         # Simplemente ignora la diferencia
         disc.status = 'IGNORED'
@@ -401,15 +401,15 @@ Usuario investiga:
   "Estaban dañados, sin valor. Descartados."
 
 Acción: RESOLVE
-  ✓ Crea StockMovement (ADJUSTMENT_OUT, -5)
-  ✓ Actualiza InventoryBalance (100 → 95)
-  ✓ Marca discrepancia como RESOLVED
+   Crea StockMovement (ADJUSTMENT_OUT, -5)
+   Actualiza InventoryBalance (100 → 95)
+   Marca discrepancia como RESOLVED
 
-Stock Final: 95 unidades ✅
+Stock Final: 95 unidades
 Auditoría: "Ajuste por conteo 2026-04-10"
 ```
 
-### ✔️ FASE 5: Finalización
+###  FASE 5: Finalización
 
 **Endpoint:** `POST /api/inventory/counts/<session_id>/finalize`
 
@@ -418,20 +418,20 @@ Auditoría: "Ajuste por conteo 2026-04-10"
 ```python
 def finalize_count_session(session_id, user):
     session = PhysicalCountSession.objects.get(id=session_id)
-    
+
     # 1. Status debe ser REVIEW
     if session.status != 'REVIEW':
         raise ValidationError("Sesión no en REVIEW")
-    
+
     # 2. Todas las discrepancias resueltas?
     pending = StockDiscrepancy.objects.filter(
         count_line__session=session,
         status='OPEN'  # Invest. = ok, Ignored = ok
     ).count()
-    
+
     if pending > 0:
         raise ValidationError(f"{pending} discrepancias sin resolver")
-    
+
     # 3. Cambiar status
     session.status = 'CLOSED'
     session.closed_by = user
@@ -447,13 +447,13 @@ def build_count_report(session):
     discrepancies = StockDiscrepancy.objects.filter(
         count_line__session=session
     )
-    
+
     report = {
         'session_id': session.id,
         'date': session.closed_at,
         'count_type': session.count_type,
         'scope': session.scope,
-        
+
         'statistics': {
             'total_lines': lines.count(),
             'articles_counted': lines.values('article').distinct().count(),
@@ -466,22 +466,22 @@ def build_count_report(session):
                 timestamp__gte=session.created_at
             ).count(),
         },
-        
+
         'summary': f"""
             Conteo Físico: {session.count_type}
             Fecha: {session.closed_at}
             Supervisor: {session.created_by.get_full_name()}
-            
+
             Artículos contados: {lines.count()}
             Discrepancias: {discrepancies.count()}
-            
+
             Resultados:
             - Positivas (Sobrante): X
             - Negativas (Faltante): Y
             - Resueltas: Z
         """
     }
-    
+
     return report
 ```
 
@@ -513,17 +513,17 @@ class PhysicalCountLine(models.Model):
     session = ForeignKey(PhysicalCountSession)
     article = ForeignKey(Article)
     location = ForeignKey(Location)
-    
+
     system_qty = PositiveIntegerField()  # Lo que dice el sistema
     counted_qty = PositiveIntegerField()  # Lo que contó el equipo
-    
+
     counter_person = ForeignKey(Person)
     review_status = CharField(  # Seguimiento de revisión
         choices=['pending', 'reviewed', 'approved'],
         default='pending'
     )
     approved_by = ForeignKey(User, null=True)
-    
+
     class Meta:
         unique_together = [['session', 'article', 'location']]
 ```
@@ -534,17 +534,17 @@ class StockDiscrepancy(models.Model):
     article = ForeignKey(Article)
     location = ForeignKey(Location)
     count_line = ForeignKey(PhysicalCountLine, null=True)
-    
+
     difference_qty = IntegerField()  # counted - system
     difference_type = CharField(  # POSITIVE o NEGATIVE
         choices=['POSITIVE', 'NEGATIVE']
     )
-    
+
     status = CharField(
         choices=['OPEN', 'RESOLVED', 'IGNORED', 'INVESTIGATING'],
         default='OPEN'
     )
-    
+
     detected_by = ForeignKey(User)
     detected_at = DateTimeField()
     possible_cause = TextField(blank=True)
@@ -579,23 +579,23 @@ class StockDiscrepancy(models.Model):
 
 ## Consideraciones
 
-### ⚠️ Integridad
+###  Integridad
 - Discrepancias se crean automáticamente
 - Ajustes son transaccionales
 - Stock nunca queda inconsistente
 
-### ⚠️ Auditoría
+###  Auditoría
 - Quién contó qué
 - Qué diferencia había
 - Quién resolvió y cómo
 - Timestamp de todo
 
-### ⚠️ Performance
+###  Performance
 - Índice en (session, article, location)
 - Queries optimizadas para reportes
 - Cálculos de diferencia en memoria
 
-### ⚠️ Reporte
+###  Reporte
 - Disponible después del cierre
 - Descargable en PDF/Excel
 - Firmable digitalmente (futuro)

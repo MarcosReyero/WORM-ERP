@@ -9,43 +9,43 @@ Este diagrama detalla paso a paso cómo el sistema procesa un movimiento de stoc
 id: fb58f074-36e1-42a6-9077-c8fcff395f74
 ---
 flowchart TD
-    A["🎯 Usuario Inicia<br/>Movimiento de Stock"] -->|Selecciona| B["📦 Artículo"]
+    A[" Usuario Inicia<br/>Movimiento de Stock"] -->|Selecciona| B[" Artículo"]
     B -->|Elige tipo| C{Tipo de<br/>Movimiento}
-    
-    C -->|PURCHASE_IN<br/>RETURN_IN| D["📥 INGRESO"]
-    C -->|CONSUMPTION_OUT<br/>PRODUCTION_OUT| E["📤 SALIDA/CONSUMO"]
-    C -->|LOAN_OUT<br/>DAMAGE_OUT| F["🚫 SALIDA ESPECIAL"]
-    C -->|TRANSFER| G["🔄 TRANSFERENCIA"]
-    
+
+    C -->|PURCHASE_IN<br/>RETURN_IN| D[" INGRESO"]
+    C -->|CONSUMPTION_OUT<br/>PRODUCTION_OUT| E[" SALIDA/CONSUMO"]
+    C -->|LOAN_OUT<br/>DAMAGE_OUT| F[" SALIDA ESPECIAL"]
+    C -->|TRANSFER| G[" TRANSFERENCIA"]
+
     D --> H["Ingresa Cantidad"]
     E --> H
     F --> H
     G --> H
-    
-    H -->|Selecciona| I["📍 Ubicación Destino"]
-    I --> J["✅ Sistema Valida"]
-    
+
+    H -->|Selecciona| I[" Ubicación Destino"]
+    I --> J[" Sistema Valida"]
+
     J -->|¿Stock Suficiente?| K{Tiene Stock?}
-    K -->|NO| L["❌ Rechaza<br/>Muestra Error"]
-    K -->|SÍ| M["🔐 Aplica Validaciones<br/>Transaccionales"]
-    
-    M --> N["💾 Crea StockMovement<br/>en BD"]
-    N --> O["🔄 Actualiza<br/>InventoryBalance"]
-    O --> P["📊 Recalcula<br/>Stock Disponible"]
-    
-    P --> Q["🎯 ¿Stock por debajo<br/>del Mínimo?"]
-    Q -->|SÍ| R["🔔 Dispara SafetyStockAlert"]
-    Q -->|NO| S["✅ Completado"]
-    
-    R --> T["📧 Evalúa Transición<br/>MONITORING → TRIGGERED"]
-    T --> U["📬 Envía Email<br/>a Responsables"]
+    K -->|NO| L[" Rechaza<br/>Muestra Error"]
+    K -->|SÍ| M[" Aplica Validaciones<br/>Transaccionales"]
+
+    M --> N[" Crea StockMovement<br/>en BD"]
+    N --> O[" Actualiza<br/>InventoryBalance"]
+    O --> P[" Recalcula<br/>Stock Disponible"]
+
+    P --> Q[" ¿Stock por debajo<br/>del Mínimo?"]
+    Q -->|SÍ| R[" Dispara SafetyStockAlert"]
+    Q -->|NO| S[" Completado"]
+
+    R --> T[" Evalúa Transición<br/>MONITORING → TRIGGERED"]
+    T --> U[" Envía Email<br/>a Responsables"]
     U --> S
-    
-    S --> V["✍️ Log de Auditoría<br/>Quién, Cuándo, Qué"]
-    
-    L -->|Usuario| W["🔁 Reintenta o Cancela"]
+
+    S --> V[" Log de Auditoría<br/>Quién, Cuándo, Qué"]
+
+    L -->|Usuario| W[" Reintenta o Cancela"]
     W --> A
-    
+
     style A fill:#bbdefb
     style D fill:#c8e6c9
     style E fill:#ffccbc
@@ -61,7 +61,7 @@ flowchart TD
 
 ## Tipos de Movimiento Soportados
 
-### 📥 **INGRESO (Entrada de Stock)**
+###  **INGRESO (Entrada de Stock)**
 
 | Tipo | Descripción | Quién puede? | Requiere? |
 |------|-------------|-------------|-----------|
@@ -69,7 +69,7 @@ flowchart TD
 | RETURN_IN | Devolución a almacén | STOREKEEPER | - |
 | ADJUSTMENT_IN | Ajuste positivo | SUPERVISOR | reason_text |
 
-### 📤 **SALIDA (Disminución de Stock)**
+###  **SALIDA (Disminución de Stock)**
 
 | Tipo | Descripción | Quién puede? | Requiere? |
 |------|-------------|-------------|-----------|
@@ -79,7 +79,7 @@ flowchart TD
 | DAMAGE_OUT | Daño | SUPERVISOR | reason_text |
 | LOAN_OUT | Préstamo a persona | STOREKEEPER | person |
 
-### 🔄 **TRANSFER (Transferencia entre ubicaciones)**
+###  **TRANSFER (Transferencia entre ubicaciones)**
 
 - Origen ≠ Destino (validación)
 - Requiere: source_location, target_location
@@ -129,7 +129,7 @@ Se registra:
 
 ## Manejo de Errores
 
-### ❌ Error: Stock Insuficiente
+###  Error: Stock Insuficiente
 ```
 ¿Intentar salida de 100 unidades pero solo hay 50?
 → Rechazado en validación
@@ -137,7 +137,7 @@ Se registra:
 → NO se persiste nada en BD
 ```
 
-### ❌ Error: Falta de Permisos
+###  Error: Falta de Permisos
 ```
 ¿Usuario OPERATOR intenta crear DAMAGE_OUT?
 → Role validation falla
@@ -145,7 +145,7 @@ Se registra:
 → Auditoría registra intento
 ```
 
-### ❌ Error: Ubicación inválida
+###  Error: Ubicación inválida
 ```
 ¿Transferencia a ubicación que no existe?
 → Validación de FK falla
@@ -178,11 +178,11 @@ Input:
   - Motivo: "Consumo turno mañana"
 
 Validaciones:
-  ✅ Artículo existe
-  ✅ Tracking mode = QUANTITY (por cantidad)
-  ✅ Stock: 150 on_hand - 0 reserved = 150 disponible
-  ✅ 10 < 150 = OK
-  ✅ Usuario es STOREKEEPER = OK
+   Artículo existe
+   Tracking mode = QUANTITY (por cantidad)
+   Stock: 150 on_hand - 0 reserved = 150 disponible
+   10 < 150 = OK
+   Usuario es STOREKEEPER = OK
 
 Cambios:
   - InventoryBalance: on_hand 150 → 140
@@ -195,23 +195,23 @@ Post-procesamiento:
   - Alerta: NO (140 > 50)
   - Email: NO
 
-Status: ✅ COMPLETADO
+Status:  COMPLETADO
 ```
 
 ## Consideraciones Importantes
 
-⚠️ **Integridad de Datos**
+ **Integridad de Datos**
 - Transacciones ACID garantizan consistencia
 - No es posible que quede "a medio camino"
 
-⚠️ **Auditoría**
+ **Auditoría**
 - Todos los movimientos quedan registrados
 - Se pueden auditar cambios históricos
 
-⚠️ **Alertas**
+ **Alertas**
 - Se disparan después de guardar movimiento
 - Envío de email es asincrónico (falla no afecta API)
 
-⚠️ **Performance**
+ **Performance**
 - Movimientos masivos pueden ser lentos
 - Se recomienda batch import vía Excel

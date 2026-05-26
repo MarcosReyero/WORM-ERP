@@ -6,70 +6,70 @@ Este diagrama documentación detallada del flujo de préstamo de activos/unidade
 
 ```mermaid
 flowchart TD
-    A["👤 Usuario: Almacenero"] -->|"Entra a<br/>Checkouts Page"| B["📤 InventoryCheckoutsPage.jsx"]
-    
+    A[" Usuario: Almacenero"] -->|"Entra a<br/>Checkouts Page"| B[" InventoryCheckoutsPage.jsx"]
+
     B -->|"GET /checkouts/"| C["views.py"]
     C -->|"list_checkouts()"| D["services.py"]
     D -->|"Query BD"| E["AssetCheckout.objects.all()"]
     E -->|"JSON Response"| B
-    
-    B -->|"Muestra:<br/>Préstamos Abiertos"| F["📋 Tabla de<br/>Checkouts Activos"]
-    B -->|"Muestra:<br/>Unidades Disponibles"| G["📦 Tabla de<br/>TrackedUnits<br/>status=AVAILABLE"]
-    
-    H["👤 Usuario: Selecciona"] -->|"Pick Unit"| G
-    I["👤 Usuario: Selecciona"] -->|"Pick Receptor"| J["Persona o Sector"]
-    K["👤 Usuario: Ingresa"] -->|"Expected Return"| L["Fecha de Devolución"]
-    
-    H --> M["📝 Formulario Checkout"]
+
+    B -->|"Muestra:<br/>Préstamos Abiertos"| F[" Tabla de<br/>Checkouts Activos"]
+    B -->|"Muestra:<br/>Unidades Disponibles"| G[" Tabla de<br/>TrackedUnits<br/>status=AVAILABLE"]
+
+    H[" Usuario: Selecciona"] -->|"Pick Unit"| G
+    I[" Usuario: Selecciona"] -->|"Pick Receptor"| J["Persona o Sector"]
+    K[" Usuario: Ingresa"] -->|"Expected Return"| L["Fecha de Devolución"]
+
+    H --> M[" Formulario Checkout"]
     I --> M
     L --> M
-    
+
     M -->|"Submit"| N["POST /checkouts/"]
     N -->|"Payload:<br/>tracked_unit_id<br/>receiver_person_id<br/>expected_return_at"| C
-    
+
     C -->|"require_role"| O{"¿Usuario<br/>es STOREKEEPER?"}
-    O -->|NO| P["❌ 403 Forbidden"]
+    O -->|NO| P[" 403 Forbidden"]
     O -->|SÍ| Q["create_checkout()"]
-    
+
     Q -->|"1. Valida"| R["¿Unidad<br/>AVAILABLE?"]
-    R -->|NO| S["❌ Error:<br/>Unidad no disponible"]
+    R -->|NO| S[" Error:<br/>Unidad no disponible"]
     R -->|SÍ| T["2. Crea<br/>AssetCheckout"]
-    
+
     T -->|"BEGIN TRANSACTION"| U["3. Actualiza<br/>TrackedUnit<br/>status = IN_USE"]
     U -->|"4. Registra<br/>StockMovement<br/>type=LOAN_OUT"| V["5. Registra<br/>en Auditoría"]
-    
-    V -->|"COMMIT"| W["✅ Respuesta<br/>201 Created"]
-    
+
+    V -->|"COMMIT"| W[" Respuesta<br/>201 Created"]
+
     W -->|"JSON:<br/>checkout_id,<br/>status,<br/>timestamps"| B
-    B -->|"Success Toast"| X["✅ Préstamo registrado"]
-    
+    B -->|"Success Toast"| X[" Préstamo registrado"]
+
     P -->|"Error Toast"| X
     S -->|"Error Toast"| X
 
 %% DEVOLUCIÓN %%
-    Y["👤 Usuario: Hace Clic"] -->|"Return Button"| Z["POST /checkouts/<id>/return/"]
-    
+    Y[" Usuario: Hace Clic"] -->|"Return Button"| Z["POST /checkouts/<id>/return/"]
+
     Z -->|"Payload:<br/>condition_in,<br/>notes"| C
     C -->|"require_role"| AA{"¿STOREKEEPER?"}
     AA -->|SÍ| AB["return_checkout()"]
-    
+
     AB -->|"1. Valida<br/>Checkout<br/>status=OPEN"| AC["2. Crea<br/>StockMovement<br/>type=RETURN_IN"]
     AC -->|"3. Actualiza<br/>TrackedUnit<br/>status = AVAILABLE"| AD["4. Cierra<br/>AssetCheckout<br/>status=RETURNED"]
-    
+
     AD -->|"5. Calcula<br/>fecha retraso"| AE{"¿Devuelto<br/>a Tiempo?"}
     AE -->|Retrasado| AF["Genera Alerta<br/>Préstamo Vencido"]
-    AE -->|A Tiempo| AG["✅ OK"]
-    
+    AE -->|A Tiempo| AG[" OK"]
+
     AF --> AH["COMMIT"]
     AG --> AH
-    
-    AH -->|"✅ 200 OK"| B
+
+    AH -->|" 200 OK"| B
 
 %% FLUJO DE FONDO %%
-    T -.->|"Dispara si stock bajo"| AI["🔔 SafetyStockAlert"]
+    T -.->|"Dispara si stock bajo"| AI[" SafetyStockAlert"]
     AI -.->|"Evalúa"| AJ["¿Stock Critical?"]
-    AJ -.->|"SÍ"| AK["📧 Envía Email<br/>Alerta"]
-    
+    AJ -.->|"SÍ"| AK[" Envía Email<br/>Alerta"]
+
     style A fill:#bbdefb
     style B fill:#f3e5f5
     style M fill:#c8e6c9
@@ -85,7 +85,7 @@ flowchart TD
 
 ## Fases del Checkout
 
-### 📋 FASE 1: Visualización y Selección
+###  FASE 1: Visualización y Selección
 
 **Vista: InventoryCheckoutsPage.jsx**
 
@@ -113,7 +113,7 @@ Pantalla dividida en:
    - Col: Ubicación (Almacén)
 ```
 
-### 🔐 FASE 2: Creación de Préstamo
+###  FASE 2: Creación de Préstamo
 
 **Endpoint:** `POST /api/inventory/checkouts/`
 
@@ -145,14 +145,14 @@ def create_checkout(payload, user):
     unit_id = payload['tracked_unit_id']
     person_id = payload['receiver_person_id']
     expected_return = payload['expected_return_at']
-    
+
     # 2. Valida
     unit = TrackedUnit.objects.get(id=unit_id)
     if unit.status != 'AVAILABLE':
         raise ValidationError("Unidad no disponible")
-    
+
     person = Person.objects.get(id=person_id)
-    
+
     # 3. Transacción ACID
     with transaction.atomic():
         # A. Crea checkout
@@ -163,13 +163,13 @@ def create_checkout(payload, user):
             recorded_by=user,
             checked_out_at=now()
         )
-        
+
         # B. Actualiza unidad
         unit.status = 'IN_USE'
         unit.current_holder_person = person
         unit.current_location = person.sector.location  # Opcional
         unit.save(update_fields=['status', ...])
-        
+
         # C. Registra movimiento
         StockMovement.objects.create(
             movement_type='LOAN_OUT',
@@ -180,7 +180,7 @@ def create_checkout(payload, user):
             target_location=None,  # Prestamo es "fuera del sistema"
             # ... otros campos
         )
-        
+
     # 4. Retorna
     return serialize_checkout(checkout)
 ```
@@ -206,7 +206,7 @@ def create_checkout(payload, user):
 }
 ```
 
-### ✅ FASE 3: Monitoreo de Préstamos Abiertos
+###  FASE 3: Monitoreo de Préstamos Abiertos
 
 **Estado: OPEN**
 
@@ -229,7 +229,7 @@ CON-001 Laptop   OPEN        10/04/26    -2 (vencido!)
 CON-002 Mouse    OPEN        12/04/26    +2 (en plazo)
 ```
 
-### 📤 FASE 4: Devolución
+###  FASE 4: Devolución
 
 **Endpoint:** `POST /api/inventory/checkouts/<id>/return/`
 
@@ -252,11 +252,11 @@ CON-002 Mouse    OPEN        12/04/26    +2 (en plazo)
 ```python
 def return_checkout(checkout_id, payload, user):
     checkout = AssetCheckout.objects.get(id=checkout_id)
-    
+
     # 1. Valida que esté OPEN
     if checkout.status != 'OPEN':
         raise ValidationError("Checkout no está abierto")
-    
+
     # 2. Transacción ACID
     with transaction.atomic():
         # A. Actualiza checkout
@@ -266,7 +266,7 @@ def return_checkout(checkout_id, payload, user):
         checkout.notes = payload['notes']
         checkout.authorized_by = user
         checkout.save()
-        
+
         # B. Actualiza unidad
         unit = checkout.tracked_unit
         new_status = {
@@ -275,13 +275,13 @@ def return_checkout(checkout_id, payload, user):
             'damaged_major': 'OUT_OF_SERVICE',
             'lost': 'LOST',
         }[payload['condition_in']]
-        
+
         unit.status = new_status
         unit.current_holder_person = None
         if new_status == 'REPAIR':
             unit.last_revision_at = now()
         unit.save()
-        
+
         # C. Registra movimiento
         StockMovement.objects.create(
             movement_type='RETURN_IN',  # Entra al stock
@@ -290,7 +290,7 @@ def return_checkout(checkout_id, payload, user):
             timestamp=now(),
             reason_text=f"Return: {payload['condition_in']}"
         )
-        
+
         # D. Calcula retraso
         days_late = (now() - checkout.expected_return_at).days
         if days_late > 0:
@@ -301,7 +301,7 @@ def return_checkout(checkout_id, payload, user):
                 person=checkout.receiver_person,
                 days_overdue=days_late
             )
-    
+
     return serialize_checkout(checkout)
 ```
 
@@ -328,29 +328,29 @@ class AssetCheckout(models.Model):
         choices=['OPEN', 'RETURNED', 'OVERDUE', 'CANCELLED'],
         default='OPEN'
     )
-    
+
     # Receptor
     receiver_person = ForeignKey(Person, null=True)
     receiver_sector = ForeignKey(Sector, null=True)
-    
+
     # Fechas
     checked_out_at = DateTimeField()
     expected_return_at = DateTimeField()
     returned_at = DateTimeField(null=True)
-    
+
     # Condición
     condition_out = CharField(default='unknown')
     condition_in = CharField(null=True)
-    
+
     # Auditoría
     recorded_by = ForeignKey(User, related_name='checkouts_recorded')
     authorized_by = ForeignKey(User, null=True, related_name='checkouts_authorized')
     created_at = DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         constraints = [
             # Debe tener receptor
-            models.Q(receiver_person__isnull=False) | 
+            models.Q(receiver_person__isnull=False) |
             models.Q(receiver_sector__isnull=False)
         ]
 ```
@@ -360,7 +360,7 @@ class AssetCheckout(models.Model):
 class TrackedUnit(models.Model):
     internal_tag = CharField(max_length=20, unique=True)  # CON-001
     article = ForeignKey(Article)
-    
+
     status = CharField(
         choices=[
             'AVAILABLE',      # Disponible para prestar
@@ -372,19 +372,19 @@ class TrackedUnit(models.Model):
         ],
         default='AVAILABLE'
     )
-    
+
     # Ubicación actual
     current_location = ForeignKey(Location, null=True)
     current_sector = ForeignKey(Sector, null=True)
     current_holder_person = ForeignKey(Person, null=True)  # ← Quién lo tiene
-    
+
     # Datos técnicos
     serial_number = CharField(null=True)
     brand = CharField(null=True)
     model = CharField(null=True)
     purchase_date = DateField(null=True)
     last_revision_at = DateTimeField(null=True)
-    
+
     class Meta:
         constraints = [
             models.CheckConstraint(
@@ -409,12 +409,12 @@ Usuario: "Necesito prestar una Laptop a Juan García hasta el 15/04"
 5. Click: "Prestar"
 
 Sistema:
-  ✓ Crea AssetCheckout
-  ✓ Actualiza TrackedUnit (AVAILABLE → IN_USE)
-  ✓ Registra StockMovement (LOAN_OUT)
-  ✓ Envía notificación a Juan
+   Crea AssetCheckout
+   Actualiza TrackedUnit (AVAILABLE → IN_USE)
+   Registra StockMovement (LOAN_OUT)
+   Envía notificación a Juan
 
-Resultado: ✅ Préstamo activo
+Resultado:  Préstamo activo
 ```
 
 ### Caso 2: Devolución a Tiempo
@@ -428,12 +428,12 @@ Usuario: "Juan devolvió la Laptop"
 6. Click: "Confirmar Devolución"
 
 Sistema:
-  ✓ Cierra AssetCheckout (OPEN → RETURNED)
-  ✓ Actualiza TrackedUnit (IN_USE → AVAILABLE)
-  ✓ Registra StockMovement (RETURN_IN)
-  ✓ Calcula: 0 días de retraso
+   Cierra AssetCheckout (OPEN → RETURNED)
+   Actualiza TrackedUnit (IN_USE → AVAILABLE)
+   Registra StockMovement (RETURN_IN)
+   Calcula: 0 días de retraso
 
-Resultado: ✅ Devolución procesada
+Resultado:  Devolución procesada
 ```
 
 ### Caso 3: Devolución Tardía con Daño
@@ -441,16 +441,16 @@ Resultado: ✅ Devolución procesada
 Usuario: "Juan devolvió laptop 2 días tarde y dañada"
 
 Sistema detecta:
-  ✓ Fecha: 12/04 > 15/04 = 2 días retraso
-  ✓ Condición: damaged_major
+   Fecha: 12/04 > 15/04 = 2 días retraso
+   Condición: damaged_major
 
 Acciones:
-  ✓ Cierra checkout
-  ✓ Marca unidad como OUT_OF_SERVICE
-  ✓ Genera alerta "CHECKOUT_OVERDUE"
-  ✓ Genera alerta "ASSET_DAMAGED"
+   Cierra checkout
+   Marca unidad como OUT_OF_SERVICE
+   Genera alerta "CHECKOUT_OVERDUE"
+   Genera alerta "ASSET_DAMAGED"
 
-Resultado: ⚠️ Requiere acción manual
+Resultado:  Requiere acción manual
 ```
 
 ### Caso 4: Préstamo Vencido
@@ -458,9 +458,9 @@ Resultado: ⚠️ Requiere acción manual
 Escenario: Préstamo de CON-002 vence hoy
 
 Cada 10 minutos (Reconciliation Task):
-  ✓ Evalúa todos checkouts OPEN
-  ✓ CON-002: expected_return < ahora?
-  ✓ SÍ: Cambia status → OVERDUE
+   Evalúa todos checkouts OPEN
+   CON-002: expected_return < ahora?
+   SÍ: Cambia status → OVERDUE
 
 UI Actualizada:
   Status: OVERDUE (color rojo)
@@ -470,36 +470,36 @@ Email enviado:
   "Préstamo vencido: CON-002 (Sector Taller)"
   "Devolver urgentemente"
 
-Resultado: ⚠️ Alerta enviada
+Resultado:  Alerta enviada
 ```
 
 ## Permisos y Roles
 
 | Acción | STOREKEEPER | SUPERVISOR | MAINTENANCE | OPERATOR |
 |--------|-------------|-----------|-------------|----------|
-| Ver checkouts abiertos | ✅ | ✅ | ✅ | ❌ |
-| Crear checkout | ✅ | ⚠️ | ✅ | ❌ |
-| Devolver | ✅ | ⚠️ | ✅ | ❌ |
-| Editar checkout | ❌ | ✅ | ❌ | ❌ |
+| Ver checkouts abiertos |  |  |  |  |
+| Crear checkout |  |  |  |  |
+| Devolver |  |  |  |  |
+| Editar checkout |  |  |  |  |
 
 ## Consideraciones Importantes
 
-### ⚠️ Integridad
+###  Integridad
 - Solo STOREKEEPER puede crear/devolver
 - TrackedUnit debe estar AVAILABLE
 - Transacción ACID garantiza consistencia
 
-### ⚠️ Auditoría
+###  Auditoría
 - Quién, cuándo, qué
 - Condición initial/final
 - Motto si está vencido
 
-### ⚠️ Alertas
+###  Alertas
 - Email cuando checkout vence
 - Notificación si hay retraso
 - Integración con Communications module
 
-### ⚠️ Performance
+###  Performance
 - Índice en (tracked_unit, status)
 - Query optimizada para OPEN checkouts
 - Cálculo de retraso en memoria (no DB)

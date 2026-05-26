@@ -1,20 +1,20 @@
-# ⚡ Guía Rápida - Sistema de Permisos
+#  Guía Rápida - Sistema de Permisos
 
-## 📌 Lo que acabas de recibir
+##  Lo que acabas de recibir
 
 Un sistema completo de gestión de permisos en el panel admin de Django que permite:
 
-✅ Controlar qué módulos pueden ver los usuarios (Inventario, Stock, Reportes, etc.)  
-✅ Controlar qué acciones pueden hacer (Ver, Crear, Editar, Eliminar)  
-✅ Crear reglas específicas para cada usuario  
-✅ Restringir acceso a sectores específicos del almacén  
-✅ Heredar permisos del rol pero permitir excepciones  
+ Controlar qué módulos pueden ver los usuarios (Inventario, Stock, Reportes, etc.)
+ Controlar qué acciones pueden hacer (Ver, Crear, Editar, Eliminar)
+ Crear reglas específicas para cada usuario
+ Restringir acceso a sectores específicos del almacén
+ Heredar permisos del rol pero permitir excepciones
 
 ---
 
-## 🚀 Primeros Pasos
+##  Primeros Pasos
 
-### 1. ¿Ya migraste la BD? 
+### 1. ¿Ya migraste la BD?
 ```bash
 # Solo si no lo hiciste:
 python manage.py migrate
@@ -39,22 +39,22 @@ Aquí verás que ya hay permisos preseteados para cada rol:
 **Opción A - Usuario normal que hereda el rol:**
 1. Crea usuario "pepito" con rol "Operario"
 2. Va a: Permisos de Usuarios → Encuentra "pepito"
-3. Marca "Hereda del rol" ✓
+3. Marca "Hereda del rol"
 4. Haz clic en "Agregar permiso de módulo específico"
-5. Selecciona "Reportes", marca "Ver" ✓ y "Exportar" ✓
+5. Selecciona "Reportes", marca "Ver"  y "Exportar"
 6. ¡Listo! Pepito ahora es Operario + puede ver reportes
 
 **Opción B - Usuario super restringido:**
 1. Crea usuario "juan" con rol "Operario"
 2. Va a: Permisos de Usuarios → Encuentra "juan"
-3. Desmarca "Hereda del rol" ✗
-4. Agrega UN permiso: "Panel de Inventario" → "Ver" ✓
+3. Desmarca "Hereda del rol"
+4. Agrega UN permiso: "Panel de Inventario" → "Ver"
 5. ¡Listo! Juan solo ve el panel, nada más
 
 **Opción C - Denegar acceso temporal:**
 1. Usuario es "Deposito" pero de vacaciones
 2. Va a: Permisos de Usuarios → Encuentra el usuario
-3. Agrega permiso: Módulo "Gestión de Stock", Sin acciones seleccionadas, Allow = ✗
+3. Agrega permiso: Módulo "Gestión de Stock", Sin acciones seleccionadas, Allow =
 4. ¡Listo! Revoca el acceso a stock aunque su rol lo tenga
 
 ### 4. Restringir por Sectores
@@ -65,12 +65,12 @@ Para que un usuario solo trabaje en ciertos sectores:
 2. Haz clic en "Agregar"
 3. Usuario: selecciona usuario
 4. Sector: selecciona sector (ej: "Electrónica")
-5. Marca: Ver ✓, Editar ✓, Eliminar ✗
+5. Marca: Ver , Editar , Eliminar
 6. ¡Listo! El usuario solo trabaja en ese sector
 
 ---
 
-## 📚 Archivos Clave
+##  Archivos Clave
 
 - **[PERMISOS.md](PERMISOS.md)** - Documentación completa (te recomiendo leerla)
 - **[accounts/permissions.py](accounts/permissions.py)** - Funciones helper
@@ -80,21 +80,21 @@ Para que un usuario solo trabaje en ciertos sectores:
 
 ---
 
-## 💡 Casos de Uso Comunes
+##  Casos de Uso Comunes
 
 ### "Quiero que pepito vea y edite stock pero no pueda crear"
 ```
 Rol: Deposito/Panolero ← ya lo tiene
 Módulo: Gestión de Stock
-Acciones: Ver ✓, Cambiar ✓, Crear ✗, Eliminar ✗
-Allow: ✓ (Permite)
+Acciones: Ver , Cambiar , Crear , Eliminar
+Allow:  (Permite)
 ```
 
 ### "Quiero que carlos solo vea reportes"
 ```
-Hereda el rol: ✗ (NO)
+Hereda el rol:  (NO)
 Módulo: Reportes
-Acciones: Ver ✓, Exportar ✓
+Acciones: Ver , Exportar
 ```
 
 ### "Quiero revocar acceso temporal a maria"
@@ -102,21 +102,21 @@ Acciones: Ver ✓, Exportar ✓
 Usuario actual: María (con varios permisos)
 Módulo: Gestión de Stock
 Acciones: (ninguna seleccionada)
-Allow: ✗ (Deniega)
+Allow:  (Deniega)
 ```
 
 ### "Quiero que luis trabaje en 2 sectores pero no en otro"
 ```
 → Permisos de Sectores
 Usuario: Luis
-Sector 1: Electrónica - Ver ✓, Editar ✓
-Sector 2: Mecánica - Ver ✓, Editar ✓
+Sector 1: Electrónica - Ver , Editar
+Sector 2: Mecánica - Ver , Editar
 (No crear permiso para → Consumibles)
 ```
 
 ---
 
-## 🎯 En el Código - Cómo Usarlo
+##  En el Código - Cómo Usarlo
 
 ### En Vistas Django
 
@@ -162,7 +162,7 @@ Luego en React:
 
 ---
 
-## ⚠️ Importante
+##  Importante
 
 1. **Admins** (is_staff=True) siempre pueden hacer todo
 2. **Usuarios inactivos** no pueden acceder a nada
@@ -172,7 +172,7 @@ Luego en React:
 
 ---
 
-## 🔍 Debug
+##  Debug
 
 ### Verificar permisos de un usuario en shell
 
@@ -194,7 +194,7 @@ get_user_accessible_modules(user)
 
 ---
 
-## 📞 Problemas Comunes
+##  Problemas Comunes
 
 **P: "Cambié permisos pero no funcionan"**
 A: Los cambios son instantáneos. Limpia caché si usas Redis, o refresca página.
@@ -206,11 +206,11 @@ A: Verifica que:
 - Si "Hereda del rol", revisa que el rol tenga permisos
 
 **P: "¿Cómo deniego acceso a un usuario sin eliminar su cuenta?"**
-A: En Permisos de Usuarios, agrega permiso con Allow = ✗
+A: En Permisos de Usuarios, agrega permiso con Allow =
 
 ---
 
-## ✅ Próximos Pasos
+##  Próximos Pasos
 
 1. Lee [PERMISOS.md](PERMISOS.md) para documentación completa
 2. Crea un usuario de prueba y experimenta en el admin
@@ -220,4 +220,4 @@ A: En Permisos de Usuarios, agrega permiso con Allow = ✗
 
 ---
 
-¡Listo! Ya tienes un sistema de permisos profesional funcionando. 🎉
+¡Listo! Ya tienes un sistema de permisos profesional funcionando.

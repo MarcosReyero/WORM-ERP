@@ -9,52 +9,52 @@ Este diagrama explica cómo el sistema `InventoryAutomationRunner` (un thread ba
 id: 924cb385-b85d-46ee-871d-68c88c0863a7
 ---
 flowchart TD
-    A["📧 Sistema de Automatización<br/>InventoryAutomationRunner"] --> B["🔄 Obtiene Lease<br/>de la Base de Datos"]
-    
-    B -->|Lease adquirido| C["⏰ Ejecuta Scheduler"]
-    B -->|Lease NO disponible| D["⏸️ Espera 30s<br/>y Reintenta"]
+    A[" Sistema de Automatización<br/>InventoryAutomationRunner"] --> B[" Obtiene Lease<br/>de la Base de Datos"]
+
+    B -->|Lease adquirido| C[" Ejecuta Scheduler"]
+    B -->|Lease NO disponible| D[" Espera 30s<br/>y Reintenta"]
     D --> B
-    
-    C --> E["🕐 Cada 600 segundos"]
-    E --> F["📊 TAREA: Reconciliación<br/>de Stock Mínimo"]
-    
-    F --> G["🔍 Itera cada Artículo"]
-    G --> H["💾 SELECT FOR UPDATE<br/>SafetyStockAlertRule"]
-    
-    H --> I["🧮 Calcula<br/>Stock Actual vs Mínimo"]
+
+    C --> E[" Cada 600 segundos"]
+    E --> F[" TAREA: Reconciliación<br/>de Stock Mínimo"]
+
+    F --> G[" Itera cada Artículo"]
+    G --> H[" SELECT FOR UPDATE<br/>SafetyStockAlertRule"]
+
+    H --> I[" Calcula<br/>Stock Actual vs Mínimo"]
     I --> J{¿Stock<br/>Bajo?}
-    
-    J -->|No transición| K["✅ Sin cambios"]
-    J -->|MONITORING→TRIGGERED| L["🚨 Transición Detectada"]
-    J -->|TRIGGERED→MONITORING| M["✅ Stock Recuperado"]
-    
-    L --> N["📧 Prepara Email<br/>a Destinatarios"]
-    N --> O["✉️ Envía por SMTP"]
-    O --> P["📝 Registra last_notified_at"]
-    
-    M --> Q["✅ Limpia Estado<br/>de Alerta"]
-    
+
+    J -->|No transición| K[" Sin cambios"]
+    J -->|MONITORING→TRIGGERED| L[" Transición Detectada"]
+    J -->|TRIGGERED→MONITORING| M[" Stock Recuperado"]
+
+    L --> N[" Prepara Email<br/>a Destinatarios"]
+    N --> O[" Envía por SMTP"]
+    O --> P[" Registra last_notified_at"]
+
+    M --> Q[" Limpia Estado<br/>de Alerta"]
+
     K --> R["Siguiente artículo"]
     P --> R
     Q --> R
-    
+
     R -->|Más artículos?| G
-    R -->|Fin de iteración| S["⏰ TAREA: Digest<br/>Automático"]
-    
+    R -->|Fin de iteración| S[" TAREA: Digest<br/>Automático"]
+
     S --> T{¿Es hora de<br/>envío?}
-    T -->|No| U["⏸️ Espera"]
-    T -->|Sí| V["📋 Recopila artículos<br/>bajo mínimo"]
-    
-    V --> W["📊 Genera Reporte HTML"]
-    W --> X["🔐 Marca período<br/>como 'en vuelo'"]
-    X --> Y["📧 Envía Email Resumen"]
-    Y --> Z["✅ Registra envío"]
-    
-    U --> AA["🔓 Libera Lease"]
+    T -->|No| U[" Espera"]
+    T -->|Sí| V[" Recopila artículos<br/>bajo mínimo"]
+
+    V --> W[" Genera Reporte HTML"]
+    W --> X[" Marca período<br/>como 'en vuelo'"]
+    X --> Y[" Envía Email Resumen"]
+    Y --> Z[" Registra envío"]
+
+    U --> AA[" Libera Lease"]
     Z --> AA
-    
-    AA --> AB["⏰ Duerme hasta<br/>próxima ejecución"]
-    
+
+    AA --> AB[" Duerme hasta<br/>próxima ejecución"]
+
     style A fill:#bbdefb
     style C fill:#fff9c4
     style F fill:#c8e6c9
@@ -69,7 +69,7 @@ flowchart TD
 
 ## Componentes Clave
 
-### 🔄 Lease Management (Control Distribuido)
+###  Lease Management (Control Distribuido)
 
 **Problema:** ¿Qué pasa si hay múltiples instancias del servidor?
 
@@ -89,7 +89,7 @@ Si Servidor 1 muere:
 - `owner_token` + `owner_label`: identifica quién tiene lease
 - SELECT FOR UPDATE garantiza exclusividad
 
-### 📊 TAREA 1: Reconciliation (Cada 600 segundos = 10 minutos)
+###  TAREA 1: Reconciliation (Cada 600 segundos = 10 minutos)
 
 **Objetivo:** Evaluar si stock de cada artículo bajó por debajo de mínimo
 
@@ -97,13 +97,13 @@ Si Servidor 1 muere:
 Para cada SafetyStockAlertRule:
   1. Calcula stock actual
   2. Compara con minimum_stock
-  
+
   Si stock < minimum:
     ├─ Estado cambió a TRIGGERED?
     │  └─ Sí: Envía email AHORA
     └─ Estado sigue TRIGGERED?
        └─ Sí: NO envía (evita spam)
-  
+
   Si stock >= minimum:
     └─ Estado cambió DE TRIGGERED?
        └─ Sí: Limpia estado
@@ -124,8 +124,8 @@ Stock actual: 45
 ¿Transición?
   Anterior: MONITORING
   Actual: TRIGGERED (45 < 50)
-  
-Resultado: ✅ Envía email "ALERTA: Stock bajo"
+
+Resultado:  Envía email "ALERTA: Stock bajo"
 
 5 minutos después (próxima tarea):
 Artículo: "Guantes Nitrilo"
@@ -134,11 +134,11 @@ Stock actual: 45 (sin cambios)
 ¿Transición?
   Anterior: TRIGGERED
   Actual: TRIGGERED (45 < 50)
-  
-Resultado: ❌ NO envía email (mismo estado)
+
+Resultado:  NO envía email (mismo estado)
 ```
 
-### 📋 TAREA 2: Digest Automático (Daily o Weekly)
+###  TAREA 2: Digest Automático (Daily o Weekly)
 
 **Objetivo:** Enviar resumen de todos los artículos bajo mínimo
 
@@ -165,7 +165,7 @@ MinimumStockDigestConfig:
   3. Marca período como "en vuelo"
   4. Envía email a recipients
   5. Registra last_notified_at
-     
+
 ¿Falla el envío de email?
   → Registra error en last_email_error
   → Próximo ciclo intenta nuevamente
@@ -218,7 +218,7 @@ Loop infinito cada 30s:
 
 Si error no-crítico:
   - Log y continúa
-  
+
 Si error crítico:
   - Log y thread muere (otro server toma control)
 ```
@@ -245,7 +245,7 @@ Si error crítico:
 
 ## Consideraciones Críticas
 
-### ⚠️ Fault Tolerance
+###  Fault Tolerance
 ```
 Server 1: Crashea durante ReconciliationTask
   → Lease expira en 90 segundos
@@ -253,7 +253,7 @@ Server 1: Crashea durante ReconciliationTask
   → Sistema sigue funcionando sin intervención manual
 ```
 
-### ⚠️ Idempotencia
+###  Idempotencia
 ```
 Email_ID = hash(article_id + task_type + timestamp_period)
 
@@ -262,7 +262,7 @@ Si sistema intenta enviar mismo email 2 veces:
   → Sistema detecta y no envía
 ```
 
-### ⚠️ Performance
+###  Performance
 ```
 1,000 artículos × 10 minutos = 100 art/min
   → ~1.7 art/seg
@@ -270,7 +270,7 @@ Si sistema intenta enviar mismo email 2 veces:
   → Sin índices: puede tardar mucho
 ```
 
-### ⚠️ Email Failures
+###  Email Failures
 ```
 SMTP server down:
   → Email falla

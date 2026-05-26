@@ -1,6 +1,6 @@
 # Sistema de Permisos - Documentación
 
-## 📋 Descripción General
+##  Descripción General
 
 El sistema de permisos permite un control granular sobre qué pueden hacer los usuarios en la plataforma. Está diseñado en tres capas:
 
@@ -10,7 +10,7 @@ El sistema de permisos permite un control granular sobre qué pueden hacer los u
 
 ---
 
-## 🎯 Conceptos Clave
+##  Conceptos Clave
 
 ### Módulos
 Son las secciones principales de la plataforma:
@@ -46,7 +46,7 @@ Cada usuario tiene un rol que determina sus permisos iniciales:
 
 ---
 
-## 🔧 Cómo Usar - Guía Admin
+##  Cómo Usar - Guía Admin
 
 ### 1. Ver y Editar Permisos por Rol
 
@@ -59,7 +59,7 @@ Para configurar qué puede hacer cada rol:
 
 **Ejemplo**: Para que el rol "Operario" solo pueda ver y crear movimientos, pero no editar:
 - Módulo: "Movimientos"
-- Acciones: "Ver" ✓, "Crear" ✓, "Editar" ✗, "Eliminar" ✗
+- Acciones: "Ver" , "Crear" , "Editar" , "Eliminar"
 
 ### 2. Personalizar Permisos de Usuario Individual
 
@@ -68,22 +68,22 @@ Para dar permisos específicos a un usuario que va más allá de su rol:
 1. Ve a **Administración de Usuarios > Permisos de Usuarios**
 2. Selecciona el usuario
 3. **Si quieres que HEREDA el rol + tenga permisos extras**:
-   - Marca "Hereda del rol" ✓
+   - Marca "Hereda del rol"
    - En la sección "Permisos de módulos específicos", agrega nuevos módulos/acciones
-   
+
 4. **Si quieres que SOLO tenga permisos específicos**:
-   - Desmarca "Hereda del rol" ✗
+   - Desmarca "Hereda del rol"
    - Define solo los módulos/acciones que necesita
 
-**Ejemplo 1 - Extender permisos**: 
+**Ejemplo 1 - Extender permisos**:
 Usuario "Pepito" es Operario pero necesita acceso a la sección de Reportes:
-- "Hereda del rol" = ✓ (hereda permisos de Operario)
-- Agregar permiso específico: Módulo "Reportes", Acciones: "Ver" ✓, "Exportar" ✓
+- "Hereda del rol" =  (hereda permisos de Operario)
+- Agregar permiso específico: Módulo "Reportes", Acciones: "Ver" , "Exportar"
 
 **Ejemplo 2 - Restringir acceso**:
 Usuario "Juan" es Deposito pero NO debe editar artículos:
-- "Hereda del rol" = ✓
-- Agregar permiso específico: Módulo "Gestión de Stock", Acciones: NINGUNA, Allow = ✗ (esto nega/revoca el acceso)
+- "Hereda del rol" =
+- Agregar permiso específico: Módulo "Gestión de Stock", Acciones: NINGUNA, Allow =  (esto nega/revoca el acceso)
 
 ### 3. Asignar Acceso a Sectores Específicos
 
@@ -97,15 +97,15 @@ Para que un usuario solo tenga acceso a ciertos sectores del almacén:
    - **Editar**: puede modificar artículos en el sector
    - **Eliminar**: puede eliminar artículos en el sector
 
-**Ejemplo**: 
+**Ejemplo**:
 Usuario "Carlos" solo puede ver y editar artículos en el sector "Electrónica":
 - Usuario: Carlos
 - Sector: Electrónica
-- Ver ✓, Editar ✓, Eliminar ✗
+- Ver , Editar , Eliminar
 
 ---
 
-## 💻 Cómo Usar - En el Código (Desarrolladores)
+##  Cómo Usar - En el Código (Desarrolladores)
 
 ### Verificar Permiso en Vistas
 
@@ -170,7 +170,7 @@ def api_modules(request):
 
 ---
 
-## 🎨 Interfaz Admin Mejorada
+##  Interfaz Admin Mejorada
 
 El admin de Django ahora tiene varias mejoras:
 
@@ -182,7 +182,7 @@ El admin de Django ahora tiene varias mejoras:
 
 ### Vista de Sectores
 - Tabla clara de qué usuario puede hacer qué en cada sector
-- Iconos visuales (👁 Ver, ✏ Editar, 🗑 Eliminar)
+- Iconos visuales ( Ver,  Editar,  Eliminar)
 
 ### Configuración de Roles
 - Editor de permisos por rol centralizado
@@ -190,28 +190,28 @@ El admin de Django ahora tiene varias mejoras:
 
 ---
 
-## 📊 Ejemplos de Configuración
+##  Ejemplos de Configuración
 
 ### Caso 1: Operario que solo ve y crea movimientos
 
 1. Rol: **Operario** (ya tiene acceso limitado)
-2. Módulo: **Movimientos** -> Acciones: Ver ✓, Crear ✓
-3. (Otros módulos heredan del rol: Panel ✓, Stock vista, Retiros ✓)
+2. Módulo: **Movimientos** -> Acciones: Ver , Crear
+3. (Otros módulos heredan del rol: Panel , Stock vista, Retiros )
 4. No necesita permisos específicos
 
 ### Caso 2: Depositor que va a hacer auditoría
 
 1. Rol: **Deposito/Panolero**
 2. Módulo existentes: Stock, Movimientos, Retiros, Conteos...
-3. **Agregar permiso específico**: 
-   - Módulo: "Reportes" -> Ver ✓, Exportar ✓
+3. **Agregar permiso específico**:
+   - Módulo: "Reportes" -> Ver , Exportar
 
 ### Caso 3: Usuario temporal que solo ve inventario
 
 1. Rol: **Operario**
 2. Desmarca "Hereda del rol"
 3. **Agregar único permiso específico**:
-   - Módulo: "Panel de Inventario" -> Ver ✓
+   - Módulo: "Panel de Inventario" -> Ver
 4. Solo verá el panel, nada más
 
 ### Caso 4: Revocar acceso temporal
@@ -219,22 +219,22 @@ El admin de Django ahora tiene varias mejoras:
 1. Usuario es **Deposito** pero durante vacaciones no debe editar
 2. Módulo: "Gestión de Stock"
 3. Acciones: ninguna seleccionada
-4. Allow = ✗ (Deniega)
+4. Allow =  (Deniega)
 5. Con esto, revoca el acceso a Stock aunque su rol lo tenga
 
 ---
 
-## ⚠️ Notas Importantes
+##  Notas Importantes
 
 1. **Administradores (is_staff=True)** siempre tienen acceso a todo, sin importar los permisos
 2. **Usuarios inactivos** no tienen acceso a nada
 3. Los cambios de permisos son **instantáneos** (sin necesidad de logout)
 4. Los **permisos específicos son aditivos** si "Hereda del rol" está marcado
-5. Para **denegar acceso**, desactiva todos los permisos en un módulo y marca Allow = ✗
+5. Para **denegar acceso**, desactiva todos los permisos en un módulo y marca Allow =
 
 ---
 
-## 🚀 Desarrollo Futuro
+##  Desarrollo Futuro
 
 Posibles mejoras:
 - [ ] Permisos basados en atributos (campo dinámico)
@@ -246,7 +246,7 @@ Posibles mejoras:
 
 ---
 
-## 📞 Soporte
+##  Soporte
 
 Para problemas o preguntas sobre el sistema de permisos:
 1. Revisa los logs del admin en Django

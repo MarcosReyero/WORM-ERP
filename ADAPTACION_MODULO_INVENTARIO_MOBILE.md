@@ -1,4 +1,4 @@
-# 📱 Adaptación del Módulo de Inventario para Vista Móvil
+#  Adaptación del Módulo de Inventario para Vista Móvil
 
 ## Resumen de Cambios
 
@@ -6,25 +6,25 @@ Se ha adaptado completamente el módulo de inventario para proporcionar una expe
 
 ---
 
-## 🎯 Objetivos Alcanzados
+##  Objetivos Alcanzados
 
-✅ **Vista móvil perfectamente funcional y legible**
+ **Vista móvil perfectamente funcional y legible**
 - Todas las solapas del módulo de inventario son accesibles
 - Contenido bien organizado y fácil de visualizar
 - Todos los controles son accesibles en pantalla pequeña
 
-✅ **Vista de escritorio intacta**
+ **Vista de escritorio intacta**
 - Cero cambios en la experiencia de ordenador
 - Todas las funcionalidades mantienen su layout original
 
-✅ **Accesibilidad táctil mejorada**
+ **Accesibilidad táctil mejorada**
 - Botones con altura mínima de 44px para tocar
 - Campos de formulario optimizados
 - Inputs con tamaño apropiado para evitar zoom en iOS
 
 ---
 
-## 📐 Breakpoints Utilizados
+##  Breakpoints Utilizados
 
 | Breakpoint | Dispositivo | Cambios Principales |
 |-----------|-----------|-------------------|
@@ -35,7 +35,7 @@ Se ha adaptado completamente el módulo de inventario para proporcionar una expe
 
 ---
 
-## 🔧 Cambios de Diseño por Componente
+##  Cambios de Diseño por Componente
 
 ### 1. **Grid Principal (module-page-grid)**
 
@@ -139,24 +139,24 @@ Se ha adaptado completamente el módulo de inventario para proporcionar una expe
 
 ---
 
-## 🎮 Solapas del Módulo de Inventario Adaptadas
+##  Solapas del Módulo de Inventario Adaptadas
 
 ### Vista
-- ✅ **Resumen** - Todos los datos reformateados para móvil
-- ✅ **Stock** - Tablas y filtros optimizados
+-  **Resumen** - Todos los datos reformateados para móvil
+-  **Stock** - Tablas y filtros optimizados
 
 ### Operación
-- ✅ **Movimientos** - Formularios y registros adaptados
-- ✅ **Préstamos** - Tablas y formularios móviles
+-  **Movimientos** - Formularios y registros adaptados
+-  **Préstamos** - Tablas y formularios móviles
 
 ### Control
-- ✅ **Conteos** - Sesiones y formularios en móvil
-- ✅ **Diferencias** - Cola de diferencias optimizada
-- ✅ **Alarmas** - Alertas y configuración en móvil
+-  **Conteos** - Sesiones y formularios en móvil
+-  **Diferencias** - Cola de diferencias optimizada
+-  **Alarmas** - Alertas y configuración en móvil
 
 ---
 
-## 🚀 Características Clave para Móvil
+##  Características Clave para Móvil
 
 ### Accesibilidad Táctil
 - **Altura mínima de botones:** 44px (estándar de accesibilidad iOS)
@@ -175,7 +175,7 @@ Se ha adaptado completamente el módulo de inventario para proporcionar una expe
 
 ---
 
-## 📝 Cambios en CSS
+##  Cambios en CSS
 
 **Archivo modificado:** `frontend/src/index.css`
 
@@ -192,7 +192,7 @@ Se ha adaptado completamente el módulo de inventario para proporcionar una expe
 
 ---
 
-## ✅ Validación en Diferentes Dispositivos
+##  Validación en Diferentes Dispositivos
 
 Para probar la adaptación:
 
@@ -232,7 +232,7 @@ Chrome DevTools → Toggle device toolbar
 
 ---
 
-## 🎨 Clases CSS Principales Utilizadas
+##  Clases CSS Principales Utilizadas
 
 ```css
 /* Base del workspace */
@@ -270,7 +270,7 @@ Chrome DevTools → Toggle device toolbar
 
 ---
 
-## 🔄 No se han modificado archivos JSX
+##  No se han modificado archivos JSX
 
 Todos los cambios son **puramente CSS**. Los componentes React mantienen su estructura original:
 - `InventoryLayout.jsx` - Sin cambios
@@ -284,24 +284,24 @@ Todos los cambios son **puramente CSS**. Los componentes React mantienen su estr
 
 ---
 
-## 📋 Checklist de Funcionalidades
+##  Checklist de Funcionalidades
 
-- ✅ Resumen operativo - Visible y funcional
-- ✅ Stock - Búsqueda y filtros optimizados
-- ✅ Movimientos - Formularios móviles
-- ✅ Préstamos - Tablas y formularios
-- ✅ Conteos - Interfaz móvil
-- ✅ Diferencias - Cola de diferencias visible
-- ✅ Alarmas - Configuración accesible
-- ✅ Botones - Tamaño táctil (44px)
-- ✅ Inputs - Font size apropiado
-- ✅ Tablas - Scroll horizontal
-- ✅ Headers - Sticky en scroll
-- ✅ Desktop - Intacto
+-  Resumen operativo - Visible y funcional
+-  Stock - Búsqueda y filtros optimizados
+-  Movimientos - Formularios móviles
+-  Préstamos - Tablas y formularios
+-  Conteos - Interfaz móvil
+-  Diferencias - Cola de diferencias visible
+-  Alarmas - Configuración accesible
+-  Botones - Tamaño táctil (44px)
+-  Inputs - Font size apropiado
+-  Tablas - Scroll horizontal
+-  Headers - Sticky en scroll
+-  Desktop - Intacto
 
 ---
 
-## 🐛 Notas Técnicas
+##  Notas Técnicas
 
 ### Media Queries Usadas
 ```css
@@ -326,7 +326,7 @@ Todos los cambios son **puramente CSS**. Los componentes React mantienen su estr
 
 ---
 
-## 🚀 Próximos Pasos (Opcionales)
+##  Próximos Pasos (Opcionales)
 
 Si quieres mejorar aún más:
 
@@ -338,7 +338,7 @@ Si quieres mejorar aún más:
 
 ---
 
-## 📞 Soporte
+##  Soporte
 
 Todos los cambios son CSS puro y no afectarán:
 - Backend
@@ -349,4 +349,4 @@ Todos los cambios son CSS puro y no afectarán:
 
 Si encuentras algún problema en una solapa específica, avisame y haré ajustes adicionales.
 
-**¡La adaptación móvil está lista para usar!** 📱✅
+**¡La adaptación móvil está lista para usar!**

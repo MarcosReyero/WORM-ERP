@@ -65,7 +65,7 @@ Opciones:
 
 Guía completa (LAN + HTTPS + PWA): `deploy/GUIA_LAN_HTTPS_PWA.md`
 
-## 🔧 Automatización de Stock Mínimo - Desarrollo
+##  Automatización de Stock Mínimo - Desarrollo
 
 ### Comenzar Quick (Recomendado)
 
@@ -125,7 +125,7 @@ Verás:
 - `lease_acquired` = Scheduler funciona
 - `reconcile_start` = Comenzó reconciliación
 - `reconcile_batch_progress` = Procesó lote de artículos
-- `digest_due` = Es hora de enviar resumen  
+- `digest_due` = Es hora de enviar resumen
 - `digest_send_success` = Email enviado
 - Ctrl+C = `automation_shutdown_signal` + limpieza
 

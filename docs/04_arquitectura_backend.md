@@ -6,23 +6,23 @@ Este diagrama muestra la estructura en capas del backend del módulo de inventar
 
 ```mermaid
 flowchart TB
-    subgraph FRONTEND["🎨 FRONTEND LAYER"]
+    subgraph FRONTEND[" FRONTEND LAYER"]
         F1["InventoryLayout.jsx"]
         F2["Pages:<br/>Overview, Stock,<br/>Movements,<br/>Checkouts, etc."]
         F3["utils.js<br/>Validaciones,<br/>Formateo"]
         F1 --> F2
         F1 --> F3
     end
-    
-    subgraph API["🔌 API REST LAYER"]
+
+    subgraph API[" API REST LAYER"]
         V1["views.py"]
         V2["Decorators:<br/>@require_role<br/>@require_auth"]
         V1 --> V2
         R1["urls.py<br/>Rutas API"]
         R1 --> V1
     end
-    
-    subgraph SERVICES["⚙️ BUSINESS LOGIC LAYER"]
+
+    subgraph SERVICES[" BUSINESS LOGIC LAYER"]
         S1["services.py"]
         S2["CRUD Operations:<br/>create_article<br/>update_article<br/>create_movement<br/>create_checkout"]
         S3["Queries:<br/>current_stock_maps<br/>article_available_stock<br/>build_dashboard"]
@@ -31,8 +31,8 @@ flowchart TB
         S1 --> S3
         S1 --> S4
     end
-    
-    subgraph MODELS["💾 DATA ACCESS LAYER"]
+
+    subgraph MODELS[" DATA ACCESS LAYER"]
         M1["models.py<br/>Django ORM"]
         M2["Article<br/>UnitOfMeasure<br/>ArticleCategory"]
         M3["InventoryBalance<br/>TrackedUnit<br/>InventoryBatch"]
@@ -43,8 +43,8 @@ flowchart TB
         M1 --> M4
         M1 --> M5
     end
-    
-    subgraph AUTO["🤖 AUTOMATION LAYER"]
+
+    subgraph AUTO[" AUTOMATION LAYER"]
         A1["automation.py"]
         A2["InventoryAutomationRunner<br/>Thread"]
         A3["Lease Management<br/>Task Coordination"]
@@ -55,19 +55,19 @@ flowchart TB
         A3 --> A4
         A3 --> A5
     end
-    
-    subgraph DB["🗄️ DATABASE LAYER"]
+
+    subgraph DB[" DATABASE LAYER"]
         D1["PostgreSQL/SQLite"]
         D2["Tables:<br/>inventory_article<br/>inventory_balance<br/>inventory_movement<br/>inventory_checkout<br/>etc."]
         D1 --> D2
     end
-    
-    subgraph EXT["🌐 EXTERNAL SERVICES"]
+
+    subgraph EXT[" EXTERNAL SERVICES"]
         E1["Django Mail"]
         E2["SMTP Server"]
         E1 --> E2
     end
-    
+
     FRONTEND -->|HTTP Requests| API
     API -->|Calls| SERVICES
     SERVICES -->|ORM Queries<br/>Transactions| MODELS
@@ -75,7 +75,7 @@ flowchart TB
     AUTO -->|Periodic Tasks<br/>State Management| MODELS
     AUTO -->|Email Triggers| EXT
     SERVICES -->|Async Events| AUTO
-    
+
     style FRONTEND fill:#f3e5f5
     style API fill:#fce4ec
     style SERVICES fill:#ede7f6
@@ -87,7 +87,7 @@ flowchart TB
 
 ## Descripción de Capas
 
-### 🎨 FRONTEND LAYER
+###  FRONTEND LAYER
 
 **Responsabilidad:** Interfaz de usuario y presentación
 
@@ -107,7 +107,7 @@ flowchart TB
 
 ---
 
-### 🔌 API REST LAYER
+###  API REST LAYER
 
 **Responsabilidad:** Exponer endpoints HTTP seguros
 
@@ -123,10 +123,10 @@ def create_movement(request):
     ...
 
 # Decoradores aplican:
-✓ Autenticación (token/session válido?)
-✓ Autorización (roles correctos?)
-✓ Request parsing (JSON válido?)
-✓ Response formatting (siempre JSON)
+ Autenticación (token/session válido?)
+ Autorización (roles correctos?)
+ Request parsing (JSON válido?)
+ Response formatting (siempre JSON)
 ```
 
 **Endpoints típicos:**
@@ -146,7 +146,7 @@ def create_movement(request):
 
 ---
 
-### ⚙️ BUSINESS LOGIC LAYER
+###  BUSINESS LOGIC LAYER
 
 **Responsabilidad:** Lógica de negocio, validaciones, cálculos
 
@@ -218,7 +218,7 @@ with transaction.atomic():
 
 ---
 
-### 💾 DATA ACCESS LAYER
+###  DATA ACCESS LAYER
 
 **Responsabilidad:** Modelos de datos y interacción con BD
 
@@ -265,7 +265,7 @@ Todos los modelos heredan para auditoría automática.
 
 ---
 
-### 🤖 AUTOMATION LAYER
+###  AUTOMATION LAYER
 
 **Responsabilidad:** Tareas periódicas, alertas automáticas
 
@@ -312,7 +312,7 @@ Solución: Lease en BD con TTL
 
 ---
 
-### 🗄️ DATABASE LAYER
+###  DATABASE LAYER
 
 **Responsabilidad:** Persistencia de datos
 
@@ -340,7 +340,7 @@ CHECK (receiver_person_id IS NOT NULL OR receiver_sector_id IS NOT NULL)
 
 ---
 
-### 🌐 EXTERNAL SERVICES
+###  EXTERNAL SERVICES
 
 **Integración:** Django Mail + SMTP
 
@@ -382,8 +382,8 @@ INVENTORY_ALARM_EMAILS_ENABLED = True
    └─ JSON { article_id, quantity, type, location_id, ... }
 
 3. Backend API Layer (views.py)
-   ├─ Autenticación ✓
-   ├─ Autorización (require_role) ✓
+   ├─ Autenticación
+   ├─ Autorización (require_role)
    └─ Parsea JSON
 
 4. Business Logic Layer (services.py)
@@ -413,7 +413,7 @@ INVENTORY_ALARM_EMAILS_ENABLED = True
 
 ## Principios de Diseño
 
-### 🎯 Separation of Concerns
+###  Separation of Concerns
 ```
 Frontend:  Presenta datos
 API:       Rutea requests
@@ -423,7 +423,7 @@ Auto:      Tareas de fondo
 External:  Integraciones
 ```
 
-### 🔐 Defense in Depth
+###  Defense in Depth
 ```
 Frontend:   Validación básica
 API:        Autenticación + autorización
@@ -431,7 +431,7 @@ Services:   Validaciones complejas
 Models:     Constraints en BD
 ```
 
-### 📊 Scalability
+###  Scalability
 ```
 Cacheado:   Catálogos (categorías, ubicaciones)
 Indices:    Queries frecuentes
@@ -439,7 +439,7 @@ Async:      Emails no bloquean API
 Lease:      Distribuido sin RabbitMQ/Celery
 ```
 
-### 🔍 Auditability
+###  Auditability
 ```
 Todos los cambios quedan registrados
 - Quién hizo qué
@@ -473,7 +473,7 @@ Todos los cambios quedan registrados
          │   PostgreSQL     │
          │  (Shared DB)     │
          └──────────────────┘
-              
+
 Lease ensures:
 - Solo 1 ejecuta tareas a la vez
 - Si 1 muere, otra toma control automáticamente

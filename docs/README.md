@@ -1,22 +1,22 @@
-# 📊 Diagramas del Sistema de Inventario
+#  Diagramas del Sistema de Inventario
 
 Documentación visual de la arquitectura y flujos del módulo de inventario.
 
 ## Índice de Diagramas
 
-### 📐 Arquitectura
+###  Arquitectura
 - **[01_flujo_general.md](./01_flujo_general.md)** - Flujo General del Sistema
   - Estructura completa: usuario → frontend → backend → bd
   - Integración con automatización y emails
   - Todas las vistas principales
 
-### 🖥️ Frontend / UX
+###  Frontend / UX
 - **[07_frontend_ui.md](./07_frontend_ui.md)** - Cambios de UI/UX (móvil + navegación)
 
 ### Performance
 - **[08_optimizacion_performance.md](./08_optimizacion_performance.md)** - Guía de optimización (performance + recursos)
 
-### 🔄 Flujos de Procesos Principales
+###  Flujos de Procesos Principales
 - **[02_flujo_movimientos.md](./02_flujo_movimientos.md)** - Flujo Detallado de Movimiento de Stock
   - Creación de movimientos (ingreso, salida, transferencia)
   - Validaciones transaccionales
@@ -36,7 +36,7 @@ Documentación visual de la arquitectura y flujos del módulo de inventario.
   - Resolución de diferencias
   - Cierre y auditoría
 
-### 🤖 Automatización
+###  Automatización
 - **[03_automatizacion.md](./03_automatizacion.md)** - Ciclo de Automatización de Alertas y Digests
   - InventoryAutomationRunner (Thread)
   - Lease management (control distribuido)
@@ -44,7 +44,7 @@ Documentación visual de la arquitectura y flujos del módulo de inventario.
   - Resumen automático periódico (Digest Task)
   - Idempotencia y fault tolerance
 
-### 🏗️ Componentes y Capas
+###  Componentes y Capas
 - **[04_arquitectura_backend.md](./04_arquitectura_backend.md)** - Arquitectura del Backend
   - Frontend Layer
   - API REST Layer
@@ -54,7 +54,7 @@ Documentación visual de la arquitectura y flujos del módulo de inventario.
   - Database Layer
   - External Services
 
-## 🎯 Cómo Usar Esta Documentación
+##  Cómo Usar Esta Documentación
 
 ### Para Desarrolladores
 - Referencia rápida sobre cómo fluyen los datos
@@ -74,7 +74,7 @@ Documentación visual de la arquitectura y flujos del módulo de inventario.
 - Puntos críticos a validar
 - Escenarios de borde
 
-## 📝 Notas Técnicas
+##  Notas Técnicas
 
 ### Rendering
 - **VS Code**: Instala extensión "Markdown Preview Mermaid Support" y abre la vista previa Markdown (Ctrl+Shift+V)
@@ -87,12 +87,12 @@ Documentación visual de la arquitectura y flujos del módulo de inventario.
 - Commit diagramas cuando hagas cambios arquitectónicos
 
 ### Convenciones de Color
-- 🔵 **Azul claro**: Acciones del usuario
-- 🟣 **Púrpura**: Capas de procesamiento
-- 🟢 **Verde**: Flujos exitosos
-- 🔴 **Rojo**: Alertas y errores
-- 🟡 **Amarillo**: Decisiones/Decisiones
-- 🟠 **Naranja**: Datos/BD
+-  **Azul claro**: Acciones del usuario
+-  **Púrpura**: Capas de procesamiento
+-  **Verde**: Flujos exitosos
+-  **Rojo**: Alertas y errores
+-  **Amarillo**: Decisiones/Decisiones
+-  **Naranja**: Datos/BD
 
 ---
 
