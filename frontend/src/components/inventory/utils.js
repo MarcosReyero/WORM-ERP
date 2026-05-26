@@ -200,10 +200,6 @@ export function getArticleStockLabel(article) {
 }
 
 export function sortArticlesForOverview(left, right) {
-  if (left.low_stock !== right.low_stock) {
-    return left.low_stock ? -1 : 1
-  }
-
   return left.name.localeCompare(right.name, 'es')
 }
 
