@@ -5901,7 +5901,7 @@ def build_movements_export_excel(filters=None):
     for movement in movements:
         sheet.append(
             [
-                movement.get("timestamp") or "",
+                movement_export_datetime(movement.get("timestamp")),
                 movement.get("movement_type_label") or "",
                 movement.get("article") or "",
                 movement.get("quantity"),
@@ -5929,7 +5929,24 @@ def build_movements_export_excel(filters=None):
     for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=4, max_col=4):
         for cell in row:
             cell.number_format = "0.###"
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=1):
+        for cell in row:
+            cell.number_format = "dd/mm/yyyy hh:mm"
 
     output = BytesIO()
     workbook.save(output)
     return f"movimientos-{timezone.localdate().isoformat()}.xlsx", output.getvalue()
+
+
+def movement_export_datetime(value):
+    """Devuelve fecha local naive para que Excel la muestre correctamente."""
+    if not value:
+        return ""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    if timezone.is_aware(value):
+        value = timezone.localtime(value)
+    return value.replace(tzinfo=None)
