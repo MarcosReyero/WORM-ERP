@@ -59,8 +59,12 @@ from .services import (
     return_checkout,
     save_minimum_stock_digest_config,
     save_full_stock_report_config,
+    force_send_minimum_stock_digest,
+    force_send_full_stock_report,
     save_purchasing_minimum_stock_alarm_config,
     save_safety_stock_alert_rule,
+    get_auto_purchase_catalog,
+    save_auto_purchase_config,
     serialize_article,
     serialize_balance,
     serialize_batch,
@@ -757,7 +761,11 @@ def inventory_minimum_stock_digest(request):
         denied = _require_permission(request, "alarms", "change")
         if denied:
             return denied
-        item = save_minimum_stock_digest_config(request.user, parse_json(request))
+        payload = parse_json(request)
+        if payload.get("action") == "send_now":
+            force_send_minimum_stock_digest(request.user)
+            return JsonResponse({"detail": "Resumen enviado correctamente."}, status=200)
+        item = save_minimum_stock_digest_config(request.user, payload)
         return JsonResponse({"detail": "Minimum stock digest saved", "item": item}, status=201)
 
     return _handle_inventory_call(handler)
@@ -782,7 +790,11 @@ def inventory_full_stock_report(request):
         denied = _require_permission(request, "reports", "change")
         if denied:
             return denied
-        item = save_full_stock_report_config(request.user, parse_json(request))
+        payload = parse_json(request)
+        if payload.get("action") == "send_now":
+            force_send_full_stock_report(request.user)
+            return JsonResponse({"detail": "Reporte enviado correctamente."}, status=200)
+        item = save_full_stock_report_config(request.user, payload)
         return JsonResponse({"detail": "Full stock report saved", "item": item}, status=201)
 
     return _handle_inventory_call(handler)
@@ -856,5 +868,40 @@ def purchasing_alarms(request):
 
         item = save_safety_stock_alert_rule(request.user, payload)
         return JsonResponse({"detail": "Purchasing rule saved", "item": item}, status=201)
+
+    return _handle_inventory_call(handler)
+
+
+@require_http_methods(["GET", "POST"])
+def auto_purchase_config(request):
+    """Configuración de solicitudes de compra automáticas por artículo."""
+    if not request.user.is_authenticated:
+        return _unauthorized()
+
+    if request.method == "GET":
+        denied = _require_permission(request, "purchasing", "view")
+        if denied:
+            return denied
+
+        def handler():
+            """Maneja handler."""
+            from .models import ArticleCategory
+            category_id = request.GET.get("category_id")
+            category_id = int(category_id) if category_id and category_id.isdigit() else None
+            categories = list(
+                ArticleCategory.objects.filter(status="active").order_by("name").values("id", "name", "parent_id")
+            )
+            articles = get_auto_purchase_catalog(request.user, category_id=category_id)
+            return JsonResponse({"categories": categories, "articles": articles})
+
+        return _handle_inventory_call(handler)
+
+    def handler():
+        """Maneja handler."""
+        denied = _require_permission(request, "purchasing", "change")
+        if denied:
+            return denied
+        result = save_auto_purchase_config(request.user, parse_json(request))
+        return JsonResponse({"detail": "Configuracion guardada.", "result": result}, status=200)
 
     return _handle_inventory_call(handler)

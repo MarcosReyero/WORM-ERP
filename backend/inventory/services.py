@@ -642,7 +642,7 @@ def apply_balance_delta(article, location, quantity_delta, user, batch=None):
     new_value = balance.on_hand + quantity_delta
     if new_value < 0:
         raise InventoryApiError(
-            f"Not enough stock at {location.name} for {article.name}",
+            f"Stock insuficiente en {location.name} para {article.name}",
             status=400,
         )
     balance.on_hand = new_value
@@ -831,6 +831,149 @@ def _purchase_quantity_for_minimum(article, current_stock):
         if value > 0:
             return value
     return Decimal("1")
+
+
+def create_auto_purchase_request_if_due(article):
+    """
+    Crea una solicitud de compra para un artículo con auto_purchase_request=True
+    si su stock actual está en o por debajo del mínimo y no existe una solicitud abierta.
+    Level-triggered (a diferencia de maybe_create que es edge-triggered).
+    """
+    if article.minimum_stock is None:
+        return None
+
+    open_statuses = {
+        InternalRequest.RequestStatus.DRAFT,
+        InternalRequest.RequestStatus.PENDING,
+        InternalRequest.RequestStatus.APPROVED,
+        InternalRequest.RequestStatus.PARTIAL,
+    }
+
+    with transaction.atomic():
+        locked_article = (
+            Article.objects.select_for_update(of=("self",))
+            .select_related("sector_responsible")
+            .get(pk=article.pk)
+        )
+        if locked_article.minimum_stock is None or not locked_article.auto_purchase_request:
+            return None
+
+        current_stock = current_stock_for_article(locked_article)
+        if current_stock > locked_article.minimum_stock:
+            return None
+
+        already_requested = InternalRequestLine.objects.filter(
+            article=locked_article,
+            request__status__in=open_statuses,
+        ).exists()
+        if already_requested:
+            return None
+
+        requesting_sector = locked_article.sector_responsible
+        if not requesting_sector:
+            return None
+
+        resolved_requester = (
+            Person.objects.filter(status=StatusCatalog.ACTIVE, sector=requesting_sector)
+            .order_by("id")
+            .first()
+        )
+        if not resolved_requester:
+            system_person, _ = Person.objects.get_or_create(
+                dni="SYSTEM-AUTO",
+                defaults={"full_name": "Sistema Automatico", "status": StatusCatalog.ACTIVE},
+            )
+            resolved_requester = system_person
+
+        quantity = _purchase_quantity_for_minimum(locked_article, current_stock)
+        notes = (
+            f"Generada automaticamente por monitoreo de stock minimo.\n"
+            f"Articulo: {locked_article.internal_code}\n"
+            f"Stock actual: {serialize_decimal(current_stock)}\n"
+            f"Stock minimo: {serialize_decimal(locked_article.minimum_stock)}"
+        )
+
+        request = InternalRequest.objects.create(
+            requester=resolved_requester,
+            requesting_sector=requesting_sector,
+            status=InternalRequest.RequestStatus.PENDING,
+            notes=notes,
+        )
+        request.request_number = f"REQ-{timezone.localdate().strftime('%Y%m%d')}-{request.pk:06d}"
+        request.save(update_fields=["request_number"])
+        InternalRequestLine.objects.create(
+            request=request,
+            article=locked_article,
+            quantity_requested=quantity,
+        )
+        return request
+
+
+def get_auto_purchase_catalog(user, category_id=None):
+    """Devuelve artículos activos con su flag auto_purchase_request, opcionalmente filtrados por categoría."""
+    require_role(user, ALARM_ROLES)
+    from django.db.models import Q
+    queryset = (
+        Article.objects.filter(status=Article.ArticleStatus.ACTIVE, minimum_stock__isnull=False)
+        .select_related("category", "subcategory", "sector_responsible")
+        .order_by("name")
+    )
+    if category_id:
+        queryset = queryset.filter(
+            Q(category_id=category_id) | Q(subcategory_id=category_id)
+        )
+    articles = []
+    for a in queryset:
+        current_stock = current_stock_for_article(a)
+        articles.append({
+            "id": a.id,
+            "name": a.name,
+            "internal_code": a.internal_code,
+            "minimum_stock": serialize_decimal(a.minimum_stock),
+            "current_stock": serialize_decimal(current_stock),
+            "low_stock": current_stock <= a.minimum_stock,
+            "auto_purchase_request": a.auto_purchase_request,
+            "category_id": a.category_id,
+            "category_name": a.category.name if a.category else None,
+            "subcategory_id": a.subcategory_id,
+            "subcategory_name": a.subcategory.name if a.subcategory else None,
+            "sector_responsible": a.sector_responsible.name if a.sector_responsible else None,
+        })
+    return articles
+
+
+def save_auto_purchase_config(user, payload):
+    """Actualiza el flag auto_purchase_request en los artículos indicados."""
+    require_role(user, ALARM_ROLES)
+    enable_ids = [int(x) for x in (payload.get("enable_ids") or []) if str(x).isdigit()]
+    disable_ids = [int(x) for x in (payload.get("disable_ids") or []) if str(x).isdigit()]
+    if enable_ids:
+        Article.objects.filter(pk__in=enable_ids).update(auto_purchase_request=True)
+    if disable_ids:
+        Article.objects.filter(pk__in=disable_ids).update(auto_purchase_request=False)
+    return {"enabled": len(enable_ids), "disabled": len(disable_ids)}
+
+
+def run_auto_purchase_requests():
+    """
+    Verifica todos los artículos con auto_purchase_request=True y crea
+    solicitudes de compra para los que estén en o por debajo del stock mínimo.
+    Llamado desde el job de reconciliación.
+    """
+    articles = (
+        Article.objects.filter(
+            auto_purchase_request=True,
+            minimum_stock__isnull=False,
+            status=Article.ArticleStatus.ACTIVE,
+        )
+        .select_related("sector_responsible")
+    )
+    created = 0
+    for article in articles:
+        result = create_auto_purchase_request_if_due(article)
+        if result:
+            created += 1
+    return created
 
 
 def maybe_create_purchase_request_for_minimum_stock(
@@ -1344,53 +1487,72 @@ def resolve_digest_recipients(config):
     }
 
 
+def build_article_alert_excel(article, current_stock_value):
+    """Construye Excel con los datos de un artículo en alerta de stock."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Alerta"
+    columns = (
+        "Codigo interno", "Articulo", "Tipo",
+        "Stock actual", "Stock minimo",
+        "Sector responsable", "Ubicacion principal",
+    )
+    sheet.append(columns)
+    sheet.append([
+        article.internal_code,
+        article.name,
+        article.get_article_type_display(),
+        current_stock_value,
+        article.minimum_stock,
+        article.sector_responsible.name if article.sector_responsible else "",
+        article.primary_location.name if article.primary_location else "",
+    ])
+    sheet.freeze_panes = "A2"
+    column_widths = [18, 34, 20, 14, 14, 22, 22]
+    for index, width in enumerate(column_widths, start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+    for cell in sheet["D2:E2"][0]:
+        cell.number_format = "0.###"
+    output = BytesIO()
+    workbook.save(output)
+    filename = f"alerta-stock-{article.internal_code}-{timezone.localdate().isoformat()}.xlsx"
+    return filename, output.getvalue()
+
+
 def build_minimum_stock_digest_message(config, low_stock_articles):
     """Construye minimum stock digest message."""
     subject = f"[Inventario] Resumen de stock minimo ({len(low_stock_articles)} articulos)"
     lines = [
-        "Resumen automatico de articulos en o por debajo del stock minimo.",
-        "",
-        f"Total afectados: {len(low_stock_articles)}",
-        "",
+        f"Resumen automatico de stock minimo — {timezone.localdate().isoformat()}.",
+        f"Se encontraron {len(low_stock_articles)} articulo(s) en o por debajo del stock minimo.",
+        "El detalle completo se encuentra en el archivo Excel adjunto.",
     ]
-
-    for article in low_stock_articles:
-        lines.extend(
-            [
-                f"- {article['name']} ({article['internal_code']})",
-                f"  Stock actual: {article['current_stock']}",
-                f"  Stock minimo: {article['minimum_stock']}",
-                f"  Sector responsable: {article['sector_responsible'] or 'Sin sector'}",
-                f"  Ubicacion principal: {article['primary_location'] or 'Sin ubicacion'}",
-                "",
-            ]
-        )
-
     if clean_string(config.notes):
-        lines.extend(
-            [
-                "Notas:",
-                config.notes.strip(),
-            ]
-        )
-
-    return subject, "\n".join(lines).strip()
+        lines.extend(["", config.notes.strip()])
+    return subject, "\n".join(lines)
 
 
 def send_minimum_stock_digest_email(config, recipient_emails, low_stock_articles):
-    """Env?a minimum stock digest email."""
+    """Env?a minimum stock digest email con Excel adjunto."""
     if not getattr(settings, "INVENTORY_ALARM_EMAILS_ENABLED", True):
         return False, "El envio por mail esta desactivado en la configuracion."
 
     subject, body = build_minimum_stock_digest_message(config, low_stock_articles)
+    _, report_payload = build_stock_export_excel_from_articles(low_stock_articles)
+    report_filename = f"stock-minimo-{timezone.localdate().isoformat()}.xlsx"
     try:
-        sent = send_mail(
+        message = EmailMessage(
             subject=subject,
-            message=body,
+            body=body,
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
-            recipient_list=recipient_emails,
-            fail_silently=False,
+            to=recipient_emails,
         )
+        message.attach(
+            report_filename,
+            report_payload,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        sent = message.send(fail_silently=False)
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
 
@@ -1616,33 +1778,29 @@ def send_safety_stock_alert_email(alert):
 
     article = alert.article
     current_stock = alert.last_stock_value if alert.last_stock_value is not None else current_stock_for_article(article)
-    location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
     subject = f"[Alarma] Stock minimo alcanzado: {article.name} ({article.internal_code})"
-    body = "\n".join(
-        [
-            "Se activo una alarma automatica por stock minimo.",
-            "",
-            f"Articulo: {article.name}",
-            f"Codigo interno: {article.internal_code}",
-            f"Tipo: {article.get_article_type_display()}",
-            f"Stock actual: {serialize_decimal(current_stock)}",
-            f"Stock minimo: {serialize_decimal(article.minimum_stock)}",
-            f"Sector responsable: {article.sector_responsible.name}",
-            f"Ubicacion principal: {location_name}",
-            "",
-            "Revisa el modulo correspondiente para tomar accion.",
-            alert.notes.strip() if alert.notes.strip() else "",
-        ]
-    ).strip()
+    lines = [
+        f"Alerta automatica de stock minimo — {article.name} ({article.internal_code}).",
+        "El detalle del articulo se encuentra en el archivo Excel adjunto.",
+    ]
+    if alert.notes.strip():
+        lines.extend(["", alert.notes.strip()])
+    body = "\n".join(lines)
 
+    report_filename, report_payload = build_article_alert_excel(article, current_stock)
     try:
-        sent = send_mail(
+        email_msg = EmailMessage(
             subject=subject,
-            message=body,
+            body=body,
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
-            recipient_list=recipients,
-            fail_silently=False,
+            to=recipients,
         )
+        email_msg.attach(
+            report_filename,
+            report_payload,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        sent = email_msg.send(fail_silently=False)
     except Exception as exc:  # noqa: BLE001
         alert.last_email_error = str(exc)
         save_validated(alert)
@@ -1788,33 +1946,29 @@ def send_minimum_stock_alarm_email(config, article, current_stock=None):
         return False
 
     current_stock_value = current_stock if current_stock is not None else current_stock_for_article(article)
-    location_name = article.primary_location.name if article.primary_location else "Sin ubicacion principal"
     subject = f"[Compras] Stock minimo alcanzado: {article.name} ({article.internal_code})"
-    body = "\n".join(
-        [
-            "Se activo una alarma automatica por stock minimo.",
-            "",
-            f"Articulo: {article.name}",
-            f"Codigo interno: {article.internal_code}",
-            f"Tipo: {article.get_article_type_display()}",
-            f"Stock actual: {serialize_decimal(current_stock_value)}",
-            f"Stock minimo: {serialize_decimal(article.minimum_stock)}",
-            f"Sector responsable: {article.sector_responsible.name}",
-            f"Ubicacion principal: {location_name}",
-            "",
-            "Revisa el modulo de Compras para tomar accion.",
-            config.notes.strip() if config.notes.strip() else "",
-        ]
-    ).strip()
+    lines = [
+        f"Alerta automatica de stock minimo — {article.name} ({article.internal_code}).",
+        "El detalle del articulo se encuentra en el archivo Excel adjunto.",
+    ]
+    if config.notes.strip():
+        lines.extend(["", config.notes.strip()])
+    body = "\n".join(lines)
 
+    report_filename, report_payload = build_article_alert_excel(article, current_stock_value)
     try:
-        sent = send_mail(
+        email_msg = EmailMessage(
             subject=subject,
-            message=body,
+            body=body,
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "inventario@erp.local"),
-            recipient_list=recipients,
-            fail_silently=False,
+            to=recipients,
         )
+        email_msg.attach(
+            report_filename,
+            report_payload,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        sent = email_msg.send(fail_silently=False)
     except Exception as exc:  # noqa: BLE001
         config.last_email_error = str(exc)
         save_validated(config)
@@ -2304,6 +2458,33 @@ def save_full_stock_report_config(user, payload):
     return serialize_full_stock_report_config(refreshed_config, save_warning=save_warning)
 
 
+def force_send_minimum_stock_digest(user):
+    """Envía el resumen de stock mínimo de forma manual inmediata."""
+    require_role(user, ALARM_ROLES)
+    config = MinimumStockDigestConfig.objects.filter(key="default").first()
+    if not config:
+        raise InventoryApiError("No hay configuración de resumen. Guardá una primero.")
+    if not config.is_enabled:
+        raise InventoryApiError("El resumen está deshabilitado. Habilitalo antes de enviar.")
+    due_key = f"manual-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+    result = dispatch_minimum_stock_digest(config.id, due_key)
+    if result.get("delivery_status") == MinimumStockDigestConfig.DeliveryStatus.SKIPPED:
+        raise InventoryApiError("No hay artículos con stock bajo en este momento — no se envió nada.")
+    return result
+
+
+def force_send_full_stock_report(user):
+    """Envía el reporte de stock completo de forma manual inmediata."""
+    require_role(user, ALARM_ROLES)
+    config = FullStockReportConfig.objects.filter(key="default").first()
+    if not config:
+        raise InventoryApiError("No hay configuración de reporte. Guardá una primero.")
+    if not config.is_enabled:
+        raise InventoryApiError("El reporte está deshabilitado. Habilitalo antes de enviar.")
+    due_key = f"manual-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+    return dispatch_full_stock_report(config.id, due_key)
+
+
 def dispatch_minimum_stock_digest(config_id, due_key):
     """Maneja dispatch minimum stock digest."""
     config = (
@@ -2469,29 +2650,15 @@ def dispatch_minimum_stock_digest(config_id, due_key):
 
 def build_full_stock_report_message(config, article_count, report_filename, due_key=""):
     """Construye full stock report message."""
-    report_label = ""
-    if due_key and ":" in str(due_key):
-        report_label = due_key.split(":", 1)[1]
-
-    subject_suffix = report_label or timezone.localdate().isoformat()
+    subject_suffix = timezone.localdate().isoformat()
     subject = f"[Inventario] Reporte de stock completo ({subject_suffix})"
     lines = [
-        "Reporte automatico del stock completo (archivo Excel adjunto).",
-        "",
-        f"Total articulos: {article_count}",
-        f"Archivo: {report_filename}",
-        "",
+        f"Reporte automatico de stock completo — {timezone.localdate().isoformat()}.",
+        f"Incluye {article_count} articulo(s). El detalle completo se encuentra en el archivo Excel adjunto.",
     ]
-
     if clean_string(config.notes):
-        lines.extend(
-            [
-                "Notas:",
-                config.notes.strip(),
-            ]
-        )
-
-    return subject, "\n".join(lines).strip()
+        lines.extend(["", config.notes.strip()])
+    return subject, "\n".join(lines)
 
 
 def send_full_stock_report_email(config, recipient_emails, report_filename, report_payload, article_count, due_key=""):

@@ -113,13 +113,6 @@ class Person(AuditedModel):
         blank=True,
         related_name="people",
     )
-    supervisor = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="team_members",
-    )
 
     class Meta:
         ordering = ["full_name"]
@@ -378,6 +371,7 @@ class Article(AuditedModel):
         null=True,
         blank=True,
     )
+    auto_purchase_request = models.BooleanField(default=False)
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.SET_NULL,
