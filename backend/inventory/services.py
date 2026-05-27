@@ -4731,6 +4731,7 @@ def _parse_stock_import_entries(workbook, sheet_name):
     ]
     _EXPORT_NAME_HEADERS = {"articulo", "nombre", "descripcion", "producto", "detalle"}
     _EXPORT_STOCK_HEADERS = {"stock_actual", "stk_actual", "stock", "cantidad", "existencias"}
+    _EXPORT_SAFETY_STOCK_HEADERS = {"stk_seg", "stock_seg", "stock_seguridad", "seguridad", "safety_stock", "seg"}
 
     try:
         name_col = next(i + 1 for i, h in enumerate(header_row) if h in _EXPORT_NAME_HEADERS)
@@ -4741,6 +4742,11 @@ def _parse_stock_import_entries(workbook, sheet_name):
         name_col = 1
         stock_col = 2
         data_start_row = 2
+
+    safety_stock_col = next(
+        (i + 1 for i, h in enumerate(header_row) if h in _EXPORT_SAFETY_STOCK_HEADERS),
+        None,
+    )
 
     for row_number in range(data_start_row, worksheet.max_row + 1):
         raw_name = worksheet.cell(row=row_number, column=name_col).value
@@ -4770,12 +4776,24 @@ def _parse_stock_import_entries(workbook, sheet_name):
         if not key:
             continue
 
+        safety_stock_value = None
+        if safety_stock_col is not None:
+            raw_safety = worksheet.cell(row=row_number, column=safety_stock_col).value
+            if raw_safety not in (None, ""):
+                try:
+                    safety_stock_value = parse_decimal(raw_safety, "stk_seg")
+                    if safety_stock_value < 0:
+                        safety_stock_value = None
+                except InventoryApiError:
+                    safety_stock_value = None
+
         entries.append(
             {
                 "row": row_number,
                 "name": name,
                 "key": key,
                 "stock": stock_value,
+                "safety_stock": safety_stock_value,
             }
         )
 
@@ -4793,6 +4811,7 @@ def _serialize_stock_import_item(item):
         "rows": item["rows"],
         "name": item["name"],
         "excel_stock": str(item["excel_stock"]),
+        "safety_stock": str(item["safety_stock"]) if item.get("safety_stock") is not None else None,
         "decision": item["decision"],
         "detail": item["detail"],
         "article_id": item["article_id"],
@@ -4860,10 +4879,13 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
                 "name": entry["name"],
                 "rows": [],
                 "excel_stock": Decimal("0"),
+                "safety_stock": None,
             },
         )
         bucket["rows"].append(entry["row"])
         bucket["excel_stock"] += entry["stock"]
+        if bucket["safety_stock"] is None and entry.get("safety_stock") is not None:
+            bucket["safety_stock"] = entry["safety_stock"]
 
     # Mapeo de articulos por nombre normalizado.
     article_candidates = {}
@@ -4910,6 +4932,7 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
             "rows": sorted(group["rows"]),
             "name": group["name"],
             "excel_stock": group["excel_stock"],
+            "safety_stock": group.get("safety_stock"),
             "article_id": None,
             "article_name": "",
             "tracking_mode": "",
@@ -5032,6 +5055,12 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
             if not article.primary_location_id:
                 article.primary_location = location
                 article_dirty = True
+
+            if item.get("safety_stock") is not None:
+                new_safety_stock = parse_decimal(item["safety_stock"], "safety_stock")
+                if article.safety_stock != new_safety_stock:
+                    article.safety_stock = new_safety_stock
+                    article_dirty = True
 
             if article.tracking_mode == Article.TrackingMode.UNIT:
                 if (
