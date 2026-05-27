@@ -5060,9 +5060,9 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
                 article_dirty = True
 
             if item.get("safety_stock") is not None:
-                new_safety_stock = parse_decimal(item["safety_stock"], "safety_stock")
-                if article.safety_stock != new_safety_stock:
-                    article.safety_stock = new_safety_stock
+                new_minimum_stock = parse_decimal(item["safety_stock"], "safety_stock")
+                if article.minimum_stock != new_minimum_stock:
+                    article.minimum_stock = new_minimum_stock
                     article_dirty = True
 
             if article.tracking_mode == Article.TrackingMode.UNIT:
