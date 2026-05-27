@@ -4834,7 +4834,7 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
         raise InventoryApiError("Excel file is required")
 
     options = options or {}
-    sheet_name = clean_string(options.get("sheet_name")) or "MAYO 26"
+    sheet_name = clean_string(options.get("sheet_name"))
     missing_policy = clean_string(options.get("missing_policy")) or "leave"
     unmatched_policy = clean_string(options.get("unmatched_policy")) or "skip"
     allow_unit_conversion = parse_boolean(options.get("allow_unit_conversion", True))
@@ -4864,6 +4864,9 @@ def import_stock_from_excel(user, excel_file, mode="preview", options=None):
         workbook = load_workbook(excel_file, data_only=True, read_only=True, keep_links=False)
     except Exception as exc:  # noqa: BLE001
         raise InventoryApiError("Could not read the Excel file") from exc
+
+    if not sheet_name:
+        sheet_name = workbook.active.title if workbook.active else workbook.sheetnames[0]
 
     try:
         raw_entries = _parse_stock_import_entries(workbook, sheet_name)
