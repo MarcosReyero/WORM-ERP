@@ -4773,9 +4773,7 @@ def _parse_stock_import_entries(workbook, sheet_name):
             ) from exc
 
         if stock_value < 0:
-            raise InventoryApiError(
-                f"Fila {row_number}: el stock no puede ser negativo para '{name}'."
-            )
+            stock_value = Decimal("0")
 
         key = _normalize_import_key(name)
         if not key:
