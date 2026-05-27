@@ -4735,7 +4735,12 @@ def _parse_stock_import_entries(workbook, sheet_name):
 
     try:
         name_col = next(i + 1 for i, h in enumerate(header_row) if h in _EXPORT_NAME_HEADERS)
-        stock_col = next(i + 1 for i, h in enumerate(header_row) if h in _EXPORT_STOCK_HEADERS)
+        # Tomar la ULTIMA columna de stock (en planillas tipo pañol hay dos "STK ACTUAL":
+        # la primera es el stock inicial y la ultima es el stock real de cierre).
+        stock_col_matches = [i + 1 for i, h in enumerate(header_row) if h in _EXPORT_STOCK_HEADERS]
+        if not stock_col_matches:
+            raise StopIteration
+        stock_col = stock_col_matches[-1]
         data_start_row = 2
     except StopIteration:
         # Formato simple: col A = nombre, col B = stock, sin encabezado.
